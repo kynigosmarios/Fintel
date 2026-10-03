@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "householdId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["uid", "email", "displayName"]
+    },
+    "Household": {
+      "title": "Household",
+      "description": "Shared household budget group for family members",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "inviteCode": { "type": "string" },
+        "memberUids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name", "ownerId", "inviteCode", "memberUids"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Logged expense in a shared household",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "householdId": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "categoryId": { "type": "number" },
+        "categoryName": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "splitType": { "type": "string" },
+        "memberNamesDisplay": { "type": "string" },
+        "note": { "type": "string" },
+        "createdByUid": { "type": "string" }
+      },
+      "required": ["id", "householdId", "title", "amount", "timestamp", "createdByUid"]
+    }
+  }
+}

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Ambient Glow behind logo -->
+    <path
+        android:pathData="M54,26 L79,47 L79,80 L29,80 L29,47 Z"
+        android:fillColor="#1510B981" />
+
+    <!-- Modern Geometric House Contour (Thick Rounded) -->
+    <path
+        android:pathData="M51.6,27.2 C53.0,26.0 55.0,26.0 56.4,27.2 L78.8,45.8 C79.6,46.4 80.0,47.4 80.0,48.4 L80.0,77.0 C80.0,79.2 78.2,81.0 76.0,81.0 L32.0,81.0 C29.8,81.0 28.0,79.2 28.0,77.0 L28.0,48.4 C28.0,47.4 28.4,46.4 29.2,45.8 Z"
+        android:strokeWidth="5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="26"
+                android:endX="54"
+                android:endY="81"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#3034D399" />
+                <item android:offset="1.0" android:color="#10059669" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Sleek Golden/Emerald Coin Centerpiece -->
+    <path
+        android:pathData="M54,44 A13,13 0 1,0 54,70 A13,13 0 1,0 54,44 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="41"
+                android:startY="44"
+                android:endX="67"
+                android:endY="70"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FDE68A" />
+                <item android:offset="0.5" android:color="#F59E0B" />
+                <item android:offset="1.0" android:color="#D97706" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Coin Inner Ring Border -->
+    <path
+        android:pathData="M54,47.5 A9.5,9.5 0 1,0 54,66.5 A9.5,9.5 0 1,0 54,47.5 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#00000000" />
+
+    <!-- Euro / Omega Symbol inside Coin -->
+    <path
+        android:pathData="M57,51.5 C52.5,51.5 50.0,54.0 50.0,57.0 C50.0,60.0 52.5,62.5 57,62.5 M47.5,55.2 L55.5,55.2 M47.5,58.8 L55.5,58.8"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Left Voice Wave Bars -->
+    <path
+        android:pathData="M18,52 L18,60"
+        android:strokeWidth="3"
+        android:strokeColor="#34D399"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M23,47 L23,65"
+        android:strokeWidth="3.2"
+        android:strokeColor="#6EE7B7"
+        android:strokeLineCap="round" />
+
+    <!-- Right Voice Wave Bars -->
+    <path
+        android:pathData="M85,47 L85,65"
+        android:strokeWidth="3.2"
+        android:strokeColor="#6EE7B7"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M90,52 L90,60"
+        android:strokeWidth="3"
+        android:strokeColor="#34D399"
+        android:strokeLineCap="round" />
+
+    <!-- Modern Roof Apex Accent Dot -->
+    <path
+        android:pathData="M54,21 A3,3 0 1,0 54,27 A3,3 0 1,0 54,21 Z"
+        android:fillColor="#34D399" />
+
+</vector>

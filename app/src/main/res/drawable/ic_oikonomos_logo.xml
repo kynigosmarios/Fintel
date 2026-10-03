@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="40dp"
+    android:height="40dp"
+    android:viewportWidth="40"
+    android:viewportHeight="40">
+
+    <!-- Rounded Squircle Background -->
+    <path
+        android:pathData="M8,0 L32,0 A8,8 0 0,1 40,8 L40,32 A8,8 0 0,1 32,40 L8,40 A8,8 0 0,1 0,32 L0,8 A8,8 0 0,1 8,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="40"
+                android:endY="40"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#064E3B" />
+                <item android:offset="1.0" android:color="#047857" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- House Outline -->
+    <path
+        android:pathData="M19.1,8.9 C19.6,8.4 20.4,8.4 20.9,8.9 L30.2,16.5 C30.7,16.9 31.0,17.4 31.0,18.0 L31.0,30.0 C31.0,31.1 30.1,32.0 29.0,32.0 L11.0,32.0 C9.9,32.0 9.0,31.1 9.0,30.0 L9.0,18.0 C9.0,17.4 9.3,16.9 9.8,16.5 Z"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FFFFFF"
+        android:fillColor="#15FFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Coin Center -->
+    <path
+        android:pathData="M20,18 A5.5,5.5 0 1,0 20,29 A5.5,5.5 0 1,0 20,18 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="15"
+                android:startY="18"
+                android:endX="25"
+                android:endY="29"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FDE68A" />
+                <item android:offset="0.5" android:color="#F59E0B" />
+                <item android:offset="1.0" android:color="#D97706" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Euro Symbol in Coin -->
+    <path
+        android:pathData="M21.5,21.0 C19.5,21.0 18.2,22.2 18.2,23.5 C18.2,24.8 19.5,26.0 21.5,26.0 M17.0,22.8 L20.5,22.8 M17.0,24.2 L20.5,24.2"
+        android:strokeWidth="1.2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- Voice Soundwave Dots / Bars -->
+    <path
+        android:pathData="M4.5,22 L4.5,25"
+        android:strokeWidth="1.8"
+        android:strokeColor="#34D399"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M6.5,20 L6.5,27"
+        android:strokeWidth="1.8"
+        android:strokeColor="#6EE7B7"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M33.5,20 L33.5,27"
+        android:strokeWidth="1.8"
+        android:strokeColor="#6EE7B7"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M35.5,22 L35.5,25"
+        android:strokeWidth="1.8"
+        android:strokeColor="#34D399"
+        android:strokeLineCap="round" />
+
+</vector>

@@ -1,0 +1,121 @@
+package com.example.data.dao
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import com.example.data.entity.Expense
+import com.example.data.entity.ExpenseCategory
+import com.example.data.entity.FamilyMember
+import com.example.data.entity.RecurringExpense
+import com.example.data.entity.SavingsGoal
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ExpenseDao {
+    // Expenses
+    @Query("SELECT * FROM expenses ORDER BY timestamp DESC")
+    fun getAllExpenses(): Flow<List<Expense>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertExpense(expense: Expense): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertExpenses(expenses: List<Expense>)
+
+    @Update
+    suspend fun updateExpense(expense: Expense)
+
+    @Delete
+    suspend fun deleteExpense(expense: Expense)
+
+    @Query("DELETE FROM expenses WHERE id = :id")
+    suspend fun deleteExpenseById(id: Long)
+
+    @Query("SELECT COUNT(*) FROM expenses")
+    suspend fun getExpenseCount(): Int
+
+    // Family Members
+    @Query("SELECT * FROM family_members ORDER BY id ASC")
+    fun getAllMembers(): Flow<List<FamilyMember>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMember(member: FamilyMember): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMembers(members: List<FamilyMember>)
+
+    @Update
+    suspend fun updateMember(member: FamilyMember)
+
+    @Delete
+    suspend fun deleteMember(member: FamilyMember)
+
+    @Query("SELECT COUNT(*) FROM family_members")
+    suspend fun getMemberCount(): Int
+
+    @Query("DELETE FROM family_members")
+    suspend fun deleteAllMembers()
+
+    // Categories
+    @Query("SELECT * FROM expense_categories ORDER BY id ASC")
+    fun getAllCategories(): Flow<List<ExpenseCategory>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCategory(category: ExpenseCategory): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCategories(categories: List<ExpenseCategory>)
+
+    @Update
+    suspend fun updateCategory(category: ExpenseCategory)
+
+    @Delete
+    suspend fun deleteCategory(category: ExpenseCategory)
+
+    @Query("SELECT COUNT(*) FROM expense_categories")
+    suspend fun getCategoryCount(): Int
+
+    @Query("DELETE FROM expense_categories")
+    suspend fun deleteAllCategories()
+
+    // Recurring Expenses
+    @Query("SELECT * FROM recurring_expenses ORDER BY id ASC")
+    fun getAllRecurringExpenses(): Flow<List<RecurringExpense>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecurringExpense(recurring: RecurringExpense): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRecurringExpenses(recurringList: List<RecurringExpense>)
+
+    @Update
+    suspend fun updateRecurringExpense(recurring: RecurringExpense)
+
+    @Delete
+    suspend fun deleteRecurringExpense(recurring: RecurringExpense)
+
+    @Query("SELECT COUNT(*) FROM recurring_expenses")
+    suspend fun getRecurringCount(): Int
+
+    // Savings Goals
+    @Query("SELECT * FROM savings_goals ORDER BY id ASC")
+    fun getAllSavingsGoals(): Flow<List<SavingsGoal>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSavingsGoal(goal: SavingsGoal): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSavingsGoals(goals: List<SavingsGoal>)
+
+    @Update
+    suspend fun updateSavingsGoal(goal: SavingsGoal)
+
+    @Delete
+    suspend fun deleteSavingsGoal(goal: SavingsGoal)
+
+    @Query("SELECT COUNT(*) FROM savings_goals")
+    suspend fun getSavingsGoalCount(): Int
+}
