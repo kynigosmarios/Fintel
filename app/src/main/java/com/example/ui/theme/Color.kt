@@ -27,7 +27,9 @@ val Gold600 = Color(0xFFD97706)
 val Gold500 = Color(0xFFF59E0B)
 val Gold400 = Color(0xFFFBBF24)
 val Gold100 = Color(0xFFFEF3C7)
+val Amber700 = Color(0xFFB45309)
 val Amber600 = Gold600
+val Amber500 = Gold500
 val Amber100 = Gold100
 
 // Slate & Backgrounds

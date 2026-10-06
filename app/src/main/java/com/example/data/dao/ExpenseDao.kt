@@ -9,6 +9,7 @@ import androidx.room.Update
 import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
+import com.example.data.entity.Income
 import com.example.data.entity.RecurringExpense
 import com.example.data.entity.SavingsGoal
 import kotlinx.coroutines.flow.Flow
@@ -16,7 +17,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ExpenseDao {
     // Expenses
-    @Query("SELECT * FROM expenses ORDER BY timestamp DESC")
+    @Query("SELECT * FROM expenses ORDER BY timestamp DESC, id DESC")
     fun getAllExpenses(): Flow<List<Expense>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -33,6 +34,9 @@ interface ExpenseDao {
 
     @Query("DELETE FROM expenses WHERE id = :id")
     suspend fun deleteExpenseById(id: Long)
+
+    @Query("DELETE FROM expenses")
+    suspend fun deleteAllExpenses()
 
     @Query("SELECT COUNT(*) FROM expenses")
     suspend fun getExpenseCount(): Int
@@ -118,4 +122,26 @@ interface ExpenseDao {
 
     @Query("SELECT COUNT(*) FROM savings_goals")
     suspend fun getSavingsGoalCount(): Int
+
+    // Incomes
+    @Query("SELECT * FROM incomes ORDER BY timestamp DESC")
+    fun getAllIncomes(): Flow<List<Income>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertIncome(income: Income): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertIncomes(incomes: List<Income>)
+
+    @Update
+    suspend fun updateIncome(income: Income)
+
+    @Delete
+    suspend fun deleteIncome(income: Income)
+
+    @Query("DELETE FROM incomes WHERE id = :id")
+    suspend fun deleteIncomeById(id: Long)
+
+    @Query("DELETE FROM incomes")
+    suspend fun deleteAllIncomes()
 }

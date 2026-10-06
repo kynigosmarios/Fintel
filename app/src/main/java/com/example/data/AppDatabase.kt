@@ -10,12 +10,13 @@ import com.example.data.dao.ExpenseDao
 import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
+import com.example.data.entity.Income
 import com.example.data.entity.RecurringExpense
 import com.example.data.entity.SavingsGoal
 
 @Database(
-    entities = [Expense::class, FamilyMember::class, ExpenseCategory::class, RecurringExpense::class, SavingsGoal::class],
-    version = 3,
+    entities = [Expense::class, FamilyMember::class, ExpenseCategory::class, RecurringExpense::class, SavingsGoal::class, Income::class],
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -65,6 +66,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `expenses` ADD COLUMN `cloudId` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `incomes` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `cloudId` TEXT NOT NULL DEFAULT '',
+                        `title` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `memberId` INTEGER NOT NULL,
+                        `memberName` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `note` TEXT NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -72,7 +97,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "oikonomos_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration(false)
                     .build()
                 INSTANCE = instance

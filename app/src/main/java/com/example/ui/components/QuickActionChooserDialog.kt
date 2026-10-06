@@ -19,8 +19,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -44,8 +43,7 @@ import com.example.ui.theme.Emerald700
 fun QuickActionChooserDialog(
     onVoiceClick: () -> Unit,
     onManualClick: () -> Unit,
-    onScanReceiptClick: () -> Unit = {},
-    onExportReportClick: () -> Unit = {},
+    onIncomeClick: () -> Unit = {},
     onOpenAppClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -62,7 +60,7 @@ fun QuickActionChooserDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp)
+                    .padding(20.dp)
             ) {
                 // Header
                 Row(
@@ -73,13 +71,13 @@ fun QuickActionChooserDialog(
                     Column {
                         Text(
                             text = "OikoNomos",
-                            fontSize = 18.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "Επιλέξτε τρόπο καταγραφής",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -88,7 +86,7 @@ fun QuickActionChooserDialog(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier
-                            .size(30.dp)
+                            .size(32.dp)
                             .clickable { onDismiss() }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -102,16 +100,16 @@ fun QuickActionChooserDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Option 1: 🎙️ Φωνητική εντολή
+                // Option 1: 🎙️ 1. Φωνητική εντολή
                 QuickActionItem(
                     title = "1. Φωνητική εντολή",
                     subtitle = "Μιλήστε άμεσα (π.χ. «15€ σούπερ μάρκετ»)",
                     icon = Icons.Default.Mic,
                     iconBgColor = Emerald700,
                     iconTint = Color.White,
-                    borderColor = Emerald700.copy(alpha = 0.4f),
+                    borderColor = Emerald700.copy(alpha = 0.45f),
                     testTag = "quick_action_voice_option",
                     onClick = {
                         onDismiss()
@@ -119,16 +117,16 @@ fun QuickActionChooserDialog(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Option 2: ⚡ Γρήγορη καταχώρηση
+                // Option 2: ⚡ 2. Γρήγορη καταχώρηση εξόδου
                 QuickActionItem(
-                    title = "2. Γρήγορη καταχώρηση",
-                    subtitle = "Άμεση καταχώρηση ποσού & κατηγορίας",
+                    title = "2. Καταχώρηση Εξόδου",
+                    subtitle = "Άμεση καταχώρηση ποσού, κατηγορίας & μελών",
                     icon = Icons.Default.FlashOn,
                     iconBgColor = Color(0xFF0284C7),
                     iconTint = Color.White,
-                    borderColor = Color(0xFF0284C7).copy(alpha = 0.4f),
+                    borderColor = Color(0xFF0284C7).copy(alpha = 0.45f),
                     testTag = "quick_action_manual_option",
                     onClick = {
                         onDismiss()
@@ -136,46 +134,29 @@ fun QuickActionChooserDialog(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Option 3: 📸 Σάρωση απόδειξης
+                // Option 3: 💰 3. Καταχώρηση Εσόδου
                 QuickActionItem(
-                    title = "3. Σάρωση απόδειξης",
-                    subtitle = "Φωτογραφία & αυτόματη εξαγωγή ποσού",
-                    icon = Icons.Default.Receipt,
-                    iconBgColor = Color(0xFF8B5CF6),
-                    iconTint = Color.White,
-                    borderColor = Color(0xFF8B5CF6).copy(alpha = 0.4f),
-                    testTag = "quick_action_scan_receipt_option",
-                    onClick = {
-                        onDismiss()
-                        onScanReceiptClick()
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Option 4: 📊 Εξαγωγή Excel / CSV
-                QuickActionItem(
-                    title = "4. Εξαγωγή σε Excel / CSV",
-                    subtitle = "Λήψη ή κοινοποίηση αναφοράς εξόδων",
-                    icon = Icons.Default.TableChart,
+                    title = "3. Καταχώρηση Εσόδου",
+                    subtitle = "Συνεισφορά μέλους (μισθός, ενοίκιο, bonus)",
+                    icon = Icons.Default.TrendingUp,
                     iconBgColor = Color(0xFF059669),
                     iconTint = Color.White,
-                    borderColor = Color(0xFF059669).copy(alpha = 0.4f),
-                    testTag = "quick_action_export_report_option",
+                    borderColor = Color(0xFF059669).copy(alpha = 0.45f),
+                    testTag = "quick_action_income_option",
                     onClick = {
                         onDismiss()
-                        onExportReportClick()
+                        onIncomeClick()
                     }
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Option 5: 🏠 Άνοιγμα εφαρμογής
+                // Option 4: 🏠 4. Άνοιγμα εφαρμογής
                 QuickActionItem(
-                    title = "5. Άνοιγμα εφαρμογής",
-                    subtitle = "Προβολή εξόδων, στόχων, γραφημάτων & ρυθμίσεων",
+                    title = "4. Άνοιγμα εφαρμογής",
+                    subtitle = "Προβολή εξόδων, εσόδων, στατιστικών & ρυθμίσεων",
                     icon = Icons.Default.Dashboard,
                     iconBgColor = MaterialTheme.colorScheme.surfaceVariant,
                     iconTint = MaterialTheme.colorScheme.onSurface,
@@ -212,25 +193,25 @@ private fun QuickActionItem(
             .testTag(testTag)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
                 shape = CircleShape,
                 color = iconBgColor,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(40.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = iconTint,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -238,7 +219,7 @@ private fun QuickActionItem(
             ) {
                 Text(
                     text = title,
-                    fontSize = 13.5.sp,
+                    fontSize = 14.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -247,7 +228,7 @@ private fun QuickActionItem(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    fontSize = 10.5.sp,
+                    fontSize = 11.5.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

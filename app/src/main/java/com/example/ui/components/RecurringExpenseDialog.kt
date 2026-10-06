@@ -44,6 +44,9 @@ import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.RecurringExpense
 import com.example.ui.theme.Emerald700
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.window.DialogProperties
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecurringExpenseDialog(
@@ -69,14 +72,18 @@ fun RecurringExpenseDialog(
 
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .widthIn(max = 480.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -89,7 +96,7 @@ fun RecurringExpenseDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (recurringToEdit == null) "Νέα Πάγια Εντολή" else "Επεξεργασία Πάγιας",
+                        text = if (recurringToEdit == null) "Νέα Πάγια" else "Επεξεργασία Πάγιας",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -104,7 +111,7 @@ fun RecurringExpenseDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Τίτλος (π.χ. Ενοίκιο, Netflix, ΔΕΗ)") },
+                    label = { Text("Τίτλος") },
                     leadingIcon = { Icon(Icons.Default.EventRepeat, contentDescription = null, tint = Emerald700) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -117,7 +124,7 @@ fun RecurringExpenseDialog(
                     OutlinedTextField(
                         value = amountText,
                         onValueChange = { amountText = it },
-                        label = { Text("Ποσό (€)") },
+                        label = { Text("Ποσό") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -127,7 +134,7 @@ fun RecurringExpenseDialog(
                     OutlinedTextField(
                         value = dayOfMonth.toString(),
                         onValueChange = { dayOfMonth = it.toIntOrNull()?.coerceIn(1, 31) ?: 1 },
-                        label = { Text("Ημέρα Μήνα (1-31)") },
+                        label = { Text("Ημέρα Μήνα") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -198,7 +205,12 @@ fun RecurringExpenseDialog(
                         .fillMaxWidth()
                         .height(48.dp)
                 ) {
-                    Text("Αποθήκευση Πάγιας Εντολής", fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Αποθήκευση",
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
         }

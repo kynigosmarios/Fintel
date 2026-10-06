@@ -5,6 +5,7 @@ import com.example.data.dao.ExpenseDao
 import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
+import com.example.data.entity.Income
 import com.example.data.entity.RecurringExpense
 import com.example.data.entity.SavingsGoal
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,7 @@ class ExpenseRepository(
 ) {
 
     val allExpenses: Flow<List<Expense>> = expenseDao.getAllExpenses()
+    val allIncomes: Flow<List<Income>> = expenseDao.getAllIncomes()
     val allMembers: Flow<List<FamilyMember>> = expenseDao.getAllMembers()
     val allCategories: Flow<List<ExpenseCategory>> = expenseDao.getAllCategories()
     val allRecurringExpenses: Flow<List<RecurringExpense>> = expenseDao.getAllRecurringExpenses()
@@ -24,6 +26,13 @@ class ExpenseRepository(
     suspend fun updateExpense(expense: Expense) = expenseDao.updateExpense(expense)
     suspend fun deleteExpense(expense: Expense) = expenseDao.deleteExpense(expense)
     suspend fun deleteExpenseById(id: Long) = expenseDao.deleteExpenseById(id)
+    suspend fun deleteAllExpenses() = expenseDao.deleteAllExpenses()
+
+    suspend fun insertIncome(income: Income): Long = expenseDao.insertIncome(income)
+    suspend fun updateIncome(income: Income) = expenseDao.updateIncome(income)
+    suspend fun deleteIncome(income: Income) = expenseDao.deleteIncome(income)
+    suspend fun deleteIncomeById(id: Long) = expenseDao.deleteIncomeById(id)
+    suspend fun deleteAllIncomes() = expenseDao.deleteAllIncomes()
 
     suspend fun insertMember(member: FamilyMember): Long = expenseDao.insertMember(member)
     suspend fun updateMember(member: FamilyMember) = expenseDao.updateMember(member)
@@ -41,42 +50,14 @@ class ExpenseRepository(
     suspend fun updateSavingsGoal(goal: SavingsGoal) = expenseDao.updateSavingsGoal(goal)
     suspend fun deleteSavingsGoal(goal: SavingsGoal) = expenseDao.deleteSavingsGoal(goal)
 
-    suspend fun seedInitialDataIfEmpty() {
-        val memberCount = expenseDao.getMemberCount()
-        if (memberCount == 0) {
-            val defaultMembers = listOf(
-                FamilyMember(
-                    name = "Μάριος",
-                    role = "Γονέας",
-                    avatarColorHex = 0xFF0284C7,
-                    voiceKeywords = "μάριος, μαριος, μπαμπάς, μπαμπας, πατέρας, πατερας",
-                    isDefault = true
-                ),
-                FamilyMember(
-                    name = "Βασιλική",
-                    role = "Γονέας",
-                    avatarColorHex = 0xFFD946EF,
-                    voiceKeywords = "βασιλική, βασιλικη, μαμά, μαμα, μητέρα, μητερα",
-                    isDefault = true
-                ),
-                FamilyMember(
-                    name = "Γεωργία",
-                    role = "Παιδί",
-                    avatarColorHex = 0xFF10B981,
-                    voiceKeywords = "γεωργία, γεωργια, γιωργια, κόρη, κορη, κορίτσι, κοριτσι",
-                    isDefault = true
-                ),
-                FamilyMember(
-                    name = "Μελίνα",
-                    role = "Παιδί",
-                    avatarColorHex = 0xFFF59E0B,
-                    voiceKeywords = "μελίνα, μελινα, κόρη, κορη, κορίτσι, κοριτσι",
-                    isDefault = true
-                )
-            )
-            expenseDao.insertMembers(defaultMembers)
-        }
+    suspend fun clearAllData() {
+        expenseDao.deleteAllExpenses()
+        expenseDao.deleteAllIncomes()
+        expenseDao.deleteAllMembers()
+        expenseDao.deleteAllCategories()
+    }
 
+    suspend fun seedInitialDataIfEmpty() {
         val categoryCount = expenseDao.getCategoryCount()
         if (categoryCount == 0) {
             val defaultCategories = listOf(
@@ -201,155 +182,6 @@ class ExpenseRepository(
                 )
             )
             expenseDao.insertCategories(defaultCategories)
-        }
-
-        val recurringCount = expenseDao.getRecurringCount()
-        if (recurringCount == 0) {
-            val defaultRecurring = listOf(
-                RecurringExpense(
-                    title = "Ενοίκιο Σπιτιού",
-                    amount = 450.0,
-                    categoryId = 9,
-                    categoryName = "Σπίτι & Λογαριασμοί",
-                    frequency = "MONTHLY",
-                    dayOfMonth = 1,
-                    splitType = "ALL_FAMILY",
-                    memberNamesDisplay = "Κοινό Οικογένειας",
-                    note = "Πάγια εντολή 1η κάθε μήνα"
-                ),
-                RecurringExpense(
-                    title = "Netflix & Συνδρομές",
-                    amount = 14.0,
-                    categoryId = 13,
-                    categoryName = "Διασκέδαση",
-                    frequency = "MONTHLY",
-                    dayOfMonth = 5,
-                    splitType = "ALL_FAMILY",
-                    memberNamesDisplay = "Κοινό Οικογένειας",
-                    note = "Οικογενειακή συνδρομή"
-                ),
-                RecurringExpense(
-                    title = "Κοινόχρηστα Πολυκατοικίας",
-                    amount = 35.0,
-                    categoryId = 9,
-                    categoryName = "Σπίτι & Λογαριασμοί",
-                    frequency = "MONTHLY",
-                    dayOfMonth = 10,
-                    splitType = "ALL_FAMILY",
-                    memberNamesDisplay = "Κοινό Οικογένειας",
-                    note = "Μηνιαία κοινόχρηστα"
-                )
-            )
-            expenseDao.insertRecurringExpenses(defaultRecurring)
-        }
-
-        val savingsCount = expenseDao.getSavingsGoalCount()
-        if (savingsCount == 0) {
-            val defaultGoals = listOf(
-                SavingsGoal(
-                    title = "Καλοκαιρινές Διακοπές",
-                    targetAmount = 1500.0,
-                    currentAmount = 650.0,
-                    deadlineDate = "Ιούνιος 2027",
-                    iconKey = "vacation",
-                    colorHex = 0xFF059669,
-                    note = "Οικογενειακό ταμείο διακοπών"
-                ),
-                SavingsGoal(
-                    title = "Έκτακτο Αποθεματικό Ταμείο",
-                    targetAmount = 1000.0,
-                    currentAmount = 450.0,
-                    deadlineDate = "31/12/2026",
-                    iconKey = "emergency",
-                    colorHex = 0xFF0284C7,
-                    note = "Για απρόβλεπτες ανάγκες και επισκευές"
-                ),
-                SavingsGoal(
-                    title = "Νέο Αυτοκίνητο",
-                    targetAmount = 4000.0,
-                    currentAmount = 1200.0,
-                    deadlineDate = "Δεκέμβριος 2027",
-                    iconKey = "car",
-                    colorHex = 0xFF8B5CF6,
-                    note = "Προκαταβολή οικογενειακού αυτοκινήτου"
-                )
-            )
-            expenseDao.insertSavingsGoals(defaultGoals)
-        }
-
-        val expenseCount = expenseDao.getExpenseCount()
-        if (expenseCount == 0) {
-            val now = System.currentTimeMillis()
-            val dayMs = 86400000L
-            val defaultExpenses = listOf(
-                Expense(
-                    title = "Σούπερ μάρκετ Σκλαβενίτης",
-                    amount = 68.40,
-                    categoryId = 1,
-                    categoryName = "Σούπερ μάρκετ",
-                    timestamp = now - (dayMs * 1),
-                    splitType = "ALL_FAMILY",
-                    memberNamesDisplay = "Κοινό Οικογένειας",
-                    splitAmountPerPerson = 17.10,
-                    note = "Εβδομαδιαία ψώνια τροφίμων"
-                ),
-                Expense(
-                    title = "Βενζίνη EKO",
-                    amount = 40.00,
-                    categoryId = 6,
-                    categoryName = "Βενζίνη",
-                    timestamp = now - (dayMs * 2),
-                    splitType = "ALL_FAMILY",
-                    memberNamesDisplay = "Κοινό Οικογένειας",
-                    splitAmountPerPerson = 10.00,
-                    note = "Ανεφοδιασμός οικογενειακού αυτοκινήτου"
-                ),
-                Expense(
-                    title = "Φαγητό έξω",
-                    amount = 28.50,
-                    categoryId = 3,
-                    categoryName = "Φαγητό έξω",
-                    timestamp = now - (dayMs * 3),
-                    splitType = "ALL_FAMILY",
-                    memberNamesDisplay = "Κοινό Οικογένειας",
-                    splitAmountPerPerson = 7.12,
-                    note = "Οικογενειακό δείπνο"
-                ),
-                Expense(
-                    title = "Καφέδες & Σνακ",
-                    amount = 4.80,
-                    categoryId = 4,
-                    categoryName = "Καφέδες",
-                    timestamp = now - (dayMs * 0),
-                    splitType = "SPECIFIC_MEMBERS",
-                    memberNamesDisplay = "Μάριος & Βασιλική",
-                    splitAmountPerPerson = 2.40,
-                    note = "Πρωινός καφές"
-                ),
-                Expense(
-                    title = "Φαρμακείο",
-                    amount = 14.80,
-                    categoryId = 5,
-                    categoryName = "Υγεία & Φαρμακείο",
-                    timestamp = now - (dayMs * 4),
-                    splitType = "ALL_FAMILY",
-                    memberNamesDisplay = "Κοινό Οικογένειας",
-                    splitAmountPerPerson = 3.70,
-                    note = "Βιταμίνες & παυσίπονα"
-                ),
-                Expense(
-                    title = "Τροφή για γάτες (Pet City)",
-                    amount = 18.50,
-                    categoryId = 10,
-                    categoryName = "Έξοδα γατιών",
-                    timestamp = now - (dayMs * 5),
-                    splitType = "ALL_FAMILY",
-                    memberNamesDisplay = "Κοινό Οικογένειας",
-                    splitAmountPerPerson = 4.62,
-                    note = "Ξηρά τροφή & κονσέρβες"
-                )
-            )
-            expenseDao.insertExpenses(defaultExpenses)
         }
     }
 }

@@ -27,11 +27,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -40,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import com.example.ui.components.OikoNomosLogo
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -118,21 +117,7 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Logo & App Name
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(2.dp, Emerald700.copy(alpha = 0.5f)),
-                shadowElevation = 8.dp,
-                modifier = Modifier.size(80.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_oikonomos_logo),
-                        contentDescription = "OikoNomos Logo",
-                        modifier = Modifier.size(54.dp)
-                    )
-                }
-            }
+            OikoNomosLogo(size = 72.dp)
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -144,8 +129,8 @@ fun AuthScreen(
             )
 
             Text(
-                text = "Έξυπνη διαχείριση εξόδων & οικογενειακός συγχρονισμός",
-                fontSize = 13.sp,
+                text = "Οικογενειακό Εξοδολόγιο",
+                fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -228,9 +213,7 @@ fun AuthScreen(
                             val serverClientId = try {
                                 context.getString(R.string.default_web_client_id)
                             } catch (e: Exception) {
-                                errorMessage = "Δεν βρέθηκε Web Client ID"
-                                isGoogleSigningIn = false
-                                return@OutlinedButton
+                                "351790236571-093q02uts0ju5do0hp4os8el545l8oai.apps.googleusercontent.com"
                             }
 
                             val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = serverClientId).build()
@@ -461,68 +444,7 @@ fun AuthScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Value props / Feature list
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                FeatureBullet(
-                    icon = Icons.Default.Mic,
-                    title = "Φωνητική καταχώρηση",
-                    subtitle = "Μιλήστε φυσικά στα ελληνικά και το έξοδο αποθηκεύεται άμεσα."
-                )
-                FeatureBullet(
-                    icon = Icons.Default.CloudDone,
-                    title = "Κοινό οικογενειακό ταμείο",
-                    subtitle = "Όλα τα μέλη καταγράφουν και βλέπουν τα έξοδα σε πραγματικό χρόνο."
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FeatureBullet(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Emerald700.copy(alpha = 0.12f),
-            modifier = Modifier.size(32.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = Emerald700,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Column {
-            Text(
-                text = title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 15.sp
-            )
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

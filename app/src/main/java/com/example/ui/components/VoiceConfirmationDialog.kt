@@ -111,7 +111,7 @@ fun VoiceConfirmationDialog(
         mutableStateOf(pendingExpense.categoryId)
     }
     var selectedTimestamp by remember(pendingExpense) {
-        mutableLongStateOf(System.currentTimeMillis())
+        mutableLongStateOf(pendingExpense.timestamp)
     }
     var isAllFamily by remember(pendingExpense) {
         mutableStateOf(pendingExpense.splitType == "ALL_FAMILY")

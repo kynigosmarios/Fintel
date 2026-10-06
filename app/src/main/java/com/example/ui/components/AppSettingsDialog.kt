@@ -1,11 +1,7 @@
 package com.example.ui.components
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
-import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,29 +13,34 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.HomeRepairService
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Pin
-import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBrightness
-import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,19 +48,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.Household
 import com.example.ui.theme.Emerald700
-import com.example.widget.OikoNomosWidgetProvider
 import com.google.firebase.auth.FirebaseUser
 
 @Composable
@@ -74,46 +74,78 @@ fun AppSettingsDialog(
     onCreateHousehold: (String) -> Unit,
     onJoinHousehold: (String) -> Unit,
     onSignOut: () -> Unit,
+    onClearAllDataAndSignOut: () -> Unit = {},
     onMessage: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    var widgetAddedMsg by remember { mutableStateOf<String?>(null) }
+    var showResetConfirmDialog by remember { mutableStateOf(false) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .padding(vertical = 12.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .widthIn(max = 420.dp)
                 .testTag("app_settings_dialog"),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(22.dp)
             ) {
-                // Header (Pinned)
+                // Header (Icon + Title + Close Button)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Ρυθμίσεις",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Emerald700.copy(alpha = 0.12f),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = Emerald700,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Ρυθμίσεις Εφαρμογής",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Εμφάνιση & προτιμήσεις",
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
 
                     Surface(
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
                         modifier = Modifier
                             .size(32.dp)
                             .clickable { onDismiss() }
+                            .testTag("app_settings_close_button")
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
@@ -126,7 +158,7 @@ fun AppSettingsDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Scrollable Content
                 Column(
@@ -135,43 +167,181 @@ fun AppSettingsDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // 1. Προφίλ & Οικογενειακός Συγχρονισμός (Google Sign-In & Household)
-                    FamilyCloudSyncCard(
-                        currentUser = currentUser,
-                        household = household,
-                        isSyncing = isSyncing,
-                        onCreateHousehold = onCreateHousehold,
-                        onJoinHousehold = onJoinHousehold,
-                        onSignOut = onSignOut,
-                        onMessage = onMessage
-                    )
-
-                    // 2. Πλακίδιο Επιφάνειας Εργασίας (Desktop Tile / Home Screen Widget)
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                    // 1. Account Summary Card (Spacious, full-width email, no awkward squishing)
+                    if (currentUser != null) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Widgets,
-                                        contentDescription = null,
-                                        tint = Emerald700,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Emerald700,
+                                    modifier = Modifier.size(42.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = currentUser.displayName?.firstOrNull()?.uppercase() ?: "O",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 17.sp
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Πλακίδιο Επιφάνειας Εργασίας",
+                                        text = currentUser.displayName?.ifBlank { null } ?: "Χρήστης OikoNomos",
+                                        fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = currentUser.email ?: "",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
+                                    modifier = Modifier
+                                        .clickable { onSignOut() }
+                                        .testTag("sign_out_button")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                                            contentDescription = "Έξοδος",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Έξοδος",
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Section: Θέμα Εμφάνισης (Theme - 3 Elegant Visual Cards Side by Side)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "ΘΕΜΑ ΕΜΦΑΝΙΣΗΣ",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            letterSpacing = 0.5.sp,
+                            modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ThemeCardOption(
+                                label = "Φωτεινό",
+                                icon = Icons.Default.LightMode,
+                                isSelected = themeMode == "LIGHT",
+                                onClick = { onThemeChange("LIGHT") },
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            ThemeCardOption(
+                                label = "Σκοτεινό",
+                                icon = Icons.Default.DarkMode,
+                                isSelected = themeMode == "DARK",
+                                onClick = { onThemeChange("DARK") },
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            ThemeCardOption(
+                                label = "Σύστημα",
+                                icon = Icons.Default.SettingsBrightness,
+                                isSelected = themeMode == "SYSTEM",
+                                onClick = { onThemeChange("SYSTEM") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // 3. Section: Προτιμήσεις Εκκίνησης (Launch Chooser Toggle)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "ΠΡΟΤΙΜΗΣΕΙΣ",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            letterSpacing = 0.5.sp,
+                            modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Emerald700.copy(alpha = 0.12f),
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Bolt,
+                                            contentDescription = null,
+                                            tint = Emerald700,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Γρήγορη επιλογή κατά την έναρξη",
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Εμφάνιση μενού φωνής/πληκτρολόγησης",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
 
@@ -181,141 +351,145 @@ fun AppSettingsDialog(
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color.White,
                                         checkedTrackColor = Emerald700
-                                    ),
-                                    modifier = Modifier.testTag("launch_with_chooser_switch")
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "Άνοιγμα με μενού 3 επιλογών (Φωνητική, Γρήγορη καταχώρηση, Άνοιγμα εφαρμογής).",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 15.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Pin to Home Screen Button
-                            Button(
-                                onClick = {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                        val appWidgetManager = context.getSystemService(AppWidgetManager::class.java)
-                                        val myProvider = ComponentName(context, OikoNomosWidgetProvider::class.java)
-                                        if (appWidgetManager.isRequestPinAppWidgetSupported) {
-                                            appWidgetManager.requestPinAppWidget(myProvider, null, null)
-                                            widgetAddedMsg = "Επιλέξτε «Προσθήκη» στο παράθυρο που άνοιξε."
-                                        } else {
-                                            widgetAddedMsg = "Κρατήστε παρατεταμένα στην αρχική οθόνη για να βάλετε το Widget."
-                                        }
-                                    } else {
-                                        widgetAddedMsg = "Κρατήστε παρατεταμένα στην αρχική οθόνη για να βάλετε το Widget."
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(44.dp)
-                                    .testTag("pin_widget_button"),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Emerald700,
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PushPin,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Καρφίτσωμα στην Επιφάνεια Εργασίας",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-
-                            if (widgetAddedMsg != null) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = widgetAddedMsg ?: "",
-                                    fontSize = 11.sp,
-                                    color = Emerald700,
-                                    fontWeight = FontWeight.SemiBold
+                                    )
                                 )
                             }
                         }
                     }
 
-                    // 3. Θέμα (Theme) - Beautiful Modern 3-Option Segmented Selector
+                    // 4. Section: Διαχείριση Δεδομένων (Data Reset Row - Sleek & Never Clipped)
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "Θέμα εμφάνισης",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "ΔΙΑΧΕΙΡΙΣΗ ΔΕΔΟΜΕΝΩΝ",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            letterSpacing = 0.5.sp,
+                            modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
 
-                        Row(
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
-                                .padding(4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                .clickable { showResetConfirmDialog = true }
                         ) {
-                            val themeOptions = listOf(
-                                Triple("LIGHT", "Φωτεινό", Icons.Default.LightMode),
-                                Triple("DARK", "Σκοτεινό", Icons.Default.DarkMode),
-                                Triple("SYSTEM", "Σύστημα", Icons.Default.SettingsBrightness)
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteSweep,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
 
-                            themeOptions.forEach { (mode, label, icon) ->
-                                val isSelected = themeMode == mode
-                                ThemeSegmentButton(
-                                    label = label,
-                                    icon = icon,
-                                    isSelected = isSelected,
-                                    onClick = { onThemeChange(mode) },
-                                    modifier = Modifier.weight(1f)
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Εκκαθάριση όλων των δεδομένων",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Διαγραφή τοπικών εξόδων & επαναφορά",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Text(
+                                    text = "Επαναφορά",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                    // Bottom Close button
+                    // 5. Clean Bottom Close Button
                     Button(
                         onClick = onDismiss,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            containerColor = Emerald700,
+                            contentColor = Color.White
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(44.dp)
+                            .height(46.dp)
                     ) {
                         Text(
                             text = "Κλείσιμο",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            fontSize = 14.sp
                         )
                     }
                 }
             }
         }
     }
+
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            shape = RoundedCornerShape(22.dp),
+            title = {
+                Text(
+                    text = "Πλήρης Εκκαθάριση;",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            text = {
+                Text(
+                    text = "Θα διαγραφούν όλα τα τοπικά έξοδα και θα αποσυνδεθείτε από τον λογαριασμό σας ώστε η εφαρμογή να επανέλθει στην αρχική της κατάσταση.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetConfirmDialog = false
+                        onDismiss()
+                        onClearAllDataAndSignOut()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Εκκαθάριση & Αποσύνδεση", fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirmDialog = false }) {
+                    Text("Ακύρωση", fontSize = 12.5.sp)
+                }
+            }
+        )
+    }
 }
 
 @Composable
-private fun ThemeSegmentButton(
+private fun ThemeCardOption(
     label: String,
     icon: ImageVector,
     isSelected: Boolean,
@@ -323,31 +497,48 @@ private fun ThemeSegmentButton(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) Emerald700 else Color.Transparent,
+        shape = RoundedCornerShape(14.dp),
+        color = if (isSelected) Emerald700.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        border = BorderStroke(
+            width = if (isSelected) 1.5.dp else 1.dp,
+            color = if (isSelected) Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        ),
         modifier = modifier
-            .height(42.dp)
+            .height(72.dp)
             .clickable { onClick() }
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+        Column(
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                modifier = Modifier.size(20.dp),
+                tint = if (isSelected) Emerald700 else MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Emerald700,
+                        modifier = Modifier.size(11.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                }
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) Emerald700 else MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

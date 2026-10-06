@@ -81,11 +81,8 @@ class SpeechRecognitionHelper(
                             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Δεν ακούστηκε ομιλία"
                             else -> "Σφάλμα αναγνώρισης ($error)"
                         }
-                        if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                            onError(message)
-                        } else {
-                            onError("Δεν ακούστηκε ομιλία. Πατήστε ξανά ή πληκτρολογήστε το έξοδο.")
-                        }
+                        cancelListening()
+                        onError(message)
                     }
                 }
 
@@ -99,6 +96,7 @@ class SpeechRecognitionHelper(
                         } else {
                             onError("Δεν αναγνωρίστηκε κείμενο.")
                         }
+                        cancelListening()
                     }
                 }
 
@@ -114,7 +112,7 @@ class SpeechRecognitionHelper(
                 putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "el-GR")
                 putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, appContext.packageName)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-                putExtra(RecognizerIntent.EXTRA_PROMPT, "Πείτε το έξοδο στα ελληνικά (π.χ. «15€ σούπερ μάρκετ»)")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Πείτε το έξοδο στα ελληνικά (π.χ. «πέντε σαράντα σούπερ μάρκετ»)")
             }
 
             recognizer.startListening(intent)
@@ -122,7 +120,7 @@ class SpeechRecognitionHelper(
             Log.e(TAG, "Failed to start speech recognition", t)
             mainHandler.post {
                 onListeningStateChanged(false)
-                onError("Η φωνητική αναγνώριση δεν μπόρεσε να ξεκινήσει (${t.localizedMessage ?: "μη διαθέσιμη"}). Δοκιμάστε τα παραδείγματα!")
+                onError("Η φωνητική αναγνώριση δεν μπόρεσε να ξεκινήσει (${t.localizedMessage ?: "μη διαθέσιμη"}).")
             }
         }
     }
@@ -130,9 +128,14 @@ class SpeechRecognitionHelper(
     fun stopListening() {
         try {
             speechRecognizer?.stopListening()
+            mainHandler.post { onListeningStateChanged(false) }
         } catch (t: Throwable) {
             Log.w(TAG, "Error stopping speech recognition", t)
+            cancelListening()
         }
+    }
+
+    fun cancelListening() {
         try {
             speechRecognizer?.cancel()
         } catch (t: Throwable) {

@@ -8,15 +8,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -25,6 +31,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -46,18 +53,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.entity.FamilyMember
 import com.example.ui.theme.Emerald700
 
 val MemberPalette = listOf(
     0xFF0284C7, // Sky Blue
-    0xFFD946EF, // Fuchsia
     0xFF10B981, // Emerald
     0xFFF59E0B, // Amber
+    0xFFEF4444, // Coral / Red
     0xFF8B5CF6, // Purple
+    0xFFD946EF, // Fuchsia
     0xFFEC4899, // Pink
     0xFF06B6D4, // Cyan
-    0xFF84CC16  // Lime
+    0xFF84CC16, // Lime
+    0xFF6366F1  // Indigo
 )
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -77,19 +87,27 @@ fun MemberDialog(
     }
     var errorText by remember { mutableStateOf<String?>(null) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+                .fillMaxWidth(0.95f)
+                .widthIn(max = 500.dp)
+                .fillMaxHeight(0.88f)
+                .padding(vertical = 12.dp)
                 .testTag("member_dialog"),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp)
             ) {
-                // Header
+                // 1. Fixed Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -97,7 +115,7 @@ fun MemberDialog(
                 ) {
                     Text(
                         text = if (memberToEdit == null) "Προσθήκη Μέλους" else "Επεξεργασία Μέλους",
-                        fontSize = 18.sp,
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.Bold,
                         color = Emerald700
                     )
@@ -116,101 +134,165 @@ fun MemberDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Name Input
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = {
-                        name = it
-                        errorText = null
-                    },
-                    label = { Text("Όνομα μέλους (π.χ. Μάριος)") },
+                // 2. Middle Scrollable Form Content
+                Column(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .testTag("member_name_input"),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Role selection
-                Text(text = "Ρόλος:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Γονέας", "Παιδί", "Άλλο").forEach { r ->
-                        FilterChip(
-                            selected = role == r,
-                            onClick = { role = r },
-                            label = { Text(r, fontSize = 12.sp) }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Color picker
-                Text(text = "Χρώμα προφίλ:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                 ) {
-                    MemberPalette.forEach { colorVal ->
-                        val isSelected = selectedColor == colorVal
+                    // Name Input
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = {
+                            name = it
+                            errorText = null
+                        },
+                        label = { Text("Όνομα μέλους (π.χ. Μάριος)") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("member_name_input"),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Role selection
+                    Text(text = "Ρόλος:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf("Γονέας", "Παιδί", "Φίλος/η", "Συνεργάτης", "Άλλο").forEach { r ->
+                            FilterChip(
+                                selected = role == r,
+                                onClick = { role = r },
+                                label = { Text(r, fontSize = 12.sp) }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Color picker - Clickable without showing all options initially
+                    var showColorPalette by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { showColorPalette = !showColorPalette }
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(26.dp)
                                 .clip(CircleShape)
-                                .background(Color(colorVal))
-                                .clickable { selectedColor = colorVal }
-                                .then(
-                                    if (isSelected) Modifier.border(2.dp, Emerald700, CircleShape)
-                                    else Modifier
-                                ),
-                            contentAlignment = Alignment.Center
+                                .background(Color(selectedColor))
+                                .border(1.5.dp, Emerald700, CircleShape)
+                        )
+                        Text(
+                            text = "Επιλογή χρώματος",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = if (showColorPalette) "Απόκρυψη" else "Αλλαγή",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Emerald700
+                        )
+                    }
+
+                    if (showColorPalette) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (isSelected) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                            MemberPalette.forEach { colorVal ->
+                                val isSelected = selectedColor == colorVal
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(colorVal))
+                                        .clickable {
+                                            selectedColor = colorVal
+                                            showColorPalette = false
+                                        }
+                                        .then(
+                                            if (isSelected) Modifier.border(2.dp, Emerald700, CircleShape)
+                                            else Modifier
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Voice keywords
+                    OutlinedTextField(
+                        value = voiceKeywords,
+                        onValueChange = { voiceKeywords = it },
+                        label = { Text("Φωνητικές λέξεις αναγνώρισης") },
+                        placeholder = { Text("π.χ. μπαμπάς, πατέρας, μάριος") },
+                        supportingText = { Text("Διαχωρίστε με κόμμα λέξεις/ψευδώνυμα", fontSize = 11.sp) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        maxLines = 2
+                    )
+
+                    if (errorText != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = errorText ?: "", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Voice keywords
-                OutlinedTextField(
-                    value = voiceKeywords,
-                    onValueChange = { voiceKeywords = it },
-                    label = { Text("Φωνητικές λέξεις αναγνώρισης") },
-                    placeholder = { Text("π.χ. μπαμπάς, πατέρας, μάριος") },
-                    supportingText = { Text("Διαχωρίστε με κόμμα λέξεις/ψευδώνυμα", fontSize = 11.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    maxLines = 2
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(vertical = 10.dp)
                 )
 
-                if (errorText != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(text = errorText ?: "", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Action buttons
+                // 3. Fixed Bottom Action buttons - ALWAYS accessible & visible
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(onClick = onDismiss, shape = RoundedCornerShape(12.dp)) {
-                        Text("Ακύρωση")
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 12.dp, horizontal = 8.dp)
+                    ) {
+                        Text(
+                            text = "Ακύρωση",
+                            maxLines = 1,
+                            softWrap = false,
+                            fontSize = 14.sp
+                        )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
                     Button(
                         onClick = {
                             if (name.isBlank()) {
@@ -226,10 +308,21 @@ fun MemberDialog(
                             )
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("save_member_button")
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .testTag("save_member_button"),
+                        contentPadding = PaddingValues(vertical = 12.dp, horizontal = 8.dp)
                     ) {
-                        Text("Αποθήκευση")
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Αποθήκευση",
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false,
+                            fontSize = 14.sp
+                        )
                     }
                 }
             }

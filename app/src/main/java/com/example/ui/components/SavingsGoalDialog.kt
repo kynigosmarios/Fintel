@@ -35,7 +35,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.entity.SavingsGoal
 import com.example.ui.theme.Emerald700
 
@@ -51,14 +53,18 @@ fun SavingsGoalDialog(
     var deadline by remember { mutableStateOf(goalToEdit?.deadlineDate ?: "Καλοκαίρι 2027") }
     var note by remember { mutableStateOf(goalToEdit?.note ?: "") }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .widthIn(max = 480.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp)
                 .testTag("savings_goal_dialog")
         ) {
             Column(
@@ -72,7 +78,7 @@ fun SavingsGoalDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (goalToEdit == null) "Νέος Στόχος Αποταμίευσης" else "Επεξεργασία Στόχου",
+                        text = if (goalToEdit == null) "Νέος Στόχος" else "Επεξεργασία Στόχου",
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -87,7 +93,7 @@ fun SavingsGoalDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Τίτλος Στόχου (π.χ. Διακοπές, Αυτοκίνητο)") },
+                    label = { Text("Τίτλος") },
                     leadingIcon = { Icon(Icons.Default.Flag, contentDescription = null, tint = Emerald700) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -100,7 +106,7 @@ fun SavingsGoalDialog(
                     OutlinedTextField(
                         value = targetText,
                         onValueChange = { targetText = it },
-                        label = { Text("Στόχος (€)") },
+                        label = { Text("Στόχος") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -110,7 +116,7 @@ fun SavingsGoalDialog(
                     OutlinedTextField(
                         value = currentText,
                         onValueChange = { currentText = it },
-                        label = { Text("Αποταμίευση (€)") },
+                        label = { Text("Αποταμίευση") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -123,7 +129,7 @@ fun SavingsGoalDialog(
                 OutlinedTextField(
                     value = deadline,
                     onValueChange = { deadline = it },
-                    label = { Text("Επιθυμητή Ημερομηνία (π.χ. Ιούνιος 2027)") },
+                    label = { Text("Ημερομηνία") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -134,7 +140,7 @@ fun SavingsGoalDialog(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Σημειώσεις / Περιγραφή") },
+                    label = { Text("Σημειώσεις") },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -156,7 +162,12 @@ fun SavingsGoalDialog(
                         .fillMaxWidth()
                         .height(48.dp)
                 ) {
-                    Text("Αποθήκευση Στόχου", fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Αποθήκευση",
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
         }

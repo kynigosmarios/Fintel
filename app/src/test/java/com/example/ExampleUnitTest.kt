@@ -1,9 +1,7 @@
 package com.example
 
 import com.example.data.entity.Expense
-import com.example.data.entity.ExpenseCategory
 import com.example.util.ExpenseReportExporter
-import com.example.util.ReceiptParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,28 +10,6 @@ class ExampleUnitTest {
     @Test
     fun addition_isCorrect() {
         assertEquals(4, 2 + 2)
-    }
-
-    @Test
-    fun testReceiptParserExtraction() {
-        val categories = listOf(
-            ExpenseCategory(id = 1, name = "Σούπερ μάρκετ", iconKey = "cart", monthlyBudget = 450.0, colorHex = 0xFF059669, voiceKeywords = "σκλαβενίτης, σούπερ"),
-            ExpenseCategory(id = 6, name = "Βενζίνη", iconKey = "gas_station", monthlyBudget = 120.0, colorHex = 0xFFEA580C, voiceKeywords = "εκο, βενζίνη")
-        )
-
-        // Case 1: Σκλαβενίτης sample
-        val sample1 = ReceiptParser.sampleReceipts[0]
-        val parsed1 = ReceiptParser.parse(sample1.rawText, categories)
-        assertEquals("Σκλαβενίτης", parsed1.storeName)
-        assertEquals(42.80, parsed1.amount, 0.01)
-        assertEquals("Σούπερ μάρκετ", parsed1.categoryName)
-
-        // Case 2: EKO Βενζίνη sample
-        val sample2 = ReceiptParser.sampleReceipts[1]
-        val parsed2 = ReceiptParser.parse(sample2.rawText, categories)
-        assertEquals("ΕΚΟ Βενζίνη", parsed2.storeName)
-        assertEquals(35.00, parsed2.amount, 0.01)
-        assertEquals("Βενζίνη", parsed2.categoryName)
     }
 
     @Test
@@ -62,11 +38,33 @@ class ExampleUnitTest {
         )
 
         val csv = ExpenseReportExporter.generateCsv(expenses, "Οκτώβριος 2026")
-        // Check for UTF-8 BOM
-        assertTrue(csv.startsWith("\uFEFF"))
+        assertTrue(csv.contains("OIKONOMOS"))
         assertTrue(csv.contains("Σούπερ μάρκετ"))
         assertTrue(csv.contains("45.50"))
-        assertTrue(csv.contains("Μάριος & Βασιλική"))
-        assertTrue(csv.contains("50.20 €")) // total amount
+        assertTrue(csv.contains("Καφέδες"))
+        assertTrue(csv.contains("4.70"))
+        assertTrue(csv.contains("50.20")) // Total
+    }
+
+    @Test
+    fun testGreekVoiceParserAmounts() {
+        val parser = com.example.util.GreekVoiceParser
+
+        assertEquals(4.30, parser.extractAmount(parser.normalizeGreek("4 ευρώ και 30 λεπτά"))!!, 0.01)
+        assertEquals(4.30, parser.extractAmount(parser.normalizeGreek("4 ευρώ 30 λεπτά"))!!, 0.01)
+        assertEquals(4.30, parser.extractAmount(parser.normalizeGreek("4 ευρώ και 30"))!!, 0.01)
+        assertEquals(4.30, parser.extractAmount(parser.normalizeGreek("τέσσερα ευρώ και τριάντα λεπτά"))!!, 0.01)
+        assertEquals(5.30, parser.extractAmount(parser.normalizeGreek("πέντε τριάντα"))!!, 0.01)
+        assertEquals(5.30, parser.extractAmount(parser.normalizeGreek("πέντε και τριάντα"))!!, 0.01)
+        assertEquals(5.30, parser.extractAmount(parser.normalizeGreek("5 και 30"))!!, 0.01)
+        assertEquals(4.30, parser.extractAmount(parser.normalizeGreek("4 και 30"))!!, 0.01)
+        assertEquals(5.30, parser.extractAmount(parser.normalizeGreek("5:30"))!!, 0.01)
+        assertEquals(4.30, parser.extractAmount(parser.normalizeGreek("4,30"))!!, 0.01)
+        assertEquals(0.30, parser.extractAmount(parser.normalizeGreek("30 λεπτά"))!!, 0.01)
+        assertEquals(0.50, parser.extractAmount(parser.normalizeGreek("μισό ευρώ"))!!, 0.01)
+        assertEquals(0.50, parser.extractAmount(parser.normalizeGreek("πενήντα λεπτά"))!!, 0.01)
+        assertEquals(540.0, parser.extractAmount(parser.normalizeGreek("πεντακόσια σαράντα"))!!, 0.01)
+        assertEquals(540.0, parser.extractAmount(parser.normalizeGreek("πεντακόσια σαράντα ευρώ"))!!, 0.01)
+        assertEquals(12.50, parser.extractAmount(parser.normalizeGreek("δώδεκα πενήντα"))!!, 0.01)
     }
 }

@@ -108,14 +108,25 @@ fun ManualExpenseDialog(
     var showDatePicker by remember { mutableStateOf(false) }
 
     var isAllFamily by remember {
-        mutableStateOf(expenseToEdit == null || expenseToEdit.splitType == "ALL_FAMILY")
+        val hasSpecific = expenseToEdit != null && (
+            expenseToEdit.splitType == "SPECIFIC_MEMBERS" ||
+            (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true))
+        )
+        mutableStateOf(if (expenseToEdit != null) !hasSpecific else true)
     }
 
     val selectedMemberIds = remember {
         val list = mutableStateListOf<Long>()
-        if (expenseToEdit != null && expenseToEdit.splitType != "ALL_FAMILY") {
+        if (expenseToEdit != null) {
             val parsedIds = expenseToEdit.memberIdsCsv.split(",").mapNotNull { it.trim().toLongOrNull() }
-            list.addAll(parsedIds)
+            if (parsedIds.isNotEmpty()) {
+                list.addAll(parsedIds)
+            } else if (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true)) {
+                val matched = members.filter { m -> expenseToEdit.memberNamesDisplay.contains(m.name, ignoreCase = true) }
+                if (matched.isNotEmpty()) list.addAll(matched.map { it.id }) else list.addAll(members.map { it.id })
+            } else {
+                list.addAll(members.map { it.id })
+            }
         } else {
             list.addAll(members.map { it.id })
         }
@@ -148,8 +159,25 @@ fun ManualExpenseDialog(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        datePickerState.selectedDateMillis?.let {
-                            selectedTimestamp = it
+                        datePickerState.selectedDateMillis?.let { utcMillis ->
+                            val cal = java.util.Calendar.getInstance()
+                            val curHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+                            val curMinute = cal.get(java.util.Calendar.MINUTE)
+                            val curSecond = cal.get(java.util.Calendar.SECOND)
+
+                            val utcCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                                timeInMillis = utcMillis
+                            }
+
+                            val targetCal = java.util.Calendar.getInstance().apply {
+                                set(java.util.Calendar.YEAR, utcCal.get(java.util.Calendar.YEAR))
+                                set(java.util.Calendar.MONTH, utcCal.get(java.util.Calendar.MONTH))
+                                set(java.util.Calendar.DAY_OF_MONTH, utcCal.get(java.util.Calendar.DAY_OF_MONTH))
+                                set(java.util.Calendar.HOUR_OF_DAY, curHour)
+                                set(java.util.Calendar.MINUTE, curMinute)
+                                set(java.util.Calendar.SECOND, curSecond)
+                            }
+                            selectedTimestamp = targetCal.timeInMillis
                         }
                         showDatePicker = false
                     }
@@ -553,13 +581,19 @@ fun ManualExpenseDialog(
                                 active.joinToString(" & ") { it.name }
                             }
 
+                            val finalTimestamp = if (isSelectedDateToday && expenseToEdit == null) {
+                                System.currentTimeMillis()
+                            } else {
+                                selectedTimestamp
+                            }
+
                             onSave(
                                 expenseToEdit?.id ?: 0L,
                                 title.trim(),
                                 parsedAmount,
                                 chosenCat.id,
                                 chosenCat.name,
-                                selectedTimestamp,
+                                finalTimestamp,
                                 splitType,
                                 finalMemberIds,
                                 memberDisplay,
@@ -572,7 +606,12 @@ fun ManualExpenseDialog(
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Αποθήκευση", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Αποθήκευση",
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
