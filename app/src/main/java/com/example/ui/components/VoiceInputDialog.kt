@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 
 /**
  * Requirement 6: Voice Recording Dialog.
@@ -61,12 +62,15 @@ import com.example.ui.theme.Emerald700
 @Composable
 fun VoiceInputDialog(
     isListening: Boolean,
+    appLanguage: String = "EL",
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
     onSubmitVoiceText: (String) -> Unit,
     onDismiss: () -> Unit,
     onShowMessage: (String) -> Unit = {}
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
+
     // Automatically start listening immediately when opened
     LaunchedEffect(Unit) {
         onStartListening()
@@ -119,7 +123,7 @@ fun VoiceInputDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Φωνητική Καταχώρηση",
+                        text = Localization.voiceLoggingTitle(lang),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -133,7 +137,7 @@ fun VoiceInputDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Κλείσιμο",
+                            contentDescription = Localization.close(lang),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -182,7 +186,7 @@ fun VoiceInputDialog(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = if (isListening) Icons.Default.GraphicEq else Icons.Default.Mic,
-                                contentDescription = if (isListening) "Ακρόαση σε εξέλιξη" else "Εκκίνηση",
+                                contentDescription = if (isListening) Localization.listeningStatus(lang) else Localization.voiceInput(lang),
                                 tint = if (isListening) Color.White else Emerald700,
                                 modifier = Modifier.size(40.dp)
                             )
@@ -194,7 +198,7 @@ fun VoiceInputDialog(
 
                 // Dynamic Status Text
                 Text(
-                    text = if (isListening) "Σας ακούω... Μιλήστε τώρα!" else "Επεξεργασία...",
+                    text = if (isListening) (if (lang == Localization.Language.ENGLISH) "Listening... Speak now!" else "Σας ακούω... Μιλήστε τώρα!") else (if (lang == Localization.Language.ENGLISH) "Processing..." else "Επεξεργασία..."),
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = if (isListening) Emerald700 else MaterialTheme.colorScheme.onSurface,
@@ -204,7 +208,7 @@ fun VoiceInputDialog(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Μόλις σταματήσετε να μιλάτε, το έξοδο θα εμφανιστεί αυτόματα.",
+                    text = if (lang == Localization.Language.ENGLISH) "Once you stop speaking, the expense will appear automatically." else "Μόλις σταματήσετε να μιλάτε, το έξοδο θα εμφανιστεί αυτόματα.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -213,7 +217,7 @@ fun VoiceInputDialog(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Requirement 6: Stop Button to stop recording whenever the user wants
+                // Stop Button
                 Button(
                     onClick = onStopListening,
                     shape = RoundedCornerShape(14.dp),
@@ -227,13 +231,13 @@ fun VoiceInputDialog(
                 ) {
                     Icon(
                         imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
-                        contentDescription = "Στοπ",
+                        contentDescription = "Stop",
                         tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isListening) "Στοπ & Ολοκλήρωση" else "Δοκιμή ξανά",
+                        text = if (isListening) (if (lang == Localization.Language.ENGLISH) "Stop & Finish" else "Στοπ & Ολοκλήρωση") else Localization.tryAgainAction(lang),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = Color.White
@@ -249,7 +253,7 @@ fun VoiceInputDialog(
                     }
                 ) {
                     Text(
-                        text = "Ακύρωση",
+                        text = Localization.cancel(lang),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )

@@ -8,10 +8,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Emerald400,
-    onPrimary = Emerald900,
+    primary = Emerald500,
+    onPrimary = Color.White,
     primaryContainer = Emerald800,
-    onPrimaryContainer = Emerald100,
+    onPrimaryContainer = Color.White,
     secondary = Teal600,
     onSecondary = Color.White,
     secondaryContainer = Teal700,

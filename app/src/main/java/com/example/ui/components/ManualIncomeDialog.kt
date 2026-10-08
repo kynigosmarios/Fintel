@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Euro
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -61,10 +60,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.entity.FamilyMember
 import com.example.data.entity.Income
-import com.example.ui.theme.Emerald100
-import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -84,6 +83,7 @@ private val DEFAULT_INCOME_CATEGORIES = listOf(
 fun ManualIncomeDialog(
     incomeToEdit: Income?,
     members: List<FamilyMember>,
+    appLanguage: String = "EL",
     onDismiss: () -> Unit,
     onSave: (
         id: Long,
@@ -96,6 +96,8 @@ fun ManualIncomeDialog(
         note: String
     ) -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
+
     var title by remember { mutableStateOf(incomeToEdit?.title ?: "") }
     var amountText by remember {
         mutableStateOf(incomeToEdit?.let { String.format(Locale.US, "%.2f", it.amount) } ?: "")
@@ -128,12 +130,12 @@ fun ManualIncomeDialog(
                     }
                     showDatePicker = false
                 }) {
-                    Text("Επιλογή")
+                    Text(Localization.select(lang))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Ακύρωση")
+                    Text(Localization.cancel(lang))
                 }
             }
         ) {
@@ -141,19 +143,21 @@ fun ManualIncomeDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .padding(10.dp)
-                .testTag("manual_income_dialog"),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .padding(vertical = 16.dp)
+                .testTag("manual_income_dialog")
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .padding(20.dp)
                     .verticalScroll(rememberScrollState())
             ) {
@@ -166,7 +170,7 @@ fun ManualIncomeDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             shape = CircleShape,
-                            color = Color(0xFF10B981).copy(alpha = 0.15f),
+                            color = Color(0xFF059669).copy(alpha = 0.15f),
                             modifier = Modifier.size(36.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -180,7 +184,7 @@ fun ManualIncomeDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = if (incomeToEdit == null) "Καταγραφή Εσόδου" else "Επεξεργασία Εσόδου",
+                            text = if (incomeToEdit == null) Localization.recordIncomeTitle(lang) else Localization.editIncomeTitle(lang),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -188,7 +192,7 @@ fun ManualIncomeDialog(
                     }
 
                     IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Κλείσιμο", modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Close, contentDescription = Localization.close(lang), modifier = Modifier.size(18.dp))
                     }
                 }
 
@@ -201,8 +205,8 @@ fun ManualIncomeDialog(
                         title = it
                         errorMessage = null
                     },
-                    label = { Text("Περιγραφή Εσόδου *") },
-                    placeholder = { Text("π.χ. Μισθός Οκτωβρίου, Ενοίκιο") },
+                    label = { Text(Localization.incomeDescLabel(lang)) },
+                    placeholder = { Text(Localization.incomeDescPlaceholder(lang)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
@@ -218,11 +222,12 @@ fun ManualIncomeDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     listOf("Μισθός", "Ενοίκιο", "Freelance", "Επιδότηση", "Bonus").forEach { sug ->
+                        val translatedSug = Localization.translateCategory(sug, lang)
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.clickable {
-                                title = sug
+                                title = translatedSug
                                 if (selectedCategory == "Μισθός" && sug != "Μισθός") {
                                     selectedCategory = when (sug) {
                                         "Ενοίκιο" -> "Ενοίκιο"
@@ -235,7 +240,7 @@ fun ManualIncomeDialog(
                             }
                         ) {
                             Text(
-                                text = "+ $sug",
+                                text = "+ $translatedSug",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -253,7 +258,7 @@ fun ManualIncomeDialog(
                         amountText = it.replace(',', '.')
                         errorMessage = null
                     },
-                    label = { Text("Ποσό Εσόδου (€) *") },
+                    label = { Text(Localization.incomeAmountLabel(lang)) },
                     placeholder = { Text("0.00") },
                     leadingIcon = {
                         Icon(Icons.Default.Euro, contentDescription = null, tint = Color(0xFF059669))
@@ -273,7 +278,7 @@ fun ManualIncomeDialog(
 
                 // Member Selection (Who brought the income)
                 Text(
-                    text = "ΜΕΛΟΣ ΠΟΥ ΣΥΝΕΙΣΕΦΕΡΕ *",
+                    text = Localization.memberWhoContributed(lang),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.outline
@@ -283,7 +288,7 @@ fun ManualIncomeDialog(
 
                 if (members.isEmpty()) {
                     Text(
-                        text = "Δεν έχουν καταχωρηθεί μέλη. Το έσοδο θα καταχωρηθεί ως Κοινό.",
+                        text = Localization.noMembersIncomeHint(lang),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -324,7 +329,7 @@ fun ManualIncomeDialog(
 
                 // Income Category Selection
                 Text(
-                    text = "ΚΑΤΗΓΟΡΙΑ ΕΣΟΔΟΥ",
+                    text = Localization.incomeCategoryLabel(lang),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.outline
@@ -342,7 +347,7 @@ fun ManualIncomeDialog(
                         FilterChip(
                             selected = isSelected,
                             onClick = { selectedCategory = cat },
-                            label = { Text(cat, fontSize = 12.sp) },
+                            label = { Text(Localization.translateCategory(cat, lang), fontSize = 12.sp) },
                             shape = RoundedCornerShape(10.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Color(0xFF059669).copy(alpha = 0.12f),
@@ -371,10 +376,10 @@ fun ManualIncomeDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.CalendarToday, contentDescription = null, tint = Color(0xFF059669), modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            val dateStr = SimpleDateFormat("dd MMMM yyyy", Locale("el", "GR")).format(Date(selectedTimestamp))
-                            Text(text = "Ημερομηνία: $dateStr", fontSize = 13.sp)
+                            val dateStr = SimpleDateFormat("dd MMMM yyyy", Localization.getDateLocale(lang)).format(Date(selectedTimestamp))
+                            Text(text = "${Localization.dateLabel(lang)} $dateStr", fontSize = 13.sp)
                         }
-                        Text("Αλλαγή", fontSize = 12.sp, color = Color(0xFF059669), fontWeight = FontWeight.Bold)
+                        Text(Localization.changeAction(lang), fontSize = 12.sp, color = Color(0xFF059669), fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -384,8 +389,8 @@ fun ManualIncomeDialog(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Σημείωση (προαιρετικό)") },
-                    placeholder = { Text("π.χ. Κατατέθηκε στην τράπεζα") },
+                    label = { Text(Localization.noteLabel(lang)) },
+                    placeholder = { Text(Localization.notePlaceholder(lang)) },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -408,16 +413,16 @@ fun ManualIncomeDialog(
                     onClick = {
                         val parsedAmount = amountText.toDoubleOrNull()
                         if (title.isBlank()) {
-                            errorMessage = "Παρακαλώ συμπληρώστε περιγραφή εσόδου"
+                            errorMessage = Localization.fillDescriptionError(lang)
                             return@Button
                         }
                         if (parsedAmount == null || parsedAmount <= 0.0) {
-                            errorMessage = "Παρακαλώ συμπληρώστε έγκυρο ποσό"
+                            errorMessage = Localization.fillAmountError(lang)
                             return@Button
                         }
 
                         val member = members.find { it.id == selectedMemberId }
-                        val memberName = member?.name ?: "Μέλος"
+                        val memberName = member?.name ?: (if (lang == Localization.Language.ENGLISH) "Member" else "Μέλος")
 
                         onSave(
                             incomeToEdit?.id ?: 0L,
@@ -431,18 +436,19 @@ fun ManualIncomeDialog(
                         )
                     },
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669), contentColor = Color.White),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                         .testTag("save_income_button")
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (incomeToEdit == null) "Καταχώρηση Εσόδου" else "Αποθήκευση Αλλαγών",
+                        text = if (incomeToEdit == null) Localization.recordNewIncome(lang) else Localization.save(lang),
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.5.sp
+                        fontSize = 14.5.sp,
+                        color = Color.White
                     )
                 }
             }

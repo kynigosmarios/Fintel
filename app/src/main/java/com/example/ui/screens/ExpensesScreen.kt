@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import com.example.util.Localization
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -89,6 +91,10 @@ import com.example.ui.theme.Emerald700
 import com.example.ui.theme.Emerald800
 import com.example.ui.theme.Emerald900
 import com.example.ui.theme.Emerald950
+import com.example.ui.theme.HeroEmeraldGradient
+import com.example.ui.theme.GlassBorderBrush
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -112,6 +118,7 @@ fun ExpensesScreen(
     selectedMemberFilter: Long?,
     selectedCategoryFilter: Long?,
     searchQuery: String,
+    appLanguage: String = "EL",
     onMemberFilterChange: (Long?) -> Unit,
     onCategoryFilterChange: (Long?) -> Unit,
     onSearchQueryChange: (String) -> Unit,
@@ -125,8 +132,10 @@ fun ExpensesScreen(
     onExportExcel: () -> Unit = {},
     onExportPdf: () -> Unit = {},
     onShareReport: () -> Unit = {},
+    isInitialLoading: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
     var incomeToDelete by remember { mutableStateOf<Income?>(null) }
     var activeViewMode by remember { mutableStateOf(0) } // 0 = Expenses, 1 = Incomes
@@ -140,9 +149,9 @@ fun ExpensesScreen(
     var showCategoryDropdown by remember { mutableStateOf(false) }
 
     val currentMonthKey = remember { SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date()) }
-    val currentMonthLabel = remember {
+    val currentMonthLabel = remember(lang) {
         val cal = java.util.Calendar.getInstance()
-        SimpleDateFormat("LLLL yyyy", Locale.forLanguageTag("el-GR")).format(cal.time).replaceFirstChar { it.uppercase() }
+        SimpleDateFormat("LLLL yyyy", Localization.getDateLocale(lang)).format(cal.time).replaceFirstChar { it.uppercase() }
     }
 
     // Extract available year-month strings from expenses
@@ -159,14 +168,14 @@ fun ExpensesScreen(
     fun getMonthLabel(key: String): String {
         return try {
             val date = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(key) ?: Date()
-            SimpleDateFormat("LLLL yyyy", Locale.forLanguageTag("el-GR")).format(date).replaceFirstChar { it.uppercase() }
+            SimpleDateFormat("LLLL yyyy", Localization.getDateLocale(lang)).format(date).replaceFirstChar { it.uppercase() }
         } catch (e: Exception) {
             key
         }
     }
 
     val activePeriodDisplay = when (selectedPeriodKey) {
-        "ALL" -> "Όλα μαζί"
+        "ALL" -> Localization.allMonthsCombined(lang)
         "CURRENT_MONTH", null -> currentMonthLabel
         else -> getMonthLabel(selectedPeriodKey!!)
     }
@@ -211,13 +220,13 @@ fun ExpensesScreen(
     val collapsedMonths = remember { mutableStateMapOf<String, Boolean>() }
 
     // Group periodFilteredExpenses into Months & Days
-    val expensesByMonth = remember(periodFilteredExpenses) {
+    val expensesByMonth = remember(periodFilteredExpenses, lang) {
         val monthKeyFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-        val monthDisplayFormat = SimpleDateFormat("LLLL yyyy", Locale.forLanguageTag("el-GR"))
+        val monthDisplayFormat = SimpleDateFormat("LLLL yyyy", Localization.getDateLocale(lang))
         val dayDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val todayStr = dayDateFormat.format(Date())
         val yesterdayStr = dayDateFormat.format(Date(System.currentTimeMillis() - 24L * 3600 * 1000))
-        val dayDisplayFormat = SimpleDateFormat("EEEE, d MMMM", Locale.forLanguageTag("el-GR"))
+        val dayDisplayFormat = SimpleDateFormat("EEEE, d MMMM", Localization.getDateLocale(lang))
 
         // Sort all expenses by entry timestamp descending first
         val sortedExpenses = periodFilteredExpenses.sortedWith(
@@ -241,8 +250,8 @@ fun ExpensesScreen(
                 groupedByDayKey.keys.sortedDescending().forEach { dayKey ->
                     val dayExpenses = groupedByDayKey[dayKey] ?: emptyList()
                     val headerTitle = when (dayKey) {
-                        todayStr -> "Σήμερα"
-                        yesterdayStr -> "Χθες"
+                        todayStr -> Localization.today(lang)
+                        yesterdayStr -> Localization.yesterday(lang)
                         else -> {
                             val firstExp = dayExpenses.firstOrNull()
                             if (firstExp != null) {
@@ -274,25 +283,45 @@ fun ExpensesScreen(
     ) {
         // Modern Neo-Fintech Hero Monthly Card
         item {
+            val expenseTabColor by animateColorAsState(
+                targetValue = if (activeViewMode == 0) Emerald500 else Color.Transparent,
+                animationSpec = tween(220),
+                label = "expense_tab_color"
+            )
+            val incomeTabColor by animateColorAsState(
+                targetValue = if (activeViewMode == 1) Emerald500 else Color.Transparent,
+                animationSpec = tween(220),
+                label = "income_tab_color"
+            )
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .testTag("monthly_summary_card"),
-                shape = RoundedCornerShape(26.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                shape = RoundedCornerShape(28.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                border = BorderStroke(1.2.dp, GlassBorderBrush)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(Emerald950, Emerald900, Emerald800)
-                            )
-                        )
+                        .background(HeroEmeraldGradient)
                         .padding(22.dp)
                 ) {
+                    // Ambient radial glow in top corner
+                    Box(
+                        modifier = Modifier
+                            .size(150.dp)
+                            .align(Alignment.TopEnd)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(Emerald400.copy(alpha = 0.25f), Color.Transparent)
+                                ),
+                                shape = CircleShape
+                            )
+                    )
+
                     Column {
                         // Top row: Clickable Month Badge with Dropdown + Manual Add Button
                         Row(
@@ -300,42 +329,37 @@ fun ExpensesScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Requirement 3: "Έξοδα μήνα" with month/year/all selector
+                            // Month/year selector badge
                             Box {
-                                Column(
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color.White.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
                                         .clickable { showPeriodDropdown = true }
-                                        .padding(vertical = 2.dp)
                                 ) {
-                                    Text(
-                                        text = "Έξοδα μήνα",
-                                        color = Emerald300,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
                                     Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(7.dp)
+                                                .size(8.dp)
                                                 .clip(CircleShape)
-                                                .background(if (budgetProgress > 0.9f) Color(0xFFF87171) else Emerald400)
+                                                .background(if (budgetProgress > 0.9f) Color(0xFFF87171) else Emerald300)
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = activePeriodDisplay,
                                             color = Color.White,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.ExtraBold
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Icon(
                                             imageVector = Icons.Default.ArrowDropDown,
-                                            contentDescription = "Επιλογή μήνα και έτους",
-                                            tint = Emerald300,
+                                            contentDescription = Localization.selectMonthYear(lang),
+                                            tint = Emerald200,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -351,7 +375,7 @@ fun ExpensesScreen(
                                         },
                                         text = {
                                             Text(
-                                                text = "Όλα μαζί (Όλοι οι μήνες)",
+                                                text = Localization.allMonthsCombined(lang),
                                                 fontWeight = if (selectedPeriodKey == "ALL") FontWeight.Bold else FontWeight.Normal
                                             )
                                         },
@@ -367,7 +391,7 @@ fun ExpensesScreen(
                                         },
                                         text = {
                                             Text(
-                                                text = "Τρέχων Μήνας ($currentMonthLabel)",
+                                                text = "${Localization.currentMonth(lang)} ($currentMonthLabel)",
                                                 fontWeight = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == currentMonthKey) FontWeight.Bold else FontWeight.Normal
                                             )
                                         },
@@ -399,154 +423,222 @@ fun ExpensesScreen(
                             // Modern glass manual add button
                             Surface(
                                 shape = RoundedCornerShape(13.dp),
-                                color = Emerald500.copy(alpha = 0.25f),
-                                border = BorderStroke(1.dp, Emerald400.copy(alpha = 0.4f)),
+                                color = Emerald500.copy(alpha = 0.28f),
+                                border = BorderStroke(1.dp, Emerald300.copy(alpha = 0.5f)),
                                 modifier = Modifier.clickable {
                                     if (activeViewMode == 0) onAddManualExpense() else onAddManualIncome()
                                 }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Add,
                                         contentDescription = null,
                                         tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(17.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = if (activeViewMode == 0) "Έξοδο" else "Έσοδο",
+                                        text = if (activeViewMode == 0) Localization.singleExpense(lang) else Localization.singleIncome(lang),
                                         color = Color.White,
-                                        fontSize = 15.sp,
+                                        fontSize = 14.5.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(18.dp))
 
-                        // Triple Financial Snapshot: Έσοδα, Έξοδα, Υπόλοιπο
-                        Row(
+                        // Center: Prominent Net Balance (Copilot / Revolut style)
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // Incomes
+                            Text(
+                                text = Localization.netBalanceLabel(lang),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp,
+                                color = Emerald200.copy(alpha = 0.9f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = String.format(Locale.US, "%s%.2f €", if (netBalance >= 0) "+" else "", netBalance),
+                                fontSize = 32.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White,
+                                letterSpacing = (-0.5).sp,
+                                maxLines = 1,
+                                softWrap = false
+                            )
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color(0xFF10B981).copy(alpha = 0.20f),
-                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.40f)),
-                                modifier = Modifier.weight(1f)
+                                shape = RoundedCornerShape(20.dp),
+                                color = (if (netBalance >= 0) Color(0xFF10B981) else Color(0xFFEF4444)).copy(alpha = 0.22f),
+                                border = BorderStroke(1.dp, (if (netBalance >= 0) Color(0xFF34D399) else Color(0xFFFCA5A5)).copy(alpha = 0.35f)),
+                                modifier = Modifier.padding(top = 6.dp)
                             ) {
-                                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
-                                    Text(
-                                        text = "Έσοδα",
-                                        fontSize = 13.5.sp,
-                                        color = Emerald200,
-                                        fontWeight = FontWeight.Bold
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (netBalance >= 0) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                        contentDescription = null,
+                                        tint = if (netBalance >= 0) Color(0xFF6EE7B7) else Color(0xFFFCA5A5),
+                                        modifier = Modifier.size(13.dp)
                                     )
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.width(5.dp))
                                     Text(
-                                        text = String.format(Locale.US, "%.2f €", totalIncome),
-                                        fontSize = 17.5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = Color(0xFF6EE7B7),
-                                        maxLines = 1,
-                                        softWrap = false
+                                        text = if (netBalance >= 0) Localization.withinBudget(lang) else Localization.overBudget(lang),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (netBalance >= 0) Color(0xFF6EE7B7) else Color(0xFFFCA5A5)
                                     )
                                 }
                             }
+                        }
 
-                            // Expenses
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // Dual Breakdown Capsules: Incomes vs Expenses
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Incomes Pill
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color(0xFF10B981).copy(alpha = 0.18f),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFF10B981).copy(alpha = 0.30f),
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.TrendingUp,
+                                                contentDescription = null,
+                                                tint = Color(0xFF6EE7B7),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = Localization.income(lang),
+                                            fontSize = 11.5.sp,
+                                            color = Emerald200,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = String.format(Locale.US, "%.2f €", totalIncome),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color.White,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Expenses Pill
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
                                 color = Color(0xFFEF4444).copy(alpha = 0.18f),
                                 border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f)),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
-                                    Text(
-                                        text = "Έξοδα",
-                                        fontSize = 13.5.sp,
-                                        color = Color(0xFFFCA5A5),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = String.format(Locale.US, "%.2f €", totalSpend),
-                                        fontSize = 17.5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = Color.White,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                            }
-
-                            // Balance
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = (if (netBalance >= 0) Color(0xFF10B981) else Color(0xFFEF4444)).copy(alpha = 0.20f),
-                                border = BorderStroke(1.dp, (if (netBalance >= 0) Color(0xFF10B981) else Color(0xFFEF4444)).copy(alpha = 0.40f)),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp)) {
-                                    Text(
-                                        text = "Υπόλοιπο",
-                                        fontSize = 13.5.sp,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = String.format(Locale.US, "%s%.2f €", if (netBalance >= 0) "+" else "", netBalance),
-                                        fontSize = 17.5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = if (netBalance >= 0) Color(0xFF6EE7B7) else Color(0xFFFCA5A5),
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(0xFFEF4444).copy(alpha = 0.30f),
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.TrendingDown,
+                                                contentDescription = null,
+                                                tint = Color(0xFFFCA5A5),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = Localization.expenses(lang),
+                                            fontSize = 11.5.sp,
+                                            color = Color(0xFFFCA5A5),
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = String.format(Locale.US, "%.2f €", totalSpend),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color.White,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        // Switcher Segment: Έξοδα / Έσοδα
+                        // Switcher Segment: Έξοδα / Έσοδα (with smooth animated pill)
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                             color = Color.White.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(modifier = Modifier.padding(4.dp)) {
                                 Surface(
-                                    shape = RoundedCornerShape(9.dp),
-                                    color = if (activeViewMode == 0) Emerald500 else Color.Transparent,
-                                    modifier = Modifier.weight(1f).clickable { activeViewMode = 0 }
+                                    shape = RoundedCornerShape(11.dp),
+                                    color = expenseTabColor,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { activeViewMode = 0 }
                                 ) {
                                     Text(
-                                        text = "💸 Έξοδα (${periodFilteredExpenses.size})",
+                                        text = Localization.expensesCount(lang, periodFilteredExpenses.size),
                                         color = Color.White,
-                                        fontSize = 12.5.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = if (activeViewMode == 0) FontWeight.ExtraBold else FontWeight.Medium,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 7.dp)
+                                        modifier = Modifier.padding(vertical = 8.dp)
                                     )
                                 }
                                 Surface(
-                                    shape = RoundedCornerShape(9.dp),
-                                    color = if (activeViewMode == 1) Emerald500 else Color.Transparent,
-                                    modifier = Modifier.weight(1f).clickable { activeViewMode = 1 }
+                                    shape = RoundedCornerShape(11.dp),
+                                    color = incomeTabColor,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { activeViewMode = 1 }
                                 ) {
                                     Text(
-                                        text = "💰 Έσοδα (${periodFilteredIncomes.size})",
+                                        text = Localization.incomesCount(lang, periodFilteredIncomes.size),
                                         color = Color.White,
-                                        fontSize = 12.5.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = if (activeViewMode == 1) FontWeight.ExtraBold else FontWeight.Medium,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 7.dp)
+                                        modifier = Modifier.padding(vertical = 8.dp)
                                     )
                                 }
                             }
@@ -562,7 +654,7 @@ fun ExpensesScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Υπόλοιπο Budget: ${String.format(Locale.US, "%.2f €", remainingBudget)}",
+                                    text = "${Localization.remainingBudgetPrefix(lang)} ${String.format(Locale.US, "%.2f €", remainingBudget)}",
                                     color = Emerald100,
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Medium
@@ -572,7 +664,7 @@ fun ExpensesScreen(
                                     color = Color.White.copy(alpha = 0.12f)
                                 ) {
                                     Text(
-                                        text = "${(budgetProgress * 100).toInt()}% του budget",
+                                        text = "${(budgetProgress * 100).toInt()}% ${Localization.ofBudget(lang)}",
                                         color = Color.White,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
@@ -616,7 +708,7 @@ fun ExpensesScreen(
                                             )
                                             Spacer(modifier = Modifier.width(5.dp))
                                             Text(
-                                                text = "Κοινά Σπιτιού",
+                                                text = Localization.commonHousehold(lang),
                                                 color = Emerald100,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Medium
@@ -648,7 +740,7 @@ fun ExpensesScreen(
                                             )
                                             Spacer(modifier = Modifier.width(5.dp))
                                             Text(
-                                                text = "Ατομικά",
+                                                text = Localization.individualPersonal(lang),
                                                 color = Emerald100,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Medium
@@ -677,14 +769,14 @@ fun ExpensesScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
-                    placeholder = { Text("Αναζήτηση εξόδου, μέλους, ποσού...", fontSize = 13.sp) },
+                    placeholder = { Text(Localization.searchExpensesPlaceholder(lang), fontSize = 13.sp) },
                     leadingIcon = {
                         Icon(Icons.Default.Search, contentDescription = null, tint = Emerald700)
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { onSearchQueryChange("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Καθαρισμός", tint = Color.Gray)
+                                Icon(Icons.Default.Clear, contentDescription = Localization.clear(lang), tint = Color.Gray)
                             }
                         }
                     },
@@ -745,11 +837,11 @@ fun ExpensesScreen(
                                     } else if (selectedMemberFilter == -1L) {
                                         Icon(Icons.Default.Group, contentDescription = null, tint = Emerald700, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Κοινά Οικογένειας", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(Localization.commonFamilyFilter(lang), fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     } else {
                                         Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Όλα", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                        Text(Localization.allFilter(lang), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                     }
                                 }
                                 Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
@@ -763,7 +855,7 @@ fun ExpensesScreen(
                         ) {
                             DropdownMenuItem(
                                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                text = { Text("Όλα", fontWeight = if (selectedMemberFilter == null) FontWeight.Bold else FontWeight.Normal) },
+                                text = { Text(Localization.allFilter(lang), fontWeight = if (selectedMemberFilter == null) FontWeight.Bold else FontWeight.Normal) },
                                 onClick = {
                                     onMemberFilterChange(null)
                                     showMemberDropdown = false
@@ -771,7 +863,7 @@ fun ExpensesScreen(
                             )
                             DropdownMenuItem(
                                 leadingIcon = { Icon(Icons.Default.Group, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp)) },
-                                text = { Text("Κοινά Οικογένειας", fontWeight = if (selectedMemberFilter == -1L) FontWeight.Bold else FontWeight.Normal) },
+                                text = { Text(Localization.commonFamilyFilter(lang), fontWeight = if (selectedMemberFilter == -1L) FontWeight.Bold else FontWeight.Normal) },
                                 onClick = {
                                     onMemberFilterChange(-1L)
                                     showMemberDropdown = false
@@ -790,7 +882,7 @@ fun ExpensesScreen(
                                                 .background(Color(m.avatarColorHex))
                                         )
                                     },
-                                    text = { Text("${m.name} (${m.role})", fontWeight = if (selectedMemberFilter == m.id) FontWeight.Bold else FontWeight.Normal) },
+                                    text = { Text("${m.name} (${Localization.translateRole(m.role, lang)})", fontWeight = if (selectedMemberFilter == m.id) FontWeight.Bold else FontWeight.Normal) },
                                     onClick = {
                                         onMemberFilterChange(m.id)
                                         showMemberDropdown = false
@@ -829,7 +921,7 @@ fun ExpensesScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = selectedCategory.name,
+                                            text = Localization.translateCategory(selectedCategory.name, lang),
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1,
@@ -838,7 +930,7 @@ fun ExpensesScreen(
                                     } else {
                                         Icon(Icons.Default.Category, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Όλες οι Κατηγορίες", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                        Text(Localization.allCategoriesFilter(lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                                     }
                                 }
                                 Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
@@ -852,7 +944,7 @@ fun ExpensesScreen(
                         ) {
                             DropdownMenuItem(
                                 leadingIcon = { Icon(Icons.Default.Category, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                text = { Text("Όλες οι Κατηγορίες", fontWeight = if (selectedCategoryFilter == null) FontWeight.Bold else FontWeight.Normal) },
+                                text = { Text(Localization.allCategoriesFilter(lang), fontWeight = if (selectedCategoryFilter == null) FontWeight.Bold else FontWeight.Normal) },
                                 onClick = {
                                     onCategoryFilterChange(null)
                                     showCategoryDropdown = false
@@ -871,7 +963,7 @@ fun ExpensesScreen(
                                             modifier = Modifier.size(16.dp)
                                         )
                                     },
-                                    text = { Text(cat.name, fontWeight = if (selectedCategoryFilter == cat.id) FontWeight.Bold else FontWeight.Normal) },
+                                    text = { Text(Localization.translateCategory(cat.name, lang), fontWeight = if (selectedCategoryFilter == cat.id) FontWeight.Bold else FontWeight.Normal) },
                                     onClick = {
                                         onCategoryFilterChange(cat.id)
                                         showCategoryDropdown = false
@@ -920,14 +1012,14 @@ fun ExpensesScreen(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Δεν βρέθηκαν έσοδα",
+                                text = Localization.noIncomesFound(lang),
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Δεν υπάρχουν καταχωρημένα έσοδα για το επιλεγμένο διάστημα ή μέλος.",
+                                text = Localization.noIncomesForPeriod(lang),
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -937,14 +1029,14 @@ fun ExpensesScreen(
                             Button(
                                 onClick = onAddManualIncome,
                                 shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669)),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669), contentColor = Color.White),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(46.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Καταχώρηση Νέου Εσόδου", fontWeight = FontWeight.Bold)
+                                Text(Localization.recordNewIncome(lang), fontWeight = FontWeight.Bold, color = Color.White)
                             }
                         }
                     }
@@ -953,13 +1045,13 @@ fun ExpensesScreen(
                 val dayDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                 val todayStr = dayDateFormat.format(Date())
                 val yesterdayStr = dayDateFormat.format(Date(System.currentTimeMillis() - 24L * 3600 * 1000))
-                val dayDisplayFormat = SimpleDateFormat("EEEE, d MMMM", Locale.forLanguageTag("el-GR"))
+                val dayDisplayFormat = SimpleDateFormat("EEEE, d MMMM", Localization.getDateLocale(lang))
 
                 val incomesByDay = periodFilteredIncomes.groupBy { inc ->
                     val dayKey = dayDateFormat.format(Date(inc.timestamp))
                     when (dayKey) {
-                        todayStr -> "Σήμερα"
-                        yesterdayStr -> "Χθες"
+                        todayStr -> Localization.today(lang)
+                        yesterdayStr -> Localization.yesterday(lang)
                         else -> dayDisplayFormat.format(Date(inc.timestamp)).replaceFirstChar { it.uppercase() }
                     }
                 }
@@ -1061,7 +1153,7 @@ fun ExpensesScreen(
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
-                                                        text = income.memberName.ifBlank { "Μέλος" },
+                                                        text = income.memberName.ifBlank { if (lang == Localization.Language.ENGLISH) "Member" else "Μέλος" },
                                                         fontSize = 11.sp,
                                                         color = memberColor,
                                                         fontWeight = FontWeight.Bold
@@ -1075,7 +1167,7 @@ fun ExpensesScreen(
                                                 color = Color(0xFF10B981).copy(alpha = 0.12f)
                                             ) {
                                                 Text(
-                                                    text = income.category,
+                                                    text = Localization.translateCategory(income.category, lang),
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = Color(0xFF047857),
@@ -1114,7 +1206,7 @@ fun ExpensesScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Edit,
-                                                contentDescription = "Επεξεργασία",
+                                                contentDescription = Localization.edit(lang),
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(16.dp)
                                             )
@@ -1126,7 +1218,7 @@ fun ExpensesScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.DeleteOutline,
-                                                contentDescription = "Διαγραφή",
+                                                contentDescription = Localization.delete(lang),
                                                 tint = MaterialTheme.colorScheme.error,
                                                 modifier = Modifier.size(16.dp)
                                             )
@@ -1139,8 +1231,41 @@ fun ExpensesScreen(
                 }
             }
         } else {
-            // Friendly Empty state
-            if (periodFilteredExpenses.isEmpty()) {
+            // Friendly Empty state or initial fast loading state
+            if (isInitialLoading && periodFilteredExpenses.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 20.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(36.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                color = Emerald700,
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "Loading expenses..." else "Φόρτωση εξόδων...",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else if (periodFilteredExpenses.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier
@@ -1171,7 +1296,11 @@ fun ExpensesScreen(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (expenses.isEmpty()) "Καλώς ήρθατε στο OikoNomos!" else "Δεν βρέθηκαν έξοδα",
+                            text = if (expenses.isEmpty()) {
+                                if (lang == Localization.Language.ENGLISH) "Welcome to OikoNomos!" else "Καλώς ήρθατε στο OikoNomos!"
+                            } else {
+                                Localization.noExpensesFound(lang)
+                            },
                             fontSize = 18.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1179,9 +1308,12 @@ fun ExpensesScreen(
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = if (expenses.isEmpty()) {
-                                "Το εξοδολόγιό σας είναι πεντακάθαρο. Καταχωρήστε εύκολα και γρήγορα το πρώτο σας έξοδο:"
+                                if (lang == Localization.Language.ENGLISH)
+                                    "Your household is clear. Start tracking your expenses quickly and easily:"
+                                else
+                                    "Το εξοδολόγιό σας είναι πεντακάθαρο. Καταχωρήστε εύκολα και γρήγορα το πρώτο σας έξοδο:"
                             } else {
-                                "Δεν υπάρχουν καταχωρημένα έξοδα για το επιλεγμένο διάστημα ή τα φίλτρα."
+                                Localization.noExpensesForPeriod(lang)
                             },
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1195,14 +1327,14 @@ fun ExpensesScreen(
                         Button(
                             onClick = onVoiceExpense,
                             shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(46.dp)
                         ) {
-                            Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Φωνητική Καταχώρηση", fontWeight = FontWeight.Bold)
+                            Text(Localization.voiceInput(lang), fontWeight = FontWeight.Bold, color = Color.White)
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
@@ -1217,7 +1349,7 @@ fun ExpensesScreen(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Χειροκίνητη Προσθήκη", fontWeight = FontWeight.SemiBold)
+                            Text(Localization.addExpense(lang), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -1271,7 +1403,7 @@ fun ExpensesScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${monthSection.count} συναλλαγές",
+                                    text = Localization.transactionsPlural(lang, monthSection.count),
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1288,7 +1420,7 @@ fun ExpensesScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
                                 imageVector = if (isCollapsed) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
-                                contentDescription = if (isCollapsed) "Ανάπτυξη" else "Σύμπτυξη",
+                                contentDescription = if (isCollapsed) (if (lang == Localization.Language.ENGLISH) "Expand" else "Ανάπτυξη") else (if (lang == Localization.Language.ENGLISH) "Collapse" else "Σύμπτυξη"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1389,7 +1521,7 @@ fun ExpensesScreen(
                                                 color = catColor.copy(alpha = 0.12f)
                                             ) {
                                                 Text(
-                                                    text = expense.categoryName.ifBlank { "Γενικά" },
+                                                    text = Localization.translateCategory(expense.categoryName.ifBlank { "General" }, lang),
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = catColor,
@@ -1399,7 +1531,7 @@ fun ExpensesScreen(
 
                                             // Member / Split Info Pill (Distinct soft blue color)
                                             val memberLabel = if (expense.splitType == "ALL_FAMILY") {
-                                                "Κοινό Οικογένειας"
+                                                Localization.commonFamilyFilter(lang)
                                             } else {
                                                 expense.memberNamesDisplay.ifBlank { null }
                                             }
@@ -1462,7 +1594,7 @@ fun ExpensesScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Edit,
-                                                contentDescription = "Επεξεργασία",
+                                                contentDescription = Localization.edit(lang),
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(16.dp)
                                             )
@@ -1474,7 +1606,7 @@ fun ExpensesScreen(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.DeleteOutline,
-                                                contentDescription = "Διαγραφή",
+                                                contentDescription = Localization.delete(lang),
                                                 tint = MaterialTheme.colorScheme.error,
                                                 modifier = Modifier.size(16.dp)
                                             )
@@ -1505,8 +1637,8 @@ fun ExpensesScreen(
         AlertDialog(
             onDismissRequest = { expenseToDelete = null },
             shape = RoundedCornerShape(20.dp),
-            title = { Text("Διαγραφή Εξόδου", fontWeight = FontWeight.Bold) },
-            text = { Text("Είστε σίγουροι ότι θέλετε να διαγράψετε το έξοδο «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)});") },
+            title = { Text(if (lang == Localization.Language.ENGLISH) "Delete Expense" else "Διαγραφή Εξόδου", fontWeight = FontWeight.Bold) },
+            text = { Text(if (lang == Localization.Language.ENGLISH) "Are you sure you want to delete «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)})?" else "Είστε σίγουροι ότι θέλετε να διαγράψετε το έξοδο «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)});") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1514,12 +1646,12 @@ fun ExpensesScreen(
                         expenseToDelete = null
                     }
                 ) {
-                    Text("Διαγραφή", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text(Localization.delete(lang), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { expenseToDelete = null }) {
-                    Text("Ακύρωση")
+                    Text(Localization.cancel(lang))
                 }
             }
         )
@@ -1531,8 +1663,8 @@ fun ExpensesScreen(
         AlertDialog(
             onDismissRequest = { incomeToDelete = null },
             shape = RoundedCornerShape(20.dp),
-            title = { Text("Διαγραφή Εσόδου", fontWeight = FontWeight.Bold) },
-            text = { Text("Είστε σίγουροι ότι θέλετε να διαγράψετε το έσοδο «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)});") },
+            title = { Text(if (lang == Localization.Language.ENGLISH) "Delete Income" else "Διαγραφή Εσόδου", fontWeight = FontWeight.Bold) },
+            text = { Text(if (lang == Localization.Language.ENGLISH) "Are you sure you want to delete «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)})?" else "Είστε σίγουροι ότι θέλετε να διαγράψετε το έσοδο «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)});") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1540,12 +1672,12 @@ fun ExpensesScreen(
                         incomeToDelete = null
                     }
                 ) {
-                    Text("Διαγραφή", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text(Localization.delete(lang), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { incomeToDelete = null }) {
-                    Text("Ακύρωση")
+                    Text(Localization.cancel(lang))
                 }
             }
         )

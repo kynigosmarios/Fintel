@@ -127,7 +127,7 @@ fun ExodologioExportCard(
             Button(
                 onClick = onShare,
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                 modifier = Modifier.fillMaxWidth().testTag("bottom_share_report_button")
             ) {
                 Icon(
@@ -137,7 +137,7 @@ fun ExodologioExportCard(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "Κοινοποίηση Αναφοράς", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(text = "Κοινοποίηση Αναφοράς", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }

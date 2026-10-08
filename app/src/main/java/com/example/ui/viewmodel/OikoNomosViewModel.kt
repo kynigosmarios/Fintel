@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class CountdownState(
@@ -46,6 +48,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private val repository: ExpenseRepository
     private val firestoreSyncRepo = FirestoreSyncRepository.create(application)
     private val auth: FirebaseAuth = Firebase.auth
+    private val prefs = application.getSharedPreferences("oikonomos_app_prefs", Context.MODE_PRIVATE)
 
     // Firebase Auth & Cloud Sync States
     private val _isAuthInitialized = MutableStateFlow(false)
@@ -66,6 +69,9 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
+    private val _isInitialExpensesLoading = MutableStateFlow(true)
+    val isInitialExpensesLoading = _isInitialExpensesLoading.asStateFlow()
+
     private var householdJob: Job? = null
     private var expensesSyncJob: Job? = null
     private var userExpensesSyncJob: Job? = null
@@ -81,38 +87,61 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             repository.seedInitialDataIfEmpty()
         }
 
+        // Fast pre-warm: If we have a cached active household ID, kick off disk cache observation immediately!
+        val cachedHouseholdId = prefs.getString("last_household_id", null)
+        if (!cachedHouseholdId.isNullOrBlank()) {
+            observeHouseholdData(cachedHouseholdId)
+        }
+
         // Listen for Google Auth state
+        var lastObservedUid: String? = null
         auth.addAuthStateListener { firebaseAuth ->
             val user = firebaseAuth.currentUser
-            _currentUser.value = user
+            val currentUid = user?.uid
             _isAuthInitialized.value = true
             if (user != null) {
-                viewModelScope.launch {
-                    loadUserProfileAndHousehold(user)
+                _currentUser.value = user
+                // If user is already authenticated and sync listeners are active, do not discard or restart listeners on resume
+                if (currentUid != lastObservedUid || _currentHousehold.value == null || expensesSyncJob?.isActive != true) {
+                    lastObservedUid = currentUid
+                    viewModelScope.launch {
+                        loadUserProfileAndHousehold(user)
+                    }
                 }
-            } else {
+            } else if (lastObservedUid != null && _currentUser.value == null) {
+                // Only clear if user intentionally logged out
+                lastObservedUid = null
                 _userProfile.value = null
                 _currentHousehold.value = null
                 _userHouseholds.value = emptyList()
+                prefs.edit().remove("last_household_id").apply()
                 householdJob?.cancel()
                 expensesSyncJob?.cancel()
                 userExpensesSyncJob?.cancel()
                 incomesSyncJob?.cancel()
                 userIncomesSyncJob?.cancel()
-                _allExpenses.value = emptyList()
-                _allIncomes.value = emptyList()
             }
         }
     }
 
     private suspend fun loadUserProfileAndHousehold(user: FirebaseUser) {
         try {
+            // First check if profile exists in cache/remote
             val profile = firestoreSyncRepo.getOrCreateUserProfile(
                 user.uid,
                 user.email ?: "",
                 user.displayName ?: ""
             )
             _userProfile.value = profile
+
+            if (profile.householdId.isNotBlank()) {
+                prefs.edit().putString("last_household_id", profile.householdId).apply()
+                // Fast path: if not already observing this household, observe it right away
+                if (_currentHousehold.value?.id != profile.householdId || expensesSyncJob?.isActive != true) {
+                    observeHouseholdData(profile.householdId)
+                }
+            }
+
             val households = firestoreSyncRepo.fetchUserHouseholds(profile.householdIds)
             _userHouseholds.value = households
 
@@ -123,7 +152,6 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 } else if (households.isNotEmpty()) {
                     _currentHousehold.value = households.first()
                 }
-                observeHouseholdData(profile.householdId)
             }
             observeUserData(user.uid)
         } catch (e: Exception) {
@@ -193,22 +221,127 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private fun observeHouseholdData(householdId: String) {
         householdJob?.cancel()
         householdJob = viewModelScope.launch {
-            firestoreSyncRepo.observeHousehold(householdId).collect { h ->
-                _currentHousehold.value = h
+            while (isActive) {
+                try {
+                    firestoreSyncRepo.observeHousehold(householdId).collect { h ->
+                        _currentHousehold.value = h
+                    }
+                } catch (e: Exception) {
+                    Log.w("OikoNomosVM", "Household listener reconnecting: ${e.message}")
+                    delay(3000)
+                }
             }
         }
 
         expensesSyncJob?.cancel()
         expensesSyncJob = viewModelScope.launch {
-            firestoreSyncRepo.observeExpenses(householdId).collect { remoteExpenses ->
-                _allExpenses.value = mapFirebaseExpensesToDomain(remoteExpenses)
+            // Step 1: Immediately read from local disk cache (< 10ms, offline-first)
+            try {
+                val cached = firestoreSyncRepo.getExpensesFromCache(householdId)
+                if (cached.isNotEmpty()) {
+                    _allExpenses.value = mapFirebaseExpensesToDomain(cached)
+                    _isInitialExpensesLoading.value = false
+                }
+            } catch (e: Exception) {
+                Log.d("OikoNomosVM", "Disk cache expenses: ${e.message}")
+            }
+
+            // Step 2: Fetch latest from server
+            try {
+                val direct = firestoreSyncRepo.getExpensesOnce(householdId)
+                if (direct.isNotEmpty() || _allExpenses.value.isEmpty()) {
+                    _allExpenses.value = mapFirebaseExpensesToDomain(direct)
+                }
+            } catch (e: Exception) {
+                Log.w("OikoNomosVM", "Initial direct expenses fetch: ${e.message}")
+            } finally {
+                _isInitialExpensesLoading.value = false
+            }
+
+            // Step 3: Real-time listener for continuous updates
+            while (isActive) {
+                try {
+                    firestoreSyncRepo.observeExpenses(householdId).collect { remoteExpenses ->
+                        _allExpenses.value = mapFirebaseExpensesToDomain(remoteExpenses)
+                        _isInitialExpensesLoading.value = false
+                    }
+                } catch (e: Exception) {
+                    Log.w("OikoNomosVM", "Expenses listener reconnecting: ${e.message}")
+                    delay(3000)
+                }
             }
         }
 
         incomesSyncJob?.cancel()
         incomesSyncJob = viewModelScope.launch {
-            firestoreSyncRepo.observeIncomes(householdId).collect { remoteIncomes ->
-                _allIncomes.value = mapFirebaseIncomesToDomain(remoteIncomes)
+            try {
+                val cached = firestoreSyncRepo.getIncomesFromCache(householdId)
+                if (cached.isNotEmpty()) {
+                    _allIncomes.value = mapFirebaseIncomesToDomain(cached)
+                }
+            } catch (e: Exception) {
+                Log.d("OikoNomosVM", "Disk cache incomes: ${e.message}")
+            }
+
+            try {
+                val direct = firestoreSyncRepo.getIncomesOnce(householdId)
+                if (direct.isNotEmpty() || _allIncomes.value.isEmpty()) {
+                    _allIncomes.value = mapFirebaseIncomesToDomain(direct)
+                }
+            } catch (e: Exception) {
+                Log.w("OikoNomosVM", "Initial direct incomes fetch: ${e.message}")
+            }
+
+            while (isActive) {
+                try {
+                    firestoreSyncRepo.observeIncomes(householdId).collect { remoteIncomes ->
+                        _allIncomes.value = mapFirebaseIncomesToDomain(remoteIncomes)
+                    }
+                } catch (e: Exception) {
+                    Log.w("OikoNomosVM", "Incomes listener reconnecting: ${e.message}")
+                    delay(3000)
+                }
+            }
+        }
+    }
+
+    /**
+     * Called when the app resumes (e.g. from lock screen or switching from another app).
+     * Re-enables Firestore network, restarts observation if needed, and fetches latest balances.
+     */
+    fun onAppResumed() {
+        val user = _currentUser.value ?: auth.currentUser ?: return
+        _currentUser.value = user
+        viewModelScope.launch {
+            try {
+                firestoreSyncRepo.enableNetwork()
+                val household = _currentHousehold.value
+                if (household != null && household.id.isNotBlank()) {
+                    val freshExpenses = firestoreSyncRepo.getExpensesOnce(household.id)
+                    if (freshExpenses.isNotEmpty()) {
+                        _allExpenses.value = mapFirebaseExpensesToDomain(freshExpenses)
+                    }
+                    val freshIncomes = firestoreSyncRepo.getIncomesOnce(household.id)
+                    if (freshIncomes.isNotEmpty()) {
+                        _allIncomes.value = mapFirebaseIncomesToDomain(freshIncomes)
+                    }
+                    if (expensesSyncJob?.isActive != true || incomesSyncJob?.isActive != true) {
+                        observeHouseholdData(household.id)
+                    }
+                } else {
+                    // Single-user mode without household: fetch directly from user documents
+                    val userExpenses = firestoreSyncRepo.getUserExpensesOnce(user.uid)
+                    if (userExpenses.isNotEmpty()) {
+                        _allExpenses.value = mapFirebaseExpensesToDomain(userExpenses)
+                    }
+                    val userIncomes = firestoreSyncRepo.getUserIncomesOnce(user.uid)
+                    if (userIncomes.isNotEmpty()) {
+                        _allIncomes.value = mapFirebaseIncomesToDomain(userIncomes)
+                    }
+                    loadUserProfileAndHousehold(user)
+                }
+            } catch (e: Exception) {
+                Log.w("OikoNomosVM", "Error in onAppResumed: ${e.message}")
             }
         }
     }
@@ -375,16 +508,16 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     val allIncomes: StateFlow<List<Income>> = _allIncomes.asStateFlow()
 
     val allMembers: StateFlow<List<FamilyMember>> = repository.allMembers
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val allCategories: StateFlow<List<ExpenseCategory>> = repository.allCategories
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val allRecurringExpenses: StateFlow<List<RecurringExpense>> = repository.allRecurringExpenses
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val allSavingsGoals: StateFlow<List<SavingsGoal>> = repository.allSavingsGoals
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Filters
     private val _selectedMemberFilter = MutableStateFlow<Long?>(null) // null = all, -1 = common family, id = specific
@@ -428,7 +561,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
             matchMember && matchCat && matchQuery
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Filtered Incomes
     val filteredIncomes: StateFlow<List<Income>> = combine(
@@ -450,7 +583,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             }
             matchMember && matchQuery
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // Income Dialogs state
     private val _showManualIncomeDialog = MutableStateFlow(false)
@@ -498,14 +631,17 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private val _showSettingsDialog = MutableStateFlow(false)
     val showSettingsDialog = _showSettingsDialog.asStateFlow()
 
-    private val _themeMode = MutableStateFlow("SYSTEM") // "SYSTEM", "LIGHT", "DARK"
+    private val _themeMode = MutableStateFlow(prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM") // "SYSTEM", "LIGHT", "DARK"
     val themeMode = _themeMode.asStateFlow()
 
-    private val _currencySymbol = MutableStateFlow("€")
+    private val _appLanguage = MutableStateFlow(prefs.getString("app_language", "EL") ?: "EL") // "EL", "EN"
+    val appLanguage = _appLanguage.asStateFlow()
+
+    private val _currencySymbol = MutableStateFlow(prefs.getString("currency_symbol", "€") ?: "€")
     val currencySymbol = _currencySymbol.asStateFlow()
 
     // Quick Action Chooser (Triggered via FAB or Widget)
-    private val _launchWithChooser = MutableStateFlow(false)
+    private val _launchWithChooser = MutableStateFlow(prefs.getBoolean("launch_with_chooser", false))
     val launchWithChooser = _launchWithChooser.asStateFlow()
 
     private val _showQuickActionChooser = MutableStateFlow(false)
@@ -683,6 +819,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         val user = _currentUser.value ?: return
         viewModelScope.launch {
             try {
+                prefs.edit().putString("last_household_id", household.id).apply()
                 firestoreSyncRepo.switchActiveHousehold(user.uid, household.id)
                 _currentHousehold.value = household
                 _userProfile.value = _userProfile.value?.copy(householdId = household.id)
@@ -873,6 +1010,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setLaunchWithChooser(enabled: Boolean) {
         _launchWithChooser.value = enabled
+        prefs.edit().putBoolean("launch_with_chooser", enabled).apply()
     }
 
     fun openSettingsDialog() {
@@ -885,10 +1023,17 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setThemeMode(mode: String) {
         _themeMode.value = mode
+        prefs.edit().putString("theme_mode", mode).apply()
+    }
+
+    fun setAppLanguage(lang: String) {
+        _appLanguage.value = lang
+        prefs.edit().putString("app_language", lang).apply()
     }
 
     fun setCurrencySymbol(symbol: String) {
         _currencySymbol.value = symbol
+        prefs.edit().putString("currency_symbol", symbol).apply()
     }
 
     fun openQuickActionChooser() {

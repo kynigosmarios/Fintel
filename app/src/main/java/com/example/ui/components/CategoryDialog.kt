@@ -55,12 +55,14 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.entity.ExpenseCategory
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CategoryDialog(
     categoryToEdit: ExpenseCategory?,
+    appLanguage: String = "EL",
     onDismiss: () -> Unit,
     onSave: (
         id: Long,
@@ -71,6 +73,8 @@ fun CategoryDialog(
         voiceKeywords: String
     ) -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
+
     var name by remember { mutableStateOf(categoryToEdit?.name ?: "") }
     var budgetText by remember {
         mutableStateOf(
@@ -108,7 +112,7 @@ fun CategoryDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (categoryToEdit == null) "Νέα Κατηγορία" else "Επεξεργασία Κατηγορίας",
+                        text = if (categoryToEdit == null) Localization.addCategory(lang) else Localization.editCategoryTitle(lang),
                         fontSize = 19.sp,
                         fontWeight = FontWeight.Bold,
                         color = Emerald700
@@ -121,7 +125,7 @@ fun CategoryDialog(
                             .clickable { onDismiss() }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Close, contentDescription = "Κλείσιμο", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Close, contentDescription = Localization.close(lang), modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -142,7 +146,8 @@ fun CategoryDialog(
                             name = it
                             errorText = null
                         },
-                        label = { Text("Όνομα κατηγορίας") },
+                        label = { Text(Localization.categoryNameLabel(lang)) },
+                        placeholder = { Text(Localization.categoryNamePlaceholder(lang)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("category_name_input"),
@@ -159,7 +164,7 @@ fun CategoryDialog(
                             budgetText = it.replace(',', '.')
                             errorText = null
                         },
-                        label = { Text("Μηνιαίο Budget (€)") },
+                        label = { Text(Localization.monthlyBudgetLimitLabel(lang)) },
                         leadingIcon = { Icon(Icons.Default.Euro, contentDescription = null, tint = Emerald700) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -170,7 +175,11 @@ fun CategoryDialog(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     // Icon selection
-                    Text(text = "Εικονίδιο:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = Localization.categoryIconLabel(lang),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                     Spacer(modifier = Modifier.height(6.dp))
 
                     FlowRow(
@@ -180,10 +189,11 @@ fun CategoryDialog(
                     ) {
                         CategoryIconHelper.availableIcons.forEach { (key, label) ->
                             val isSelected = selectedIconKey == key
+                            val displayLabel = Localization.translateCategory(label, lang)
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { selectedIconKey = key },
-                                label = { Text(label, fontSize = 11.sp) },
+                                label = { Text(displayLabel, fontSize = 11.sp) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = CategoryIconHelper.getIcon(key),
@@ -202,11 +212,14 @@ fun CategoryDialog(
                     OutlinedTextField(
                         value = voiceKeywords,
                         onValueChange = { voiceKeywords = it },
-                        label = { Text("Φωνητικές λέξεις-κλειδιά") },
-                        placeholder = { Text("π.χ. σούπερ μάρκετ, σκλαβενίτης, τρόφιμα") },
+                        label = { Text(Localization.categoryKeywordsLabel(lang)) },
+                        placeholder = { Text(Localization.categoryKeywordsPlaceholder(lang)) },
                         supportingText = {
                             Text(
-                                "Λέξεις που θα αναγνωρίζονται αυτόματα στη φωνή",
+                                if (lang == Localization.Language.ENGLISH)
+                                    "Keywords that will be automatically detected via speech"
+                                else
+                                    "Λέξεις που θα αναγνωρίζονται αυτόματα στη φωνή",
                                 fontSize = 11.sp
                             )
                         },
@@ -228,7 +241,7 @@ fun CategoryDialog(
                     modifier = Modifier.padding(vertical = 10.dp)
                 )
 
-                // 3. Fixed Bottom Action buttons - ALWAYS accessible & visible
+                // 3. Fixed Bottom Action buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -241,7 +254,7 @@ fun CategoryDialog(
                         contentPadding = PaddingValues(vertical = 12.dp, horizontal = 8.dp)
                     ) {
                         Text(
-                            text = "Ακύρωση",
+                            text = Localization.cancel(lang),
                             maxLines = 1,
                             softWrap = false,
                             fontSize = 14.sp
@@ -252,11 +265,11 @@ fun CategoryDialog(
                         onClick = {
                             val parsedBudget = budgetText.toDoubleOrNull()
                             if (name.isBlank()) {
-                                errorText = "Συμπληρώστε όνομα κατηγορίας"
+                                errorText = if (lang == Localization.Language.ENGLISH) "Please enter category name" else "Συμπληρώστε όνομα κατηγορίας"
                                 return@Button
                             }
                             if (parsedBudget == null || parsedBudget < 0) {
-                                errorText = "Συμπληρώστε έγκυρο budget"
+                                errorText = if (lang == Localization.Language.ENGLISH) "Please enter a valid budget" else "Συμπληρώστε έγκυρο budget"
                                 return@Button
                             }
 
@@ -269,21 +282,22 @@ fun CategoryDialog(
                                 voiceKeywords.trim()
                             )
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .weight(1.3f)
                             .testTag("save_category_button"),
                         contentPadding = PaddingValues(vertical = 12.dp, horizontal = 8.dp)
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Αποθήκευση",
+                            text = Localization.save(lang),
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             softWrap = false,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            color = Color.White
                         )
                     }
                 }

@@ -50,6 +50,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.example.R
 import com.example.ui.theme.Emerald700
 import com.example.ui.viewmodel.OikoNomosViewModel
+import com.example.util.Localization
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
@@ -92,6 +94,8 @@ fun AuthScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
+    val appLanguage by viewModel.appLanguage.collectAsState()
+    val lang = Localization.Language.fromCode(appLanguage)
 
     var isSignUp by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
@@ -129,7 +133,7 @@ fun AuthScreen(
             )
 
             Text(
-                text = "Οικογενειακό Εξοδολόγιο",
+                text = if (lang == Localization.Language.ENGLISH) "Family Expense Tracker" else "Οικογενειακό Εξοδολόγιο",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -150,7 +154,7 @@ fun AuthScreen(
                     modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Segmented Tab: Σύνδεση / Εγγραφή
+                    // Segmented Tab: Sign In / Sign Up
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -172,7 +176,7 @@ fun AuthScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    text = "Σύνδεση",
+                                    text = if (lang == Localization.Language.ENGLISH) "Sign In" else "Σύνδεση",
                                     fontSize = 14.sp,
                                     fontWeight = if (!isSignUp) FontWeight.Bold else FontWeight.Medium,
                                     color = if (!isSignUp) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
@@ -193,7 +197,7 @@ fun AuthScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    text = "Εγγραφή",
+                                    text = if (lang == Localization.Language.ENGLISH) "Sign Up" else "Εγγραφή",
                                     fontSize = 14.sp,
                                     fontWeight = if (isSignUp) FontWeight.Bold else FontWeight.Medium,
                                     color = if (isSignUp) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
@@ -234,7 +238,7 @@ fun AuthScreen(
                                             }
                                         )
                                     } else {
-                                        errorMessage = "Μη έγκυρο διαπιστευτήριο Google"
+                                        errorMessage = if (lang == Localization.Language.ENGLISH) "Invalid Google credential" else "Μη έγκυρο διαπιστευτήριο Google"
                                         isGoogleSigningIn = false
                                     }
                                 } catch (e: GetCredentialCancellationException) {
@@ -242,7 +246,7 @@ fun AuthScreen(
                                     isGoogleSigningIn = false
                                 } catch (e: Exception) {
                                     Log.e("Auth", "Google Sign-In failed", e)
-                                    errorMessage = "Σφάλμα Google Sign-In: ${e.localizedMessage ?: "Προσπαθήστε ξανά"}"
+                                    errorMessage = if (lang == Localization.Language.ENGLISH) "Google Sign-In error: ${e.localizedMessage ?: "Please try again"}" else "Σφάλμα Google Sign-In: ${e.localizedMessage ?: "Προσπαθήστε ξανά"}"
                                     isGoogleSigningIn = false
                                 }
                             }
@@ -267,7 +271,7 @@ fun AuthScreen(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = if (isSignUp) "Εγγραφή με Google" else "Σύνδεση με Google",
+                                    text = if (isSignUp) (if (lang == Localization.Language.ENGLISH) "Sign up with Google" else "Εγγραφή με Google") else (if (lang == Localization.Language.ENGLISH) "Sign in with Google" else "Σύνδεση με Google"),
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -285,7 +289,7 @@ fun AuthScreen(
                     ) {
                         HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
                         Text(
-                            text = "  ή με Email  ",
+                            text = if (lang == Localization.Language.ENGLISH) "  or with Email  " else "  ή με Email  ",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -299,8 +303,8 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            label = { Text("Ονοματεπώνυμο") },
-                            placeholder = { Text("π.χ. Γιώργος Παπαδόπουλος") },
+                            label = { Text(if (lang == Localization.Language.ENGLISH) "Full Name" else "Ονοματεπώνυμο") },
+                            placeholder = { Text(if (lang == Localization.Language.ENGLISH) "e.g. George Smith" else "π.χ. Γιώργος Παπαδόπουλος") },
                             leadingIcon = {
                                 Icon(Icons.Default.Person, contentDescription = null, tint = Emerald700)
                             },
@@ -346,8 +350,8 @@ fun AuthScreen(
                             password = it
                             errorMessage = null
                         },
-                        label = { Text("Κωδικός πρόσβασης") },
-                        placeholder = { Text("Τουλάχιστον 6 χαρακτήρες") },
+                        label = { Text(if (lang == Localization.Language.ENGLISH) "Password" else "Κωδικός πρόσβασης") },
+                        placeholder = { Text(if (lang == Localization.Language.ENGLISH) "At least 6 characters" else "Τουλάχιστον 6 χαρακτήρες") },
                         leadingIcon = {
                             Icon(Icons.Default.Lock, contentDescription = null, tint = Emerald700)
                         },
@@ -355,7 +359,7 @@ fun AuthScreen(
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = "Εμφάνιση κωδικού"
+                                    contentDescription = if (lang == Localization.Language.ENGLISH) "Show password" else "Εμφάνιση κωδικού"
                                 )
                             }
                         },
@@ -435,7 +439,7 @@ fun AuthScreen(
                             .testTag("auth_submit_button")
                     ) {
                         Text(
-                            text = if (isSignUp) "Δημιουργία Λογαριασμού" else "Σύνδεση",
+                            text = if (isSignUp) (if (lang == Localization.Language.ENGLISH) "Create Account" else "Δημιουργία Λογαριασμού") else (if (lang == Localization.Language.ENGLISH) "Sign In" else "Σύνδεση"),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White

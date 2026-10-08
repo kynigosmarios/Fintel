@@ -56,6 +56,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.entity.FamilyMember
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 
 val MemberPalette = listOf(
     0xFF0284C7, // Sky Blue
@@ -74,9 +75,12 @@ val MemberPalette = listOf(
 @Composable
 fun MemberDialog(
     memberToEdit: FamilyMember?,
+    appLanguage: String = "EL",
     onDismiss: () -> Unit,
     onSave: (id: Long, name: String, role: String, avatarColorHex: Long, voiceKeywords: String) -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
+
     var name by remember { mutableStateOf(memberToEdit?.name ?: "") }
     var role by remember { mutableStateOf(memberToEdit?.role ?: "Γονέας") }
     var selectedColor by remember {
@@ -114,7 +118,7 @@ fun MemberDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (memberToEdit == null) "Προσθήκη Μέλους" else "Επεξεργασία Μέλους",
+                        text = if (memberToEdit == null) Localization.addMember(lang) else Localization.editMemberTitle(lang),
                         fontSize = 19.sp,
                         fontWeight = FontWeight.Bold,
                         color = Emerald700
@@ -127,7 +131,7 @@ fun MemberDialog(
                             .clickable { onDismiss() }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Close, contentDescription = "Κλείσιμο", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Close, contentDescription = Localization.close(lang), modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -148,7 +152,8 @@ fun MemberDialog(
                             name = it
                             errorText = null
                         },
-                        label = { Text("Όνομα μέλους (π.χ. Μάριος)") },
+                        label = { Text(Localization.memberNameLabel(lang)) },
+                        placeholder = { Text(Localization.memberNamePlaceholder(lang)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("member_name_input"),
@@ -159,24 +164,29 @@ fun MemberDialog(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Role selection
-                    Text(text = "Ρόλος:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = Localization.memberRoleLabel(lang),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                     Spacer(modifier = Modifier.height(6.dp))
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        listOf("Γονέας", "Παιδί", "Φίλος/η", "Συνεργάτης", "Άλλο").forEach { r ->
+                        listOf("Γονέας", "Παιδί", "Σύντροφος", "Άλλο").forEach { r ->
+                            val translatedRole = Localization.translateRole(r, lang)
                             FilterChip(
                                 selected = role == r,
                                 onClick = { role = r },
-                                label = { Text(r, fontSize = 12.sp) }
+                                label = { Text(translatedRole, fontSize = 12.sp) }
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Color picker - Clickable without showing all options initially
+                    // Color picker
                     var showColorPalette by remember { mutableStateOf(false) }
                     Row(
                         modifier = Modifier
@@ -195,14 +205,14 @@ fun MemberDialog(
                                 .border(1.5.dp, Emerald700, CircleShape)
                         )
                         Text(
-                            text = "Επιλογή χρώματος",
+                            text = Localization.selectColor(lang),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Text(
-                            text = if (showColorPalette) "Απόκρυψη" else "Αλλαγή",
+                            text = if (showColorPalette) (if (lang == Localization.Language.ENGLISH) "Hide" else "Απόκρυψη") else Localization.changeAction(lang),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = Emerald700
@@ -229,7 +239,7 @@ fun MemberDialog(
                                         }
                                         .then(
                                             if (isSelected) Modifier.border(2.dp, Emerald700, CircleShape)
-                                            else Modifier
+                                             else Modifier
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -252,9 +262,14 @@ fun MemberDialog(
                     OutlinedTextField(
                         value = voiceKeywords,
                         onValueChange = { voiceKeywords = it },
-                        label = { Text("Φωνητικές λέξεις αναγνώρισης") },
-                        placeholder = { Text("π.χ. μπαμπάς, πατέρας, μάριος") },
-                        supportingText = { Text("Διαχωρίστε με κόμμα λέξεις/ψευδώνυμα", fontSize = 11.sp) },
+                        label = { Text(Localization.voiceKeywordsLabel(lang)) },
+                        placeholder = { Text(Localization.memberKeywordsPlaceholder(lang)) },
+                        supportingText = {
+                            Text(
+                                if (lang == Localization.Language.ENGLISH) "Separate words/nicknames with commas" else "Διαχωρίστε με κόμμα λέξεις/ψευδώνυμα",
+                                fontSize = 11.sp
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         maxLines = 2
@@ -273,7 +288,7 @@ fun MemberDialog(
                     modifier = Modifier.padding(vertical = 10.dp)
                 )
 
-                // 3. Fixed Bottom Action buttons - ALWAYS accessible & visible
+                // 3. Fixed Bottom Action buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -286,7 +301,7 @@ fun MemberDialog(
                         contentPadding = PaddingValues(vertical = 12.dp, horizontal = 8.dp)
                     ) {
                         Text(
-                            text = "Ακύρωση",
+                            text = Localization.cancel(lang),
                             maxLines = 1,
                             softWrap = false,
                             fontSize = 14.sp
@@ -296,7 +311,7 @@ fun MemberDialog(
                     Button(
                         onClick = {
                             if (name.isBlank()) {
-                                errorText = "Συμπληρώστε όνομα μέλους"
+                                errorText = if (lang == Localization.Language.ENGLISH) "Please enter member name" else "Συμπληρώστε όνομα μέλους"
                                 return@Button
                             }
                             onSave(
@@ -307,21 +322,22 @@ fun MemberDialog(
                                 voiceKeywords.trim()
                             )
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .weight(1.3f)
                             .testTag("save_member_button"),
                         contentPadding = PaddingValues(vertical = 12.dp, horizontal = 8.dp)
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Αποθήκευση",
+                            text = Localization.save(lang),
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             softWrap = false,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            color = Color.White
                         )
                     }
                 }

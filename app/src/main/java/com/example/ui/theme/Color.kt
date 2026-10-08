@@ -1,5 +1,6 @@
 package com.example.ui.theme
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // Emerald Theme Colors
@@ -32,9 +33,22 @@ val Amber600 = Gold600
 val Amber500 = Gold500
 val Amber100 = Gold100
 
+// Modern Fintech Pastels & Accents (Mobbin & Dribbble inspired)
+val FintechIndigo = Color(0xFF6366F1)
+val FintechIndigoLight = Color(0xFFEEF2FF)
+val FintechRose = Color(0xFFF43F5E)
+val FintechRoseLight = Color(0xFFFFF1F2)
+val FintechCyan = Color(0xFF06B6D4)
+val FintechCyanLight = Color(0xFFECFEFF)
+val FintechPurple = Color(0xFF8B5CF6)
+val FintechPurpleLight = Color(0xFFF5F3FF)
+val FintechLime = Color(0xFF84CC16)
+val FintechLimeLight = Color(0xFFF7FEE7)
+
 // Slate & Backgrounds
 val Slate950 = Color(0xFF020617)
 val Slate900 = Color(0xFF0F172A)
+val Slate850 = Color(0xFF172033)
 val Slate800 = Color(0xFF1E293B)
 val Slate700 = Color(0xFF334155)
 val Slate600 = Color(0xFF475569)
@@ -57,3 +71,44 @@ val CrimsonContainer = Color(0xFFFEE2E2)
 val WarningOrange = Color(0xFFF97316)
 val WarningContainer = Color(0xFFFFEDD5)
 val SuccessGreen = Color(0xFF10B981)
+
+// Neo-Fintech Luxury Gradients
+val HeroEmeraldGradient = Brush.linearGradient(
+    colors = listOf(
+        Color(0xFF022C22), // Deep Forest
+        Color(0xFF064E3B), // Emerald 900
+        Color(0xFF065F46), // Emerald 800
+        Color(0xFF047857)  // Emerald 700
+    )
+)
+
+val GlowPillGradient = Brush.horizontalGradient(
+    colors = listOf(
+        Color(0xFF10B981),
+        Color(0xFF059669)
+    )
+)
+
+val PrimaryEmeraldGradient = Brush.linearGradient(
+    colors = listOf(
+        Emerald600,
+        Emerald700
+    )
+)
+
+val SoftMintGradient = Brush.linearGradient(
+    colors = listOf(
+        Color(0xFFECFDF5),
+        Color(0xFFD1FAE5)
+    )
+)
+
+val GlassBorderBrush = Brush.linearGradient(
+    colors = listOf(
+        Color.White.copy(alpha = 0.28f),
+        Color.White.copy(alpha = 0.08f)
+    )
+)
+
+val SubtleCardBorderLight = Color(0xFFE2E8F0).copy(alpha = 0.8f)
+val SubtleCardBorderDark = Color(0xFF1E3A2F).copy(alpha = 0.8f)

@@ -54,14 +54,17 @@ import com.example.R
 import com.example.service.QuickExpenseTileService
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 
 @Composable
 fun TileSettingsDialog(
     isTileFeatureEnabled: Boolean,
     onToggleFeature: (Boolean) -> Unit,
     onTestQuickAction: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    appLanguage: String = "EL"
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     val context = LocalContext.current
     var addTileStatusMessage by remember { mutableStateOf<String?>(null) }
 
@@ -104,13 +107,13 @@ fun TileSettingsDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Πλακίδιο Γρήγορων Ρυθμίσεων",
+                                text = if (lang == Localization.Language.ENGLISH) "Quick Settings Tile" else "Πλακίδιο Γρήγορων Ρυθμίσεων",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Quick Settings Tile",
+                                text = if (lang == Localization.Language.ENGLISH) "Instant expense logging tile" else "Γρήγορη καταγραφή εξόδου",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -127,7 +130,7 @@ fun TileSettingsDialog(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Κλείσιμο",
+                                contentDescription = Localization.close(lang),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -152,13 +155,17 @@ fun TileSettingsDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Ενεργοποίηση Πλακιδίου",
+                                text = if (lang == Localization.Language.ENGLISH) "Enable Quick Tile" else "Ενεργοποίηση Πλακιδίου",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (isTileFeatureEnabled) "Ενεργό στις ρυθμίσεις του κινητού" else "Ανενεργό",
+                                text = if (isTileFeatureEnabled) {
+                                    if (lang == Localization.Language.ENGLISH) "Active in phone quick settings" else "Ενεργό στις ρυθμίσεις του κινητού"
+                                } else {
+                                    if (lang == Localization.Language.ENGLISH) "Disabled" else "Ανενεργό"
+                                },
                                 fontSize = 11.sp,
                                 color = if (isTileFeatureEnabled) Emerald700 else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -190,24 +197,27 @@ fun TileSettingsDialog(
                                 context.mainExecutor
                             ) { result ->
                                 addTileStatusMessage = if (result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED) {
-                                    "Το πλακίδιο προστέθηκε επιτυχώς!"
+                                    if (lang == Localization.Language.ENGLISH) "Tile added successfully!" else "Το πλακίδιο προστέθηκε επιτυχώς!"
                                 } else {
-                                    "Μπορείτε να το προσθέσετε χειροκίνητα σέρνοντας τη μπάρα ειδοποιήσεων."
+                                    if (lang == Localization.Language.ENGLISH) "You can add it manually by dragging down the notification bar." else "Μπορείτε να το προσθέσετε χειροκίνητα σέρνοντας τη μπάρα ειδοποιήσεων."
                                 }
                             }
                         } else {
-                            addTileStatusMessage = "Σύρετε τη μπάρα ειδοποιήσεων προς τα κάτω, πατήστε το μολύβι επεξεργασίας και σύρετε το πλακίδιο OikoNomos στα ενεργά."
+                            addTileStatusMessage = if (lang == Localization.Language.ENGLISH)
+                                "Swipe down the notification shade, tap the edit pencil and drag the OikoNomos tile to active tiles."
+                            else
+                                "Σύρετε τη μπάρα ειδοποιήσεων προς τα κάτω, πατήστε το μολύβι επεξεργασίας και σύρετε το πλακίδιο OikoNomos στα ενεργά."
                         }
                     },
                     shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("request_add_tile_button")
                 ) {
-                    Icon(Icons.Default.OfflineBolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.OfflineBolt, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Προσθήκη στη Μπάρα Ειδοποιήσεων", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(if (lang == Localization.Language.ENGLISH) "Add to Notification Bar" else "Προσθήκη στη Μπάρα Ειδοποιήσεων", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
 
                 if (addTileStatusMessage != null) {
@@ -215,7 +225,7 @@ fun TileSettingsDialog(
                     Text(
                         text = addTileStatusMessage ?: "",
                         fontSize = 11.sp,
-                        color = Emerald700,
+                        color = MaterialTheme.colorScheme.primary,
                         lineHeight = 16.sp
                     )
                 }
@@ -233,9 +243,9 @@ fun TileSettingsDialog(
                         .fillMaxWidth()
                         .testTag("test_quick_action_button")
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp), tint = Emerald700)
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("⚡ Δοκιμή Λειτουργίας Τώρα", fontSize = 13.sp, color = Emerald700, fontWeight = FontWeight.SemiBold)
+                    Text(if (lang == Localization.Language.ENGLISH) "⚡ Test Quick Action Now" else "⚡ Δοκιμή Λειτουργίας Τώρα", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -246,7 +256,10 @@ fun TileSettingsDialog(
 
                 // Explanatory bullets
                 Text(
-                    text = "• Φωνή: Ομιλία ➔ Οθόνη επιβεβαίωσης / διόρθωσης ➔ Αποθήκευση\n• Χειροκίνητα: Συμπλήρωση ➔ Κατευθείαν αποθήκευση",
+                    text = if (lang == Localization.Language.ENGLISH)
+                        "• Voice: Speak ➔ Confirmation / edit screen ➔ Save\n• Manual: Fill form ➔ Direct save"
+                    else
+                        "• Φωνή: Ομιλία ➔ Οθόνη επιβεβαίωσης / διόρθωσης ➔ Αποθήκευση\n• Χειροκίνητα: Συμπλήρωση ➔ Κατευθείαν αποθήκευση",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp

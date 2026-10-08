@@ -55,12 +55,14 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.model.Household
 import com.example.ui.theme.Amber700
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 
 @Composable
 fun ExodologioDetailsDialog(
     currentHousehold: Household?,
     allHouseholds: List<Household>,
     isPremium: Boolean,
+    appLanguage: String = "EL",
     onRenameHousehold: (String) -> Unit,
     onSelectHousehold: (Household) -> Unit,
     onCreateNewHousehold: (String) -> Unit,
@@ -70,9 +72,10 @@ fun ExodologioDetailsDialog(
     onClearExpenses: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     var isEditingName by remember { mutableStateOf(false) }
-    var editedName by remember(currentHousehold?.name) {
-        mutableStateOf(currentHousehold?.name ?: "Το Εξοδολόγιό μου")
+    var editedName by remember(currentHousehold?.name, appLanguage) {
+        mutableStateOf(currentHousehold?.name ?: if (lang == Localization.Language.ENGLISH) "My Household Book" else "Το Εξοδολόγιό μου")
     }
     var showCreateDialog by remember { mutableStateOf(false) }
     var newHouseholdName by remember { mutableStateOf("") }
@@ -116,7 +119,7 @@ fun ExodologioDetailsDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Το Εξοδολόγιό μου",
+                            text = Localization.myExodologio(lang),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -133,7 +136,7 @@ fun ExodologioDetailsDialog(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Κλείσιμο",
+                                contentDescription = Localization.close(lang),
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
@@ -159,7 +162,7 @@ fun ExodologioDetailsDialog(
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text(
-                                text = "ΕΝΕΡΓΟ ΕΞΟΔΟΛΟΓΙΟ",
+                                text = Localization.activeExodologioHeader(lang),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
@@ -176,7 +179,7 @@ fun ExodologioDetailsDialog(
                                     OutlinedTextField(
                                         value = editedName,
                                         onValueChange = { editedName = it },
-                                        label = { Text("Όνομα") },
+                                        label = { Text(if (lang == Localization.Language.ENGLISH) "Name" else "Όνομα") },
                                         singleLine = true,
                                         shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.weight(1f)
@@ -188,7 +191,7 @@ fun ExodologioDetailsDialog(
                                             isEditingName = false
                                         }
                                     ) {
-                                        Icon(Icons.Default.Check, contentDescription = "Αποθήκευση", tint = Emerald700)
+                                        Icon(Icons.Default.Check, contentDescription = Localization.save(lang), tint = Emerald700)
                                     }
                                 }
                             } else {
@@ -198,7 +201,7 @@ fun ExodologioDetailsDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = currentHousehold?.name ?: "Το Εξοδολόγιό μου",
+                                        text = Localization.translateHouseholdName(currentHousehold?.name ?: "", lang).ifBlank { Localization.myExodologio(lang) },
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -214,7 +217,7 @@ fun ExodologioDetailsDialog(
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
                                                 imageVector = Icons.Default.Edit,
-                                                contentDescription = "Μετονομασία",
+                                                contentDescription = Localization.edit(lang),
                                                 tint = Emerald700,
                                                 modifier = Modifier.size(15.dp)
                                             )
@@ -242,9 +245,9 @@ fun ExodologioDetailsDialog(
                                     Icon(Icons.Default.Group, contentDescription = null, tint = Emerald700, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
-                                        Text(text = "Μέλη Εξοδολογίου", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(text = Localization.exodologioMembers(lang), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Text(
-                                            text = "${currentHousehold?.memberUids?.size ?: 1} ενεργά μέλη",
+                                            text = Localization.activeMembersCount(lang, currentHousehold?.memberUids?.size ?: 1),
                                             fontSize = 11.5.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -260,7 +263,7 @@ fun ExodologioDetailsDialog(
                                     }
                                 ) {
                                     Text(
-                                        text = "Προβολή",
+                                        text = Localization.view(lang),
                                         color = Emerald700,
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
@@ -309,13 +312,13 @@ fun ExodologioDetailsDialog(
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Δημιουργία Νέου Εξοδολογίου",
+                                    text = Localization.createNewExodologio(lang),
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Ξεχωριστό εξοδολόγιο",
+                                    text = Localization.separateExodologio(lang),
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -349,7 +352,7 @@ fun ExodologioDetailsDialog(
                     ) {
                         Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Διαγραφή όλων των εξόδων", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(Localization.clearAllExpenses(lang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Close button
@@ -364,7 +367,7 @@ fun ExodologioDetailsDialog(
                             .fillMaxWidth()
                             .height(44.dp)
                     ) {
-                        Text("Κλείσιμο", fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+                        Text(Localization.close(lang), fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
                     }
                 }
             }
@@ -375,15 +378,21 @@ fun ExodologioDetailsDialog(
         AlertDialog(
             onDismissRequest = { showCreateDialog = false },
             shape = RoundedCornerShape(20.dp),
-            title = { Text("Νέο Εξοδολόγιο", fontWeight = FontWeight.Bold) },
+            title = { Text(if (lang == Localization.Language.ENGLISH) "New Household" else "Νέο Εξοδολόγιο", fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("Δώστε όνομα για το νέο εξοδολόγιο (π.χ. Σπίτι, Εργασία, Εξοχικό, Ταξίδι):", fontSize = 13.sp)
+                    Text(
+                        if (lang == Localization.Language.ENGLISH)
+                            "Enter name for the new household (e.g. Home, Work, Vacation, Personal):"
+                        else
+                            "Δώστε όνομα για το νέο εξοδολόγιο (π.χ. Σπίτι, Εργασία, Εξοχικό, Ταξίδι):",
+                        fontSize = 13.sp
+                    )
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = newHouseholdName,
                         onValueChange = { newHouseholdName = it },
-                        placeholder = { Text("π.χ. Προσωπικά Έξοδα") },
+                        placeholder = { Text(if (lang == Localization.Language.ENGLISH) "e.g. Personal Expenses" else "π.χ. Προσωπικά Έξοδα") },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -399,13 +408,13 @@ fun ExodologioDetailsDialog(
                             onDismiss()
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700)
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White)
                 ) {
-                    Text("Δημιουργία", fontWeight = FontWeight.Bold)
+                    Text(Localization.save(lang), fontWeight = FontWeight.Bold, color = Color.White)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) { Text("Ακύρωση") }
+                TextButton(onClick = { showCreateDialog = false }) { Text(Localization.cancel(lang)) }
             }
         )
     }
@@ -414,8 +423,8 @@ fun ExodologioDetailsDialog(
         AlertDialog(
             onDismissRequest = { showClearConfirmDialog = false },
             shape = RoundedCornerShape(20.dp),
-            title = { Text("Διαγραφή όλων των εξόδων", fontWeight = FontWeight.Bold) },
-            text = { Text("Είστε σίγουροι ότι θέλετε να διαγράψετε οριστικά όλα τα έξοδα του τρέχοντος εξοδολογίου; Η ενέργεια αυτή δεν μπορεί να αναιρεθεί.") },
+            title = { Text(Localization.clearAllExpensesConfirmTitle(lang), fontWeight = FontWeight.Bold) },
+            text = { Text(Localization.clearAllExpensesConfirmMsg(lang)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -425,11 +434,11 @@ fun ExodologioDetailsDialog(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Διαγραφή", fontWeight = FontWeight.Bold)
+                    Text(Localization.delete(lang), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearConfirmDialog = false }) { Text("Ακύρωση") }
+                TextButton(onClick = { showClearConfirmDialog = false }) { Text(Localization.cancel(lang)) }
             }
         )
     }

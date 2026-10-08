@@ -40,14 +40,18 @@ class FirestoreSyncRepository(
             } else {
                 FirebaseFirestore.getInstance()
             }
-            // Ensure zero data stored on device flash memory (Memory Cache only)
+            // Enable Persistent Disk Cache so expenses and balances load immediately from disk on app launch
             try {
-                val memorySettings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
-                    .setLocalCacheSettings(com.google.firebase.firestore.MemoryCacheSettings.newBuilder().build())
+                val diskCacheSettings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
+                    .setLocalCacheSettings(
+                        com.google.firebase.firestore.PersistentCacheSettings.newBuilder()
+                            .setSizeBytes(com.google.firebase.firestore.FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
+                            .build()
+                    )
                     .build()
-                firestoreInstance.firestoreSettings = memorySettings
+                firestoreInstance.firestoreSettings = diskCacheSettings
             } catch (e: Exception) {
-                Log.w(TAG, "Memory cache settings could not be set: ${e.message}")
+                Log.w(TAG, "Persistent cache settings could not be set: ${e.message}")
             }
             return FirestoreSyncRepository(firestoreInstance)
         }
@@ -353,6 +357,126 @@ class FirestoreSyncRepository(
             .collection("incomes").document(docId)
             .set(incomeToSave)
             .await()
+    }
+
+    suspend fun enableNetwork() {
+        try {
+            db.enableNetwork().await()
+        } catch (e: Exception) {
+            Log.w(TAG, "enableNetwork warning: ${e.message}")
+        }
+    }
+
+    suspend fun getExpensesFromCache(householdId: String): List<FirebaseExpense> {
+        if (householdId.isBlank()) return emptyList()
+        return try {
+            val snapshot = db.collection("households").document(householdId)
+                .collection("expenses")
+                .get(com.google.firebase.firestore.Source.CACHE)
+                .await()
+            snapshot.toObjects(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                .sortedWith(
+                    compareByDescending<FirebaseExpense> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun getIncomesFromCache(householdId: String): List<FirebaseIncome> {
+        if (householdId.isBlank()) return emptyList()
+        return try {
+            val snapshot = db.collection("households").document(householdId)
+                .collection("incomes")
+                .get(com.google.firebase.firestore.Source.CACHE)
+                .await()
+            snapshot.toObjects(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                .sortedWith(
+                    compareByDescending<FirebaseIncome> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun getExpensesOnce(householdId: String): List<FirebaseExpense> {
+        if (householdId.isBlank()) return emptyList()
+        return try {
+            val snapshot = db.collection("households").document(householdId)
+                .collection("expenses")
+                .get()
+                .await()
+            snapshot.toObjects(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                .sortedWith(
+                    compareByDescending<FirebaseExpense> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
+        } catch (e: Exception) {
+            Log.w(TAG, "Error fetching expenses once", e)
+            emptyList()
+        }
+    }
+
+    suspend fun getIncomesOnce(householdId: String): List<FirebaseIncome> {
+        if (householdId.isBlank()) return emptyList()
+        return try {
+            val snapshot = db.collection("households").document(householdId)
+                .collection("incomes")
+                .get()
+                .await()
+            snapshot.toObjects(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                .sortedWith(
+                    compareByDescending<FirebaseIncome> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
+        } catch (e: Exception) {
+            Log.w(TAG, "Error fetching incomes once", e)
+            emptyList()
+        }
+    }
+
+    suspend fun getUserExpensesOnce(userId: String): List<FirebaseExpense> {
+        if (userId.isBlank()) return emptyList()
+        return try {
+            val snapshot = db.collection("users").document(userId)
+                .collection("expenses")
+                .get()
+                .await()
+            snapshot.toObjects(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                .sortedWith(
+                    compareByDescending<FirebaseExpense> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
+        } catch (e: Exception) {
+            Log.w(TAG, "Error fetching user expenses once", e)
+            emptyList()
+        }
+    }
+
+    suspend fun getUserIncomesOnce(userId: String): List<FirebaseIncome> {
+        if (userId.isBlank()) return emptyList()
+        return try {
+            val snapshot = db.collection("users").document(userId)
+                .collection("incomes")
+                .get()
+                .await()
+            snapshot.toObjects(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                .sortedWith(
+                    compareByDescending<FirebaseIncome> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
+        } catch (e: Exception) {
+            Log.w(TAG, "Error fetching user incomes once", e)
+            emptyList()
+        }
     }
 
     suspend fun deleteUserIncome(userId: String, incomeId: String) {

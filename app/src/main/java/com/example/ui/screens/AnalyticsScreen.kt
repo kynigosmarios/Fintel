@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import com.example.util.Localization
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -80,8 +83,10 @@ data class PieChartSlice(
 fun PieChartView(
     slices: List<PieChartSlice>,
     totalAmount: Double,
+    appLanguage: String = "EL",
     modifier: Modifier = Modifier
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     val total = totalAmount.coerceAtLeast(1.0)
     val validSlices = slices.filter { it.value > 0.001 }
 
@@ -93,7 +98,7 @@ fun PieChartView(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Δεν υπάρχουν καταχωρημένα έξοδα",
+                text = Localization.noExpensesRegistered(lang),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -144,7 +149,7 @@ fun PieChartView(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Σύνολο",
+                    text = Localization.total(lang),
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -190,10 +195,12 @@ fun AnalyticsScreen(
     incomes: List<Income> = emptyList(),
     categories: List<ExpenseCategory>,
     members: List<FamilyMember>,
+    appLanguage: String = "EL",
     onExportReport: () -> Unit = {},
     onManageCategories: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     var splitMode by remember { mutableIntStateOf(0) } // 0 = Ατομικά, 1 = Γονείς + Κοινά, 2 = Ισόποσα σε όλους
     var chartTypeFamily by remember { mutableIntStateOf(0) } // 0 = Μπάρες, 1 = Πίτα (Requirement 6)
     var chartTypeMembers by remember { mutableIntStateOf(0) } // 0 = Μπάρες, 1 = Πίτα (Requirement 6)
@@ -344,6 +351,7 @@ fun AnalyticsScreen(
             BudgetAlertsCard(
                 expenses = expenses,
                 categories = categories,
+                appLanguage = appLanguage,
                 onManageBudgets = onManageCategories
             )
         }
@@ -380,13 +388,13 @@ fun AnalyticsScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "Στατιστική Ανάλυση",
+                                    text = Localization.statisticalAnalysis(lang),
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Οικογενειακός ισολογισμός μήνα",
+                                    text = Localization.familyMonthlyBalance(lang),
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -409,7 +417,7 @@ fun AnalyticsScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.TableChart,
-                                    contentDescription = "Εξαγωγή σε Excel",
+                                    contentDescription = Localization.exportToExcel(lang),
                                     tint = Emerald700,
                                     modifier = Modifier.size(15.dp)
                                 )
@@ -426,7 +434,7 @@ fun AnalyticsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Triple KPI: Έσοδα, Έξοδα, Καθαρό Υπόλοιπο
+                    // Triple KPI: Incomes, Expenses, Net Balance
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -438,7 +446,7 @@ fun AnalyticsScreen(
                             border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.28f))
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Έσοδα", fontSize = 11.sp, color = Color(0xFF047857), fontWeight = FontWeight.SemiBold)
+                                Text(Localization.incomes(lang), fontSize = 11.sp, color = Color(0xFF047857), fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = String.format(Locale.US, "+%.2f €", totalIncome),
@@ -448,7 +456,7 @@ fun AnalyticsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "${incomes.size} εγγραφές",
+                                    text = Localization.entriesCount(incomes.size, lang),
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -462,7 +470,7 @@ fun AnalyticsScreen(
                             border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.22f))
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Έξοδα", fontSize = 11.sp, color = Color(0xFFDC2626), fontWeight = FontWeight.SemiBold)
+                                Text(Localization.expenses(lang), fontSize = 11.sp, color = Color(0xFFDC2626), fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = String.format(Locale.US, "%.2f €", totalSpend),
@@ -472,7 +480,7 @@ fun AnalyticsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "${expenses.size} συναλλαγές",
+                                    text = Localization.transactionsCount(expenses.size, lang),
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -486,7 +494,7 @@ fun AnalyticsScreen(
                             border = BorderStroke(1.dp, (if (netBalance >= 0) Color(0xFF10B981) else Color(0xFFEF4444)).copy(alpha = 0.28f))
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Υπόλοιπο", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+                                Text(Localization.netBalanceTitle(lang), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = String.format(Locale.US, "%s%.2f €", if (netBalance >= 0) "+" else "", netBalance),
@@ -496,7 +504,7 @@ fun AnalyticsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = if (totalIncome > 0) "Αποταμ: ${savingsRate.toInt()}%" else "Ισοζύγιο",
+                                    text = if (totalIncome > 0) Localization.savingsRateLabel(savingsRate.toInt(), lang) else Localization.balanceLabel(lang),
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (netBalance >= 0) Color(0xFF059669) else Color(0xFFDC2626)
@@ -543,13 +551,13 @@ fun AnalyticsScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Έσοδα Οικογένειας",
+                                    text = Localization.familyIncome(lang),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Συνεισφορά ανά μέλος & πηγές",
+                                    text = Localization.contributionByMember(lang),
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -560,7 +568,8 @@ fun AnalyticsScreen(
                         ChartTypeToggle(
                             selectedType = chartTypeIncome,
                             onSelectType = { chartTypeIncome = it },
-                            activeColor = Color(0xFF059669)
+                            activeColor = Color(0xFF059669),
+                            appLanguage = appLanguage
                         )
                     }
 
@@ -577,14 +586,14 @@ fun AnalyticsScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
-                                    text = "Δεν έχουν καταχωρηθεί ακόμα έσοδα",
+                                    text = Localization.noIncomesYet(lang),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Καταχωρήστε μισθούς, ενοίκια, επιδοτήσεις κ.α. από την αρχική οθόνη με το κουμπί «+ Έσοδο».",
+                                    text = Localization.registerIncomeHint(lang),
                                     fontSize = 11.5.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -606,12 +615,13 @@ fun AnalyticsScreen(
                                     )
                                 } else null
                             } + if (unassignedMemberIncomes > 0.001) {
-                                listOf(PieChartSlice("Κοινό / Άλλο", unassignedMemberIncomes, Color(0xFF10B981)))
+                                listOf(PieChartSlice(Localization.commonOther(lang), unassignedMemberIncomes, Color(0xFF10B981)))
                             } else emptyList()
 
                             PieChartView(
                                 slices = incomeSlices,
-                                totalAmount = totalIncome
+                                totalAmount = totalIncome,
+                                appLanguage = appLanguage
                             )
                         } else {
                             // Bar List for Member Incomes
@@ -652,7 +662,7 @@ fun AnalyticsScreen(
                                                     fontWeight = FontWeight.Bold
                                                 )
                                                 Text(
-                                                    text = "${member.role} • $percent% του συνόλου εσόδων",
+                                                    text = "${Localization.translateRole(member.role, lang)} • ${Localization.percentOfTotalIncome(percent, lang)}",
                                                     fontSize = 10.5.sp,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -708,12 +718,12 @@ fun AnalyticsScreen(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column {
                                                 Text(
-                                                    text = "Κοινό / Λοιπά Έσοδα",
+                                                    text = Localization.commonOtherIncome(lang),
                                                     fontSize = 13.5.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
                                                 Text(
-                                                    text = "Μη αντιστοιχισμένα σε μέλος ($unassignedPct%)",
+                                                    text = Localization.unassignedMemberIncome(unassignedPct, lang),
                                                     fontSize = 10.5.sp,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
@@ -750,7 +760,7 @@ fun AnalyticsScreen(
                             Spacer(modifier = Modifier.height(12.dp))
 
                             Text(
-                                text = "Πηγές Εσόδων ανά Κατηγορία",
+                                text = Localization.incomeSourcesByCategory(lang),
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -775,7 +785,7 @@ fun AnalyticsScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = catName,
+                                                text = Localization.translateCategory(catName, lang),
                                                 fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color(0xFF047857)
@@ -831,7 +841,7 @@ fun AnalyticsScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Κατανομή Εξόδων",
+                                text = Localization.expenseDistribution(lang),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -842,7 +852,8 @@ fun AnalyticsScreen(
                         ChartTypeToggle(
                             selectedType = chartTypeFamily,
                             onSelectType = { chartTypeFamily = it },
-                            activeColor = Emerald700
+                            activeColor = Emerald700,
+                            appLanguage = appLanguage
                         )
                     }
 
@@ -856,10 +867,11 @@ fun AnalyticsScreen(
                         // Pie Chart View
                         PieChartView(
                             slices = listOf(
-                                PieChartSlice("Γονείς", parentsTotalSpend, Color(0xFF0284C7)),
-                                PieChartSlice("Παιδιά", kidsSpend, Color(0xFF10B981))
+                                PieChartSlice(Localization.parents(lang), parentsTotalSpend, Color(0xFF0284C7)),
+                                PieChartSlice(Localization.children(lang), kidsSpend, Color(0xFF10B981))
                             ),
-                            totalAmount = totalSpend
+                            totalAmount = totalSpend,
+                            appLanguage = appLanguage
                         )
                     } else {
                         // Stacked visual bar
@@ -899,7 +911,7 @@ fun AnalyticsScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF0284C7)))
                                     Spacer(modifier = Modifier.width(5.dp))
-                                    Text("Γονείς ($parentsPercent%)", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("${Localization.parents(lang)} ($parentsPercent%)", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
@@ -915,7 +927,7 @@ fun AnalyticsScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF10B981)))
                                     Spacer(modifier = Modifier.width(5.dp))
-                                    Text("Παιδιά ($kidsPercent%)", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                                    Text("${Localization.children(lang)} ($kidsPercent%)", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
@@ -946,7 +958,7 @@ fun AnalyticsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Καταμερισμός ανά Μέλος",
+                            text = Localization.breakdownByMember(lang),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -957,15 +969,16 @@ fun AnalyticsScreen(
                         ChartTypeToggle(
                             selectedType = chartTypeMembers,
                             onSelectType = { chartTypeMembers = it },
-                            activeColor = Emerald700
+                            activeColor = Emerald700,
+                            appLanguage = appLanguage
                         )
                     }
 
                     Text(
                         text = when (splitMode) {
-                            0 -> "Προσωπικά έξοδα ανά μέλος της οικογένειας"
-                            1 -> "Έξοδα γονέων & κάλυψη κοινών εξόδων σπιτιού"
-                            else -> "Έξοδα & δραστηριότητες για τα παιδιά"
+                            0 -> Localization.individualSpendingSubtitle(lang)
+                            1 -> Localization.parentsSpendingSubtitle(lang)
+                            else -> Localization.kidsSpendingSubtitle(lang)
                         },
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -973,45 +986,53 @@ fun AnalyticsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Mode selection filter chips: Ατομικά, Γονείς, Παιδιά
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // Mode selection modern segmented pill control: Individual, Parents, Kids
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        FilterChip(
-                            selected = splitMode == 0,
-                            onClick = { splitMode = 0 },
-                            label = { Text("Ατομικά", fontSize = 11.5.sp, fontWeight = if (splitMode == 0) FontWeight.Bold else FontWeight.Normal) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Emerald700.copy(alpha = 0.15f),
-                                selectedLabelColor = Emerald700
-                            )
-                        )
-                        FilterChip(
-                            selected = splitMode == 1,
-                            onClick = { splitMode = 1 },
-                            label = { Text("Γονείς", fontSize = 11.5.sp, fontWeight = if (splitMode == 1) FontWeight.Bold else FontWeight.Normal) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Emerald700.copy(alpha = 0.15f),
-                                selectedLabelColor = Emerald700
-                            )
-                        )
-                        FilterChip(
-                            selected = splitMode == 2,
-                            onClick = { splitMode = 2 },
-                            label = { Text("Παιδιά", fontSize = 11.5.sp, fontWeight = if (splitMode == 2) FontWeight.Bold else FontWeight.Normal) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Emerald700.copy(alpha = 0.15f),
-                                selectedLabelColor = Emerald700
-                            )
-                        )
+                        Row(modifier = Modifier.padding(3.dp)) {
+                            val modes = listOf(Localization.individualMode(lang), Localization.parentsMode(lang), Localization.kidsMode(lang))
+                            modes.forEachIndexed { index, title ->
+                                val isSelected = splitMode == index
+                                val bgColor by animateColorAsState(
+                                    targetValue = if (isSelected) Emerald700 else Color.Transparent,
+                                    animationSpec = tween(220),
+                                    label = "split_tab_bg_$index"
+                                )
+                                val textColor by animateColorAsState(
+                                    targetValue = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    animationSpec = tween(220),
+                                    label = "split_tab_text_$index"
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(11.dp),
+                                    color = bgColor,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { splitMode = index }
+                                        .testTag("split_mode_tab_$index")
+                                ) {
+                                    Text(
+                                        text = title,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = textColor,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
                     if (displayedMembers.isEmpty()) {
                         Text(
-                            text = if (splitMode == 2) "Δεν έχουν καταχωρηθεί μέλη με ρόλο «Παιδί»." else "Δεν υπάρχουν μέλη στη συγκεκριμένη κατηγορία.",
+                            text = if (splitMode == 2) Localization.noKidsRegisteredHint(lang) else Localization.noMembersInCategoryHint(lang),
                             fontSize = 12.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 12.dp)
@@ -1029,7 +1050,8 @@ fun AnalyticsScreen(
                         val displayedTotal = memberSpendMap.values.sum()
                         PieChartView(
                             slices = memberSlices,
-                            totalAmount = displayedTotal
+                            totalAmount = displayedTotal,
+                            appLanguage = appLanguage
                         )
                     } else {
                         // Bar View for members
@@ -1071,9 +1093,9 @@ fun AnalyticsScreen(
                                                 fontWeight = FontWeight.Bold
                                             )
                                             val subtitle = when (splitMode) {
-                                                0 -> "${member.role} • Ατομικά έξοδα"
-                                                1 -> if (com > 0.01) "${member.role} • Ατομ: ${String.format(Locale.US, "%.1f€", ind)} + Σπίτι: ${String.format(Locale.US, "%.1f€", com)}" else "${member.role} • Ατομικά έξοδα"
-                                                else -> "Παιδί • Έξοδα & δραστηριότητες"
+                                                0 -> Localization.individualExpensesSubtitle(member.role, lang)
+                                                1 -> if (com > 0.01) "${Localization.translateRole(member.role, lang)} • ${if (lang == Localization.Language.ENGLISH) "Ind" else "Ατομ"}: ${String.format(Locale.US, "%.1f€", ind)} + ${if (lang == Localization.Language.ENGLISH) "Home" else "Σπίτι"}: ${String.format(Locale.US, "%.1f€", com)}" else Localization.individualExpensesSubtitle(member.role, lang)
+                                                else -> Localization.kidsExpensesSubtitle(lang)
                                             }
                                             Text(
                                                 text = subtitle,
@@ -1140,7 +1162,7 @@ fun AnalyticsScreen(
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Έλεγχος Budgets",
+                                text = Localization.budgetMonitoring(lang),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -1148,7 +1170,7 @@ fun AnalyticsScreen(
                         }
 
                         Text(
-                            text = "${categories.size} κατηγορίες",
+                            text = Localization.categoriesCount(categories.size, lang),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1163,9 +1185,9 @@ fun AnalyticsScreen(
                         val progress = ratio.toFloat().coerceIn(0f, 1f)
 
                         val statusText = when {
-                            ratio >= 1.0 -> "Υπέρβαση"
-                            ratio >= 0.75 -> "Προσοχή"
-                            else -> "Εντός ορίου"
+                            ratio >= 1.0 -> Localization.exceededBudget(lang)
+                            ratio >= 0.75 -> Localization.warningBudget(lang)
+                            else -> Localization.withinBudget(lang)
                         }
 
                         val barColor = when {
@@ -1197,7 +1219,7 @@ fun AnalyticsScreen(
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = cat.name,
+                                        text = Localization.translateCategory(cat.name, lang),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
@@ -1260,8 +1282,10 @@ private fun ChartTypeToggle(
     selectedType: Int, // 0 = Bar, 1 = Pie
     onSelectType: (Int) -> Unit,
     activeColor: Color = Emerald700,
+    appLanguage: String = "EL",
     modifier: Modifier = Modifier
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
@@ -1284,7 +1308,7 @@ private fun ChartTypeToggle(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.BarChart,
-                        contentDescription = "Προβολή Μπάρας",
+                        contentDescription = Localization.barChartView(lang),
                         tint = if (selectedType == 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(17.dp)
                     )
@@ -1302,7 +1326,7 @@ private fun ChartTypeToggle(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.PieChart,
-                        contentDescription = "Προβολή Πίτας",
+                        contentDescription = Localization.pieChartView(lang),
                         tint = if (selectedType == 1) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(17.dp)
                     )

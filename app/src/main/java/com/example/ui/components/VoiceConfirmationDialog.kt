@@ -74,6 +74,7 @@ import com.example.data.entity.FamilyMember
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
 import com.example.ui.theme.Emerald900
+import com.example.util.Localization
 import com.example.util.ParsedVoiceExpense
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -85,6 +86,7 @@ fun VoiceConfirmationDialog(
     pendingExpense: ParsedVoiceExpense?,
     categories: List<ExpenseCategory>,
     members: List<FamilyMember>,
+    appLanguage: String = "EL",
     onConfirm: (
         title: String,
         amount: Double,
@@ -99,6 +101,8 @@ fun VoiceConfirmationDialog(
     onCancel: () -> Unit
 ) {
     if (pendingExpense == null) return
+
+    val lang = Localization.Language.fromCode(appLanguage)
 
     // Editable state initialized from parsed voice result
     var amountText by remember(pendingExpense) {
@@ -134,8 +138,7 @@ fun VoiceConfirmationDialog(
     val activeMemberCount = if (isAllFamily) members.size else selectedMemberIds.size.coerceAtLeast(1)
     val splitPerPerson = currentAmount / activeMemberCount
 
-    // Date formatting in Greek
-    val displayDateFormat = remember { SimpleDateFormat("EEEE, d MMMM yyyy", Locale.forLanguageTag("el-GR")) }
+    val displayDateFormat = remember(lang) { SimpleDateFormat("EEEE, d MMMM yyyy", Localization.getDateLocale(lang)) }
     val todayDateString = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
     val isSelectedDateToday = remember(selectedTimestamp) {
         val selectedString = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(selectedTimestamp))
@@ -153,18 +156,35 @@ fun VoiceConfirmationDialog(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        datePickerState.selectedDateMillis?.let {
-                            selectedTimestamp = it
+                        datePickerState.selectedDateMillis?.let { utcMillis ->
+                            val cal = java.util.Calendar.getInstance()
+                            val curHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+                            val curMinute = cal.get(java.util.Calendar.MINUTE)
+                            val curSecond = cal.get(java.util.Calendar.SECOND)
+
+                            val utcCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                                timeInMillis = utcMillis
+                            }
+
+                            val targetCal = java.util.Calendar.getInstance().apply {
+                                set(java.util.Calendar.YEAR, utcCal.get(java.util.Calendar.YEAR))
+                                set(java.util.Calendar.MONTH, utcCal.get(java.util.Calendar.MONTH))
+                                set(java.util.Calendar.DAY_OF_MONTH, utcCal.get(java.util.Calendar.DAY_OF_MONTH))
+                                set(java.util.Calendar.HOUR_OF_DAY, curHour)
+                                set(java.util.Calendar.MINUTE, curMinute)
+                                set(java.util.Calendar.SECOND, curSecond)
+                            }
+                            selectedTimestamp = targetCal.timeInMillis
                         }
                         showDatePicker = false
                     }
                 ) {
-                    Text("Επιλογή", color = Emerald700, fontWeight = FontWeight.Bold)
+                    Text(Localization.select(lang), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Ακύρωση")
+                    Text(Localization.cancel(lang))
                 }
             }
         ) {
@@ -191,7 +211,7 @@ fun VoiceConfirmationDialog(
                     .fillMaxSize()
                     .padding(20.dp)
             ) {
-                // 1. Header (Badge + Spoken Prompt)
+                // 1. Fixed Header (Badge + Close Button)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -212,7 +232,7 @@ fun VoiceConfirmationDialog(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Φωνητική Αναγνώριση",
+                            text = Localization.voiceOptionTitle(lang),
                             color = Emerald900,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
@@ -229,7 +249,7 @@ fun VoiceConfirmationDialog(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Κλείσιμο",
+                                contentDescription = Localization.close(lang),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -256,7 +276,7 @@ fun VoiceConfirmationDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 2. Scrollable Editable Fields (Amount, Category, Members, Date)
+                // 2. Scrollable Editable Fields
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -269,7 +289,7 @@ fun VoiceConfirmationDialog(
                             titleText = it
                             errorText = null
                         },
-                        label = { Text("Περιγραφή Εξόδου") },
+                        label = { Text(Localization.expenseDescLabel(lang)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("voice_expense_title_input"),
@@ -280,14 +300,14 @@ fun VoiceConfirmationDialog(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Ποσό (Ευρώ και Λεπτά)
+                    // Amount
                     OutlinedTextField(
                         value = amountText,
                         onValueChange = {
                             amountText = it.replace(',', '.')
                             errorText = null
                         },
-                        label = { Text("Ποσό (π.χ. 5.40 €)") },
+                        label = { Text(Localization.expenseAmountLabel(lang)) },
                         leadingIcon = {
                             Icon(Icons.Default.Euro, contentDescription = null, tint = Emerald700)
                         },
@@ -302,9 +322,9 @@ fun VoiceConfirmationDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Ημερομηνία (Τρέχουσα με δυνατότητα αλλαγής)
+                    // Date
                     Text(
-                        text = "Ημερομηνία Εξόδου:",
+                        text = Localization.dateLabel(lang),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -335,7 +355,7 @@ fun VoiceConfirmationDialog(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
-                                        text = if (isSelectedDateToday) "Σήμερα (Τρέχουσα)" else "Ημερομηνία",
+                                        text = if (isSelectedDateToday) Localization.today(lang) else Localization.date(lang),
                                         fontSize = 11.sp,
                                         color = Emerald700,
                                         fontWeight = FontWeight.Bold
@@ -354,7 +374,7 @@ fun VoiceConfirmationDialog(
                                 color = Emerald100
                             ) {
                                 Text(
-                                    text = "Αλλαγή",
+                                    text = Localization.changeAction(lang),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Emerald700,
@@ -366,9 +386,9 @@ fun VoiceConfirmationDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Κατηγορία (Επιλογή & Αλλαγή)
+                    // Category
                     Text(
-                        text = "Κατηγορία:",
+                        text = Localization.categoryLabel(lang),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -386,7 +406,7 @@ fun VoiceConfirmationDialog(
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { selectedCategoryId = cat.id },
-                                label = { Text(cat.name, fontSize = 12.sp) },
+                                label = { Text(Localization.translateCategory(cat.name, lang), fontSize = 12.sp) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = CategoryIconHelper.getIcon(cat.iconKey),
@@ -405,9 +425,9 @@ fun VoiceConfirmationDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Άτομα Οικογένειας που αφορά
+                    // Member Split
                     Text(
-                        text = "Άτομα Οικογένειας που αφορά:",
+                        text = Localization.memberWhoPaid(lang),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -438,7 +458,7 @@ fun VoiceConfirmationDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Κοινό έξοδο όλου του σπιτιού (Οικογένεια)",
+                                text = if (lang == Localization.Language.ENGLISH) "Common to entire household (Family)" else "Κοινό έξοδο όλου του σπιτιού (Οικογένεια)",
                                 fontSize = 13.sp,
                                 fontWeight = if (isAllFamily) FontWeight.Bold else FontWeight.Normal
                             )
@@ -448,7 +468,7 @@ fun VoiceConfirmationDialog(
                     if (!isAllFamily) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Επιλέξτε ποια άτομα αφορά:",
+                            text = if (lang == Localization.Language.ENGLISH) "Select participating members:" else "Επιλέξτε ποια άτομα αφορά:",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -462,6 +482,7 @@ fun VoiceConfirmationDialog(
                             members.forEach { member ->
                                 val isChecked = selectedMemberIds.contains(member.id)
                                 val avatarColor = Color(member.avatarColorHex)
+                                val translatedRole = Localization.translateRole(member.role, lang)
 
                                 FilterChip(
                                     selected = isChecked,
@@ -474,7 +495,7 @@ fun VoiceConfirmationDialog(
                                             selectedMemberIds.add(member.id)
                                         }
                                     },
-                                    label = { Text("${member.name} (${member.role})", fontSize = 12.sp) },
+                                    label = { Text("${member.name} ($translatedRole)", fontSize = 12.sp) },
                                     leadingIcon = {
                                         Box(
                                             modifier = Modifier
@@ -504,12 +525,15 @@ fun VoiceConfirmationDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Διαμοιρασμός: ",
+                                    text = if (lang == Localization.Language.ENGLISH) "Split calculation: " else "Διαμοιρασμός: ",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = String.format(Locale.US, "%.2f € / άτομο", splitPerPerson),
+                                    text = if (lang == Localization.Language.ENGLISH)
+                                        String.format(Locale.US, "%.2f € / person", splitPerPerson)
+                                    else
+                                        String.format(Locale.US, "%.2f € / άτομο", splitPerPerson),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Emerald700
@@ -530,7 +554,7 @@ fun VoiceConfirmationDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // 3. Fixed Sticky Bottom Action Bar (Cancel + Confirm) - ALWAYS visible on screen!
+                // 3. Fixed Sticky Bottom Action Bar (Cancel + Confirm)
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                     modifier = Modifier.padding(vertical = 10.dp)
@@ -545,7 +569,7 @@ fun VoiceConfirmationDialog(
                         onClick = onCancel,
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text("Ακύρωση")
+                        Text(Localization.cancel(lang))
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -554,11 +578,11 @@ fun VoiceConfirmationDialog(
                         onClick = {
                             val parsedAmount = amountText.toDoubleOrNull()
                             if (titleText.isBlank()) {
-                                errorText = "Παρακαλώ συμπληρώστε τίτλο εξόδου"
+                                errorText = Localization.fillDescriptionError(lang)
                                 return@Button
                             }
                             if (parsedAmount == null || parsedAmount <= 0) {
-                                errorText = "Παρακαλώ εισάγετε έγκυρο ποσό"
+                                errorText = Localization.fillAmountError(lang)
                                 return@Button
                             }
 
@@ -573,7 +597,7 @@ fun VoiceConfirmationDialog(
                             }
 
                             val memberDisplay = if (isAllFamily) {
-                                "Κοινό Οικογένειας"
+                                if (lang == Localization.Language.ENGLISH) "Family Shared" else "Κοινό Οικογένειας"
                             } else {
                                 val active = members.filter { finalMemberIds.contains(it.id) }
                                 active.joinToString(" & ") { it.name }
@@ -591,13 +615,13 @@ fun VoiceConfirmationDialog(
                                 pendingExpense.originalPrompt
                             )
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.testTag("dialog_confirm_button")
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Καταχώρηση", fontWeight = FontWeight.Bold)
+                        Text(Localization.confirm(lang), fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }

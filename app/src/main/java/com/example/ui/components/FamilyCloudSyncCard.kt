@@ -63,6 +63,7 @@ import com.example.ui.theme.Emerald700
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+import com.example.util.Localization
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -79,8 +80,10 @@ fun FamilyCloudSyncCard(
     onCreateHousehold: (String) -> Unit,
     onJoinHousehold: (String) -> Unit,
     onSignOut: () -> Unit,
-    onMessage: (String) -> Unit
+    onMessage: (String) -> Unit,
+    appLanguage: String = "EL"
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isSigningIn by remember { mutableStateOf(false) }
@@ -121,13 +124,17 @@ fun FamilyCloudSyncCard(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Συγχρονισμός & Οικογένεια",
+                            text = if (lang == Localization.Language.ENGLISH) "Sync & Family" else "Συγχρονισμός & Οικογένεια",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (currentUser != null) "Συνδεδεμένος λογαριασμός" else "Κοινό εξοδολόγιο με τη σύζυγο",
+                            text = if (currentUser != null) {
+                                if (lang == Localization.Language.ENGLISH) "Connected account" else "Συνδεδεμένος λογαριασμός"
+                            } else {
+                                if (lang == Localization.Language.ENGLISH) "Shared tracking with family" else "Κοινό εξοδολόγιο με τη σύζυγο"
+                            },
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -140,7 +147,10 @@ fun FamilyCloudSyncCard(
             // State 1: User NOT logged in -> Google Sign-In button
             if (currentUser == null) {
                 Text(
-                    text = "Συνδεθείτε με το Google λογαριασμό σας για να μοιράζεστε το εξοδολόγιο σε πραγματικό χρόνο.",
+                    text = if (lang == Localization.Language.ENGLISH)
+                        "Sign in with your Google account to share the household ledger in real time."
+                    else
+                        "Συνδεθείτε με το Google λογαριασμό σας για να μοιράζεστε το εξοδολόγιο σε πραγματικό χρόνο.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
@@ -169,22 +179,22 @@ fun FamilyCloudSyncCard(
                                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                                     val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
                                     Firebase.auth.signInWithCredential(authCredential).await()
-                                    onMessage("Συνδεθήκατε επιτυχώς!")
+                                    onMessage(if (lang == Localization.Language.ENGLISH) "Signed in successfully!" else "Συνδεθήκατε επιτυχώς!")
                                 } else {
-                                    onMessage("Μη έγκυρο διαπιστευτήριο")
+                                    onMessage(if (lang == Localization.Language.ENGLISH) "Invalid credential" else "Μη έγκυρο διαπιστευτήριο")
                                 }
                             } catch (e: GetCredentialCancellationException) {
                                 Log.w("Auth", "Google Sign-In cancelled: ${e.message}")
                             } catch (e: Exception) {
                                 Log.e("Auth", "Google Sign-In error", e)
-                                onMessage("Σφάλμα σύνδεσης: ${e.localizedMessage}")
+                                onMessage(if (lang == Localization.Language.ENGLISH) "Connection error: ${e.localizedMessage}" else "Σφάλμα σύνδεσης: ${e.localizedMessage}")
                             } finally {
                                 isSigningIn = false
                             }
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                     modifier = Modifier.fillMaxWidth().testTag("google_sign_in_button"),
                     enabled = !isSigningIn
                 ) {
@@ -192,9 +202,9 @@ fun FamilyCloudSyncCard(
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Σύνδεση με Google", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(if (lang == Localization.Language.ENGLISH) "Sign in with Google" else "Σύνδεση με Google", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 }
@@ -223,7 +233,7 @@ fun FamilyCloudSyncCard(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = currentUser.displayName ?: "Χρήστης",
+                            text = currentUser.displayName ?: (if (lang == Localization.Language.ENGLISH) "User" else "Χρήστης"),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -240,9 +250,9 @@ fun FamilyCloudSyncCard(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.testTag("sign_out_button")
                     ) {
-                        Icon(Icons.Default.Logout, contentDescription = "Αποσύνδεση", modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.Logout, contentDescription = Localization.signOut(lang), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Έξοδος", fontSize = 11.sp)
+                        Text(Localization.signOut(lang), fontSize = 11.sp)
                     }
                 }
 
@@ -267,14 +277,14 @@ fun FamilyCloudSyncCard(
                                     Icon(Icons.Default.Group, contentDescription = null, tint = Emerald700, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = household.name,
+                                        text = Localization.translateHouseholdName(household.name, lang),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = Emerald700
                                     )
                                 }
                                 Text(
-                                    text = "${household.memberUids.size} μέλη συνδεδεμένα",
+                                    text = if (lang == Localization.Language.ENGLISH) "${household.memberUids.size} members connected" else "${household.memberUids.size} μέλη συνδεδεμένα",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -283,7 +293,7 @@ fun FamilyCloudSyncCard(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
-                                text = "Κωδικός Πρόσκλησης για τη σύζυγο:",
+                                text = if (lang == Localization.Language.ENGLISH) "Invite code for partner / family:" else "Κωδικός Πρόσκλησης για τη σύζυγο:",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -309,13 +319,13 @@ fun FamilyCloudSyncCard(
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                             val clip = ClipData.newPlainText("OikoNomos Invite Code", household.inviteCode)
                                             clipboard.setPrimaryClip(clip)
-                                            onMessage("Ο κωδικός ${household.inviteCode} αντιγράφηκε!")
+                                            onMessage(if (lang == Localization.Language.ENGLISH) "Code ${household.inviteCode} copied!" else "Ο κωδικός ${household.inviteCode} αντιγράφηκε!")
                                         },
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp), tint = Emerald700)
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Αντιγραφή", fontSize = 11.sp, color = Emerald700)
+                                        Text(if (lang == Localization.Language.ENGLISH) "Copy" else "Αντιγραφή", fontSize = 11.sp, color = Emerald700)
                                     }
 
                                     Button(
@@ -324,11 +334,14 @@ fun FamilyCloudSyncCard(
                                                 action = Intent.ACTION_SEND
                                                 putExtra(
                                                     Intent.EXTRA_TEXT,
-                                                    "Έλα να μοιραστούμε τα οικογενειακά μας έξοδα στο OikoNomos! Βάλε τον κωδικό: ${household.inviteCode}"
+                                                    if (lang == Localization.Language.ENGLISH)
+                                                        "Join me in tracking our family expenses on OikoNomos! Use invite code: ${household.inviteCode}"
+                                                    else
+                                                        "Έλα να μοιραστούμε τα οικογενειακά μας έξοδα στο OikoNomos! Βάλε τον κωδικό: ${household.inviteCode}"
                                                 )
                                                 type = "text/plain"
                                             }
-                                            val shareIntent = Intent.createChooser(sendIntent, "Κοινοποίηση κωδικού")
+                                            val shareIntent = Intent.createChooser(sendIntent, if (lang == Localization.Language.ENGLISH) "Share invite code" else "Κοινοποίηση κωδικού")
                                             context.startActivity(shareIntent)
                                         },
                                         shape = RoundedCornerShape(8.dp),
@@ -336,7 +349,7 @@ fun FamilyCloudSyncCard(
                                     ) {
                                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Κοινοποίηση", fontSize = 11.sp)
+                                        Text(if (lang == Localization.Language.ENGLISH) "Share" else "Κοινοποίηση", fontSize = 11.sp)
                                     }
                                 }
                             }
@@ -345,7 +358,7 @@ fun FamilyCloudSyncCard(
                 } else {
                     // Not in household yet: options to Create or Join
                     Text(
-                        text = "Δεν ανήκετε ακόμα σε κοινό εξοδολόγιο:",
+                        text = if (lang == Localization.Language.ENGLISH) "You are not part of a shared household yet:" else "Δεν ανήκετε ακόμα σε κοινό εξοδολόγιο:",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -360,10 +373,10 @@ fun FamilyCloudSyncCard(
                             Button(
                                 onClick = { showCreateDialog = true },
                                 shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                                colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Δημιουργία", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(if (lang == Localization.Language.ENGLISH) "Create" else "Δημιουργία", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
 
                             OutlinedButton(
@@ -371,7 +384,7 @@ fun FamilyCloudSyncCard(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Σύνδεση με κωδικό", fontSize = 12.sp, color = Emerald700, fontWeight = FontWeight.Bold)
+                                Text(if (lang == Localization.Language.ENGLISH) "Connect with code" else "Σύνδεση με κωδικό", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -381,7 +394,7 @@ fun FamilyCloudSyncCard(
                             OutlinedTextField(
                                 value = familyNameInput,
                                 onValueChange = { familyNameInput = it },
-                                label = { Text("Όνομα (π.χ. Οικογένεια Κυνηγός)", fontSize = 11.sp) },
+                                label = { Text(if (lang == Localization.Language.ENGLISH) "Name (e.g. Smith Family)" else "Όνομα (π.χ. Οικογένεια Κυνηγός)", fontSize = 11.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(10.dp)
@@ -393,21 +406,21 @@ fun FamilyCloudSyncCard(
                             ) {
                                 Button(
                                     onClick = {
-                                        onCreateHousehold(familyNameInput.ifBlank { "Οικογένεια" })
+                                        onCreateHousehold(familyNameInput.ifBlank { if (lang == Localization.Language.ENGLISH) "Family" else "Οικογένεια" })
                                         showCreateDialog = false
                                     },
                                     shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("Έναρξη", fontSize = 12.sp)
+                                    Text(if (lang == Localization.Language.ENGLISH) "Start" else "Έναρξη", fontSize = 12.sp, color = Color.White)
                                 }
                                 OutlinedButton(
                                     onClick = { showCreateDialog = false },
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(0.7f)
                                 ) {
-                                    Text("Ακύρωση", fontSize = 12.sp)
+                                    Text(Localization.cancel(lang), fontSize = 12.sp)
                                 }
                             }
                         }
@@ -418,7 +431,7 @@ fun FamilyCloudSyncCard(
                             OutlinedTextField(
                                 value = joinCodeInput,
                                 onValueChange = { joinCodeInput = it.uppercase() },
-                                label = { Text("Κωδικός συζύγου (π.χ. OIKO-1234)", fontSize = 11.sp) },
+                                label = { Text(if (lang == Localization.Language.ENGLISH) "Partner code (e.g. OIKO-1234)" else "Κωδικός συζύγου (π.χ. OIKO-1234)", fontSize = 11.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
                                 shape = RoundedCornerShape(10.dp)
@@ -436,17 +449,17 @@ fun FamilyCloudSyncCard(
                                         }
                                     },
                                     shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("Σύνδεση", fontSize = 12.sp)
+                                    Text(if (lang == Localization.Language.ENGLISH) "Connect" else "Σύνδεση", fontSize = 12.sp, color = Color.White)
                                 }
                                 OutlinedButton(
                                     onClick = { showJoinDialog = false },
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(0.7f)
                                 ) {
-                                    Text("Ακύρωση", fontSize = 12.sp)
+                                    Text(Localization.cancel(lang), fontSize = 12.sp)
                                 }
                             }
                         }

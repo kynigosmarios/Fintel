@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 import java.util.Calendar
 
 data class CategoryBudgetStatus(
@@ -56,9 +57,11 @@ data class CategoryBudgetStatus(
 fun BudgetAlertsCard(
     expenses: List<Expense>,
     categories: List<ExpenseCategory>,
+    appLanguage: String = "EL",
     onManageBudgets: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     // Current month filter
     val currentMonthExpenses = remember(expenses) {
         val cal = Calendar.getInstance()
@@ -142,16 +145,16 @@ fun BudgetAlertsCard(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Όρια Προϋπολογισμού Μήνα",
+                            text = Localization.monthlyBudgetLimits(lang),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = when {
-                                exceededCount > 0 -> "$exceededCount κατηγορίες υπερέβησαν το όριο!"
-                                warningCount > 0 -> "$warningCount κατηγορίες πλησιάζουν το όριο (80%+)"
-                                else -> "Όλες οι κατηγορίες εντός ορίων"
+                                exceededCount > 0 -> Localization.categoriesExceededLimit(lang, exceededCount)
+                                warningCount > 0 -> Localization.categoriesApproachingLimit(lang, warningCount)
+                                else -> Localization.allBudgetsHealthy(lang)
                             },
                             fontSize = 11.sp,
                             fontWeight = if (exceededCount > 0 || warningCount > 0) FontWeight.SemiBold else FontWeight.Normal,
@@ -170,7 +173,7 @@ fun BudgetAlertsCard(
                     modifier = Modifier.clickable { onManageBudgets() }
                 ) {
                     Text(
-                        text = "Κατηγορίες",
+                        text = Localization.tabCategories(lang),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = Emerald700,
@@ -197,7 +200,7 @@ fun BudgetAlertsCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = status.category.name,
+                            text = Localization.translateCategory(status.category.name, lang),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface

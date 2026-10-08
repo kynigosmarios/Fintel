@@ -1,12 +1,22 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +42,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -61,10 +73,13 @@ import com.example.data.entity.SavingsGoal
 import com.example.ui.theme.Emerald700
 import com.example.ui.theme.Emerald900
 
+import com.example.util.Localization
+
 @Composable
 fun SavingsAndRecurringScreen(
     goals: List<SavingsGoal>,
     recurringExpenses: List<RecurringExpense>,
+    appLanguage: String = "EL",
     onAddGoal: () -> Unit,
     onEditGoal: (SavingsGoal) -> Unit,
     onDeleteGoal: (SavingsGoal) -> Unit,
@@ -77,51 +92,120 @@ fun SavingsAndRecurringScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
+    val lang = Localization.Language.fromCode(appLanguage)
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
             .testTag("savings_and_recurring_screen")
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Tab Row: Goals vs Recurring
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = Emerald700,
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
         ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Savings, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+        // Modern Segmented Pill Switcher: Στόχοι vs Πάγιες
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(modifier = Modifier.padding(4.dp)) {
+                val goalsBgColor by animateColorAsState(
+                    targetValue = if (selectedTab == 0) Emerald700 else Color.Transparent,
+                    animationSpec = tween(220),
+                    label = "goals_tab_bg"
+                )
+                val goalsTextColor by animateColorAsState(
+                    targetValue = if (selectedTab == 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    animationSpec = tween(220),
+                    label = "goals_tab_text"
+                )
+                val recurringBgColor by animateColorAsState(
+                    targetValue = if (selectedTab == 1) Emerald700 else Color.Transparent,
+                    animationSpec = tween(220),
+                    label = "recurring_tab_bg"
+                )
+                val recurringTextColor by animateColorAsState(
+                    targetValue = if (selectedTab == 1) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    animationSpec = tween(220),
+                    label = "recurring_tab_text"
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = goalsBgColor,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedTab = 0 }
+                        .testTag("tab_goals_segmented")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Savings,
+                            contentDescription = null,
+                            tint = goalsTextColor,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Στόχοι (${goals.size})", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal)
+                        Text(
+                            text = "${Localization.savingsTabTitle(lang)} (${goals.size})",
+                            fontSize = 13.sp,
+                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
+                            color = goalsTextColor
+                        )
                     }
                 }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.EventRepeat, contentDescription = null, modifier = Modifier.size(16.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = recurringBgColor,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { selectedTab = 1 }
+                        .testTag("tab_recurring_segmented")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.EventRepeat,
+                            contentDescription = null,
+                            tint = recurringTextColor,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Πάγιες (${recurringExpenses.size})", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal)
+                        Text(
+                            text = "${Localization.recurringTabTitle(lang)} (${recurringExpenses.size})",
+                            fontSize = 13.sp,
+                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
+                            color = recurringTextColor
+                        )
                     }
                 }
-            )
+            }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        if (selectedTab == 0) {
+        AnimatedContent(
+            targetState = selectedTab,
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(140)) togetherWith fadeOut(animationSpec = tween(100)))
+                    .using(SizeTransform(clip = false))
+            },
+            label = "savings_recurring_tab_animated"
+        ) { tabIndex ->
+            if (tabIndex == 0) {
             // SAVINGS GOALS TAB
             val totalSaved = goals.sumOf { it.currentAmount }
             val totalTarget = goals.sumOf { it.targetAmount }
@@ -134,7 +218,7 @@ fun SavingsAndRecurringScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Συνολική Οικογενειακή Αποταμίευση", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
+                    Text(Localization.totalFamilySavings(lang), color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -148,7 +232,7 @@ fun SavingsAndRecurringScreen(
                             color = Color.White
                         )
                         Text(
-                            text = "από ${String.format(java.util.Locale.US, "%.0f", totalTarget)} € (${(overallPercentage * 100).toInt()}%)",
+                            text = "${Localization.ofTarget(lang)} ${String.format(java.util.Locale.US, "%.0f", totalTarget)} € (${(overallPercentage * 100).toInt()}%)",
                             fontSize = 13.sp,
                             color = Color.White.copy(alpha = 0.85f)
                         )
@@ -173,15 +257,15 @@ fun SavingsAndRecurringScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Οι Στόχοι Μας", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(Localization.ourGoals(lang), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Button(
                     onClick = onAddGoal,
-                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Νέος Στόχος", fontSize = 12.sp)
+                    Text(Localization.newGoal(lang), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -189,6 +273,7 @@ fun SavingsAndRecurringScreen(
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 100.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(goals, key = { it.id }) { goal ->
@@ -225,16 +310,16 @@ fun SavingsAndRecurringScreen(
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
                                         Text(goal.title, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                                        Text("Ημερομηνία: ${goal.deadlineDate}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("${Localization.deadlinePrefix(lang)}${goal.deadlineDate}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
 
                                 Row {
                                     IconButton(onClick = { onEditGoal(goal) }) {
-                                        Icon(Icons.Default.Edit, contentDescription = "Επεξεργασία", modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Default.Edit, contentDescription = Localization.edit(lang), modifier = Modifier.size(18.dp))
                                     }
                                     IconButton(onClick = { onDeleteGoal(goal) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Διαγραφή", modifier = Modifier.size(18.dp), tint = Color(0xFFEF4444))
+                                        Icon(Icons.Default.Delete, contentDescription = Localization.delete(lang), modifier = Modifier.size(18.dp), tint = Color(0xFFEF4444))
                                     }
                                 }
                             }
@@ -274,7 +359,7 @@ fun SavingsAndRecurringScreen(
                             if (isCompleted) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = "🎉 Συγχαρητήρια! Ο στόχος επετεύχθη!",
+                                    text = Localization.goalAchievedCongratulations(lang),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF10B981)
@@ -288,8 +373,8 @@ fun SavingsAndRecurringScreen(
                                     listOf(20.0, 50.0, 100.0).forEach { amount ->
                                         Surface(
                                             shape = RoundedCornerShape(8.dp),
-                                            color = Emerald700.copy(alpha = 0.1f),
-                                            border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.3f)),
+                                            color = Emerald700.copy(alpha = 0.2f),
+                                            border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.4f)),
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .clickable { onDepositToGoal(goal, amount) }
@@ -298,7 +383,7 @@ fun SavingsAndRecurringScreen(
                                                 text = "+${amount.toInt()}€",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Emerald700,
+                                                color = Color.White,
                                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                                 modifier = Modifier.padding(vertical = 6.dp)
                                             )
@@ -328,22 +413,22 @@ fun SavingsAndRecurringScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Σύνολο Πάγιων Εντολών", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(Localization.totalStandingOrders(lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            text = "${String.format(java.util.Locale.US, "%.2f", monthlyTotal)} € / μήνα",
+                            text = "${String.format(java.util.Locale.US, "%.2f", monthlyTotal)} € ${Localization.perMonthSuffix(lang)}",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Emerald700
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                     Button(
                         onClick = onAddRecurring,
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Νέα Πάγια", fontSize = 12.sp)
+                        Text(Localization.newStandingOrder(lang), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -352,6 +437,7 @@ fun SavingsAndRecurringScreen(
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 100.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(recurringExpenses, key = { it.id }) { recurring ->
@@ -371,7 +457,7 @@ fun SavingsAndRecurringScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(recurring.title, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                                 Text(
-                                    text = "${recurring.categoryName} • Κάθε ${recurring.dayOfMonth}η του μήνα",
+                                    text = "${Localization.translateCategory(recurring.categoryName, lang)} • ${Localization.everyDayOfMonth(lang, recurring.dayOfMonth)}",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -390,21 +476,21 @@ fun SavingsAndRecurringScreen(
                                     onClick = { onExecuteRecurringNow(recurring) },
                                     modifier = Modifier.size(36.dp)
                                 ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = "Εκτέλεση τώρα", tint = Emerald700)
+                                    Icon(Icons.Default.PlayArrow, contentDescription = Localization.executeNowAction(lang), tint = Emerald700)
                                 }
 
                                 IconButton(
                                     onClick = { onEditRecurring(recurring) },
                                     modifier = Modifier.size(36.dp)
                                 ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Επεξεργασία", modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.Edit, contentDescription = Localization.edit(lang), modifier = Modifier.size(18.dp))
                                 }
 
                                 IconButton(
                                     onClick = { onDeleteRecurring(recurring) },
                                     modifier = Modifier.size(36.dp)
                                 ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Διαγραφή", modifier = Modifier.size(18.dp), tint = Color(0xFFEF4444))
+                                    Icon(Icons.Default.Delete, contentDescription = Localization.delete(lang), modifier = Modifier.size(18.dp), tint = Color(0xFFEF4444))
                                 }
 
                                 Switch(
@@ -416,6 +502,53 @@ fun SavingsAndRecurringScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+        // Bottom-left aligned action button (identical design to Members and Categories)
+        if (selectedTab == 0) {
+            ExtendedFloatingActionButton(
+                onClick = onAddGoal,
+                containerColor = Emerald700,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp),
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 20.dp)
+                    .testTag("add_goal_fab")
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = Localization.addGoal(lang),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = Color.White
+                )
+            }
+        } else {
+            ExtendedFloatingActionButton(
+                onClick = onAddRecurring,
+                containerColor = Emerald700,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp),
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 20.dp)
+                    .testTag("add_recurring_fab")
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = Localization.addRecurring(lang),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = Color.White
+                )
             }
         }
     }

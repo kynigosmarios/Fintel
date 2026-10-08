@@ -19,37 +19,47 @@
 
         <!-- House Roof -->
         <path
-            android:pathData="M46,458 L500,56 L954,458"
+            android:pathData="M36,470 L500,52 L964,470"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="56"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round"
+            android:strokeWidth="42"
+            android:strokeLineCap="square"
+            android:strokeLineJoin="miter"
             android:fillColor="#00000000" />
 
         <!-- Left Wall -->
         <path
-            android:pathData="M134,395 L134,944"
+            android:pathData="M115,396 L115,938"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="56"
-            android:strokeLineCap="round"
+            android:strokeWidth="42"
+            android:strokeLineCap="square"
             android:fillColor="#00000000" />
 
         <!-- Right Wall -->
         <path
-            android:pathData="M866,395 L866,944"
+            android:pathData="M885,396 L885,938"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="56"
-            android:strokeLineCap="round"
+            android:strokeWidth="42"
+            android:strokeLineCap="square"
             android:fillColor="#00000000" />
 
-        <!-- Infinity / Economy Flow Symbol -->
+        <!-- Special Interlocking Infinity Symbol - Left Loop and Lower Diagonal -->
         <path
-            android:pathData="M500,650 C555,560 600,495 660,495 C746,495 815,564 815,650 C815,736 746,805 660,805 C600,805 555,740 500,650 C445,560 400,495 340,495 C254,495 185,564 185,650 C185,736 254,805 340,805 C400,805 445,740 500,650 Z"
+            android:pathData="M470,545 C440,510 395,492 345,492 C258,492 188,563 188,650 C188,737 258,808 345,808 C390,808 430,790 460,762 L595,650"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="56"
-            android:strokeLineCap="round"
+            android:strokeWidth="42"
+            android:strokeLineCap="square"
             android:strokeLineJoin="round"
             android:fillColor="#00000000" />
+
+        <!-- Special Interlocking Infinity Symbol - Right Loop and Upper Diagonal (180-deg rotated) -->
+        <path
+            android:pathData="M405,650 L540,538 C570,510 610,492 655,492 C742,492 812,563 812,650 C812,737 742,808 655,808 C605,808 560,790 530,755"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="42"
+            android:strokeLineCap="square"
+            android:strokeLineJoin="round"
+            android:fillColor="#00000000" />
+
     </group>
 
 </vector>

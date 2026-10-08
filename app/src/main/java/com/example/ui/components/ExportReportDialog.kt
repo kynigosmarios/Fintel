@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.Button
@@ -51,14 +49,17 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.entity.Expense
 import com.example.ui.theme.Emerald700
 import com.example.util.ExpenseReportExporter
+import com.example.util.Localization
 import java.util.Calendar
 
 @Composable
 fun ExportReportDialog(
     expenses: List<Expense>,
+    appLanguage: String = "EL",
     onDismiss: () -> Unit,
     onShowMessage: (String) -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     val context = LocalContext.current
     var selectedFilterIndex by remember { mutableIntStateOf(0) } // 0: This Month, 1: All Time
 
@@ -73,7 +74,7 @@ fun ExportReportDialog(
     }
 
     val targetExpenses = if (selectedFilterIndex == 0) currentMonthExpenses else expenses
-    val periodTitle = if (selectedFilterIndex == 0) "Τρέχων Μήνας" else "Όλα τα Έξοδα"
+    val periodTitle = if (selectedFilterIndex == 0) Localization.currentMonth(lang) else Localization.allFilter(lang)
     val totalAmount = targetExpenses.sumOf { it.amount }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -116,20 +117,20 @@ fun ExportReportDialog(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Εξαγωγή Αναφοράς",
+                                text = Localization.exportReportTitle(lang),
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Σε μορφή Excel / CSV με ελληνικούς χαρακτήρες",
+                                text = Localization.exportReportSubtitle(lang),
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Κλείσιμο")
+                        Icon(Icons.Default.Close, contentDescription = Localization.close(lang))
                     }
                 }
 
@@ -140,7 +141,7 @@ fun ExportReportDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("Τρέχων Μήνας", "Όλα τα Έξοδα").forEachIndexed { index, label ->
+                    listOf(Localization.currentMonth(lang), Localization.allFilter(lang)).forEachIndexed { index, label ->
                         val isSelected = selectedFilterIndex == index
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -175,7 +176,7 @@ fun ExportReportDialog(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = "Περίοδος:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = Localization.periodLabel(lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(text = periodTitle, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(6.dp))
@@ -183,15 +184,15 @@ fun ExportReportDialog(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = "Πλήθος Εξόδων:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(text = "${targetExpenses.size} συναλλαγές", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = Localization.expenseCountLabel(lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = Localization.transactionsPlural(lang, targetExpenses.size), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(text = "Συνολικό Ποσό:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Emerald700)
+                            Text(text = Localization.totalAmountLabel(lang), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Emerald700)
                             Text(
                                 text = "${String.format(java.util.Locale.US, "%.2f", totalAmount)} €",
                                 fontSize = 14.sp,
@@ -210,16 +211,16 @@ fun ExportReportDialog(
                         ExpenseReportExporter.shareReport(context, targetExpenses, periodTitle)
                         onDismiss()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                         .testTag("share_report_button")
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Κοινοποίηση (Email / Viber / Drive)", fontWeight = FontWeight.Bold)
+                    Text(Localization.shareReportAction(lang), fontWeight = FontWeight.Bold, color = Color.White)
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -230,7 +231,7 @@ fun ExportReportDialog(
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("OikoNomos Report", csv)
                         clipboard.setPrimaryClip(clip)
-                        onShowMessage("Η αναφορά CSV αντιγράφηκε στο πρόχειρο!")
+                        onShowMessage(Localization.csvCopiedMessage(lang))
                         onDismiss()
                     },
                     shape = RoundedCornerShape(12.dp),
@@ -238,7 +239,7 @@ fun ExportReportDialog(
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Αντιγραφή κειμένου CSV", fontSize = 13.sp)
+                    Text(Localization.copyCsvAction(lang), fontSize = 13.sp)
                 }
             }
         }

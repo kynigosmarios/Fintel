@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -35,23 +35,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.RecurringExpense
 import com.example.ui.theme.Emerald700
-
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.window.DialogProperties
+import com.example.util.Localization
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecurringExpenseDialog(
     recurringToEdit: RecurringExpense? = null,
     categories: List<ExpenseCategory>,
+    appLanguage: String = "EL",
     onDismiss: () -> Unit,
     onSave: (
         id: Long,
@@ -63,12 +64,18 @@ fun RecurringExpenseDialog(
         note: String
     ) -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
+
     var title by remember { mutableStateOf(recurringToEdit?.title ?: "") }
     var amountText by remember { mutableStateOf(recurringToEdit?.let { String.format(java.util.Locale.US, "%.2f", it.amount) } ?: "") }
     var dayOfMonth by remember { mutableIntStateOf(recurringToEdit?.dayOfMonth ?: 1) }
     var selectedCategoryId by remember { mutableLongStateOf(recurringToEdit?.categoryId ?: categories.firstOrNull()?.id ?: 1L) }
     var selectedCategoryName by remember { mutableStateOf(recurringToEdit?.categoryName ?: categories.firstOrNull()?.name ?: "Σπίτι") }
-    var note by remember { mutableStateOf(recurringToEdit?.note ?: "Πάγια εντολή") }
+    var note by remember {
+        mutableStateOf(
+            recurringToEdit?.note ?: (if (lang == Localization.Language.ENGLISH) "Standing Order" else "Πάγια εντολή")
+        )
+    }
 
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -96,13 +103,13 @@ fun RecurringExpenseDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (recurringToEdit == null) "Νέα Πάγια" else "Επεξεργασία Πάγιας",
+                        text = if (recurringToEdit == null) Localization.newStandingOrder(lang) else Localization.editStandingOrder(lang),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Κλείσιμο")
+                        Icon(Icons.Default.Close, contentDescription = Localization.close(lang))
                     }
                 }
 
@@ -111,7 +118,8 @@ fun RecurringExpenseDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Τίτλος") },
+                    label = { Text(Localization.recurringDescLabel(lang)) },
+                    placeholder = { Text(Localization.recurringDescPlaceholder(lang)) },
                     leadingIcon = { Icon(Icons.Default.EventRepeat, contentDescription = null, tint = Emerald700) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
@@ -124,7 +132,7 @@ fun RecurringExpenseDialog(
                     OutlinedTextField(
                         value = amountText,
                         onValueChange = { amountText = it },
-                        label = { Text("Ποσό") },
+                        label = { Text(Localization.expenseAmountLabel(lang)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -134,7 +142,7 @@ fun RecurringExpenseDialog(
                     OutlinedTextField(
                         value = dayOfMonth.toString(),
                         onValueChange = { dayOfMonth = it.toIntOrNull()?.coerceIn(1, 31) ?: 1 },
-                        label = { Text("Ημέρα Μήνα") },
+                        label = { Text(Localization.dayOfMonthLabel(lang)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -150,10 +158,10 @@ fun RecurringExpenseDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = selectedCategoryName,
+                        value = Localization.translateCategory(selectedCategoryName, lang),
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Κατηγορία") },
+                        label = { Text(Localization.categoryLabel(lang)) },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryDropdownExpanded) },
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
@@ -166,7 +174,7 @@ fun RecurringExpenseDialog(
                     ) {
                         categories.forEach { cat ->
                             DropdownMenuItem(
-                                text = { Text(cat.name) },
+                                text = { Text(Localization.translateCategory(cat.name, lang)) },
                                 onClick = {
                                     selectedCategoryId = cat.id
                                     selectedCategoryName = cat.name
@@ -182,7 +190,7 @@ fun RecurringExpenseDialog(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Σημειώσεις") },
+                    label = { Text(Localization.noteLabel(lang)) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -198,7 +206,7 @@ fun RecurringExpenseDialog(
                             onDismiss()
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                     shape = RoundedCornerShape(12.dp),
                     enabled = title.isNotBlank() && amountText.isNotBlank(),
                     modifier = Modifier
@@ -206,8 +214,9 @@ fun RecurringExpenseDialog(
                         .height(48.dp)
                 ) {
                     Text(
-                        text = "Αποθήκευση",
+                        text = Localization.save(lang),
                         fontWeight = FontWeight.Bold,
+                        color = Color.White,
                         maxLines = 1,
                         softWrap = false
                     )

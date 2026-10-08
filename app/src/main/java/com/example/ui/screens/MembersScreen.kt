@@ -36,6 +36,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -67,6 +69,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import com.example.data.model.Household
 import com.example.ui.theme.Amber700
+import com.example.util.Localization
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -74,6 +77,7 @@ fun MembersScreen(
     members: List<FamilyMember>,
     currentHousehold: Household? = null,
     isPremium: Boolean = false,
+    appLanguage: String = "EL",
     onAddMember: () -> Unit,
     onEditMember: (FamilyMember) -> Unit,
     onDeleteMember: (FamilyMember) -> Unit,
@@ -84,14 +88,18 @@ fun MembersScreen(
 ) {
     var memberToDelete by remember { mutableStateOf<FamilyMember?>(null) }
     var memberColorPickerTarget by remember { mutableStateOf<FamilyMember?>(null) }
+    val lang = Localization.Language.fromCode(appLanguage)
 
-    LazyColumn(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .testTag("members_screen"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .testTag("members_screen")
     ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         // Cloud Sync & Invite Card (Feature 4 - Paid Feature)
         item {
             Card(
@@ -120,13 +128,13 @@ fun MembersScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "Πρόσκληση Χρηστών στο Εξοδολόγιο",
+                                    text = Localization.inviteMembersTitle(lang),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = if (isPremium) "Pro Ενεργό: Μοιραστείτε τα έξοδα ζωντανά" else "🔒 Λειτουργία επί πληρωμή (OikoNomos Pro)",
+                                    text = if (isPremium) Localization.proActiveLiveSync(lang) else Localization.proPaidFeature(lang),
                                     fontSize = 11.5.sp,
                                     color = if (isPremium) Emerald700 else Amber700
                                 )
@@ -138,7 +146,7 @@ fun MembersScreen(
 
                     if (!isPremium) {
                         Text(
-                            text = "Συνδέστε την οικογένεια, τον/την σύντροφο ή συνεργάτες στο ίδιο εξοδολόγιο ώστε να βλέπουν και να καταχωρούν έξοδα σε πραγματικό χρόνο.",
+                            text = Localization.inviteCardDesc(lang),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -151,18 +159,18 @@ fun MembersScreen(
                         ) {
                             Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Αναβάθμιση σε Pro για Πρόσκληση", fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                            Text(Localization.upgradeToProToInvite(lang), fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
                         }
                     } else {
                         Button(
                             onClick = { onShareInviteCode("") },
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth().height(44.dp)
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Share, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Πρόσκληση Μέλους στο Εξοδολόγιο", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(Localization.inviteMemberToHousehold(lang), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
                         }
                     }
                 }
@@ -200,13 +208,13 @@ fun MembersScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Μέλη Οικογένειας",
+                                    text = Localization.familyMembersHeader(lang),
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${members.size} ενεργά μέλη",
+                                    text = Localization.activeMembersCount(lang, members.size),
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -216,19 +224,19 @@ fun MembersScreen(
                         Button(
                             onClick = onAddMember,
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                             modifier = Modifier.testTag("add_member_button")
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Προσθήκη", fontSize = 12.sp)
+                            Text(Localization.add(lang), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Ορίστε λέξεις αναγνώρισης (π.χ. «μπαμπάς», «μαμά», «παιδιά») για να αναγνωρίζει η φωνή ποιος συμμετέχει σε κάθε έξοδο.",
+                        text = Localization.membersVoiceKeywordsHint(lang),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -287,7 +295,7 @@ fun MembersScreen(
                                 color = avatarColor.copy(alpha = 0.15f)
                             ) {
                                 Text(
-                                    text = member.role,
+                                    text = Localization.translateRole(member.role, lang),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = avatarColor,
@@ -300,7 +308,7 @@ fun MembersScreen(
                         IconButton(onClick = { onEditMember(member) }) {
                             Icon(
                                 Icons.Default.Edit,
-                                contentDescription = "Επεξεργασία μέλους",
+                                contentDescription = Localization.edit(lang),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -309,7 +317,7 @@ fun MembersScreen(
                         IconButton(onClick = { memberToDelete = member }) {
                             Icon(
                                 Icons.Default.DeleteOutline,
-                                contentDescription = "Διαγραφή μέλους",
+                                contentDescription = Localization.delete(lang),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -318,7 +326,7 @@ fun MembersScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Color selection for each member - Clickable without showing all options initially
+                    // Color selection for each member
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
@@ -335,7 +343,7 @@ fun MembersScreen(
                                 .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
                         )
                         Text(
-                            text = "Επιλογή χρώματος",
+                            text = Localization.selectColor(lang),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.primary
@@ -354,7 +362,7 @@ fun MembersScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Φωνητικές λέξεις:",
+                            text = Localization.voiceKeywordsLabel(lang),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -370,7 +378,7 @@ fun MembersScreen(
                     ) {
                         if (keywordsList.isEmpty()) {
                             Text(
-                                text = "Μόνο το όνομα «${member.name}»",
+                                text = if (lang == Localization.Language.ENGLISH) "Only name \"${member.name}\"" else "Μόνο το όνομα «${member.name}»",
                                 fontSize = 11.sp,
                                 color = Color.Gray
                             )
@@ -395,13 +403,36 @@ fun MembersScreen(
         }
     }
 
+        // Bottom-left aligned action button
+        ExtendedFloatingActionButton(
+            onClick = onAddMember,
+            containerColor = Emerald700,
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 20.dp)
+                .testTag("add_member_fab")
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = Localization.addMemberFab(lang),
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = Color.White
+            )
+        }
+    }
+
     // Delete Confirmation Dialog
     if (memberToDelete != null) {
         val target = memberToDelete!!
         AlertDialog(
             onDismissRequest = { memberToDelete = null },
-            title = { Text("Διαγραφή Μέλους") },
-            text = { Text("Είστε σίγουροι ότι θέλετε να αφαιρέσετε το μέλος «${target.name}»;") },
+            title = { Text(Localization.deleteMemberConfirmTitle(lang)) },
+            text = { Text(Localization.deleteMemberConfirmMsg(lang, target.name)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -409,12 +440,12 @@ fun MembersScreen(
                         memberToDelete = null
                     }
                 ) {
-                    Text("Διαγραφή", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text(Localization.delete(lang), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { memberToDelete = null }) {
-                    Text("Ακύρωση")
+                    Text(Localization.cancel(lang))
                 }
             }
         )
@@ -438,13 +469,13 @@ fun MembersScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Επιλογή χρώματος: ${target.name}",
+                            text = if (lang == Localization.Language.ENGLISH) "Choose color: ${target.name}" else "Επιλογή χρώματος: ${target.name}",
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         IconButton(onClick = { memberColorPickerTarget = null }) {
-                            Icon(Icons.Default.Close, contentDescription = "Κλείσιμο")
+                            Icon(Icons.Default.Close, contentDescription = Localization.close(lang))
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))

@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +24,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBrightness
@@ -33,7 +33,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -60,6 +59,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.Household
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 import com.google.firebase.auth.FirebaseUser
 
 @Composable
@@ -68,8 +68,10 @@ fun AppSettingsDialog(
     household: Household?,
     isSyncing: Boolean,
     themeMode: String,
+    appLanguage: String = "EL",
     launchWithChooser: Boolean,
     onThemeChange: (String) -> Unit,
+    onLanguageChange: (String) -> Unit = {},
     onToggleLaunchWithChooser: (Boolean) -> Unit,
     onCreateHousehold: (String) -> Unit,
     onJoinHousehold: (String) -> Unit,
@@ -79,6 +81,7 @@ fun AppSettingsDialog(
     onDismiss: () -> Unit
 ) {
     var showResetConfirmDialog by remember { mutableStateOf(false) }
+    val lang = Localization.Language.fromCode(appLanguage)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -126,13 +129,13 @@ fun AppSettingsDialog(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Ρυθμίσεις Εφαρμογής",
+                                text = Localization.appSettings(lang),
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Εμφάνιση & προτιμήσεις",
+                                text = Localization.appSettingsSubtitle(lang),
                                 fontSize = 11.5.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -150,7 +153,7 @@ fun AppSettingsDialog(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Κλείσιμο",
+                                contentDescription = Localization.close(lang),
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
@@ -167,7 +170,7 @@ fun AppSettingsDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // 1. Account Summary Card (Spacious, full-width email, no awkward squishing)
+                    // 1. Account Summary Card
                     if (currentUser != null) {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
@@ -200,7 +203,7 @@ fun AppSettingsDialog(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = currentUser.displayName?.ifBlank { null } ?: "Χρήστης OikoNomos",
+                                        text = currentUser.displayName?.ifBlank { null } ?: if (lang == Localization.Language.ENGLISH) "OikoNomos User" else "Χρήστης OikoNomos",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -233,13 +236,13 @@ fun AppSettingsDialog(
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.Logout,
-                                            contentDescription = "Έξοδος",
+                                            contentDescription = Localization.signOut(lang),
                                             tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(13.dp)
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = "Έξοδος",
+                                            text = Localization.signOut(lang),
                                             fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.error
@@ -250,10 +253,53 @@ fun AppSettingsDialog(
                         }
                     }
 
-                    // 2. Section: Θέμα Εμφάνισης (Theme - 3 Elegant Visual Cards Side by Side)
+                    // 2. Section: Γλώσσα Εφαρμογής (Language Selection - Greek & English)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Language,
+                                contentDescription = null,
+                                tint = Emerald700,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = Localization.languageSection(lang),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            LanguageOptionCard(
+                                title = "Ελληνικά",
+                                flag = "🇬🇷",
+                                isSelected = appLanguage == "EL",
+                                onClick = { onLanguageChange("EL") },
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            LanguageOptionCard(
+                                title = "English",
+                                flag = "🇬🇧",
+                                isSelected = appLanguage == "EN",
+                                onClick = { onLanguageChange("EN") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // 3. Section: Θέμα Εμφάνισης (Theme - Light, Dark, System)
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "ΘΕΜΑ ΕΜΦΑΝΙΣΗΣ",
+                            text = Localization.themeDisplay(lang),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
@@ -266,7 +312,7 @@ fun AppSettingsDialog(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             ThemeCardOption(
-                                label = "Φωτεινό",
+                                label = Localization.themeLight(lang),
                                 icon = Icons.Default.LightMode,
                                 isSelected = themeMode == "LIGHT",
                                 onClick = { onThemeChange("LIGHT") },
@@ -274,7 +320,7 @@ fun AppSettingsDialog(
                             )
 
                             ThemeCardOption(
-                                label = "Σκοτεινό",
+                                label = Localization.themeDark(lang),
                                 icon = Icons.Default.DarkMode,
                                 isSelected = themeMode == "DARK",
                                 onClick = { onThemeChange("DARK") },
@@ -282,7 +328,7 @@ fun AppSettingsDialog(
                             )
 
                             ThemeCardOption(
-                                label = "Σύστημα",
+                                label = Localization.themeSystem(lang),
                                 icon = Icons.Default.SettingsBrightness,
                                 isSelected = themeMode == "SYSTEM",
                                 onClick = { onThemeChange("SYSTEM") },
@@ -291,10 +337,10 @@ fun AppSettingsDialog(
                         }
                     }
 
-                    // 3. Section: Προτιμήσεις Εκκίνησης (Launch Chooser Toggle)
+                    // 4. Section: Προτιμήσεις Εκκίνησης (Launch Chooser Toggle)
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "ΠΡΟΤΙΜΗΣΕΙΣ",
+                            text = Localization.preferencesSection(lang),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
@@ -333,13 +379,13 @@ fun AppSettingsDialog(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Γρήγορη επιλογή κατά την έναρξη",
+                                        text = Localization.quickActionLaunch(lang),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "Εμφάνιση μενού φωνής/πληκτρολόγησης",
+                                        text = Localization.quickActionLaunchSubtitle(lang),
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -357,10 +403,10 @@ fun AppSettingsDialog(
                         }
                     }
 
-                    // 4. Section: Διαχείριση Δεδομένων (Data Reset Row - Sleek & Never Clipped)
+                    // 5. Section: Διαχείριση Δεδομένων (Data Reset Row)
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "ΔΙΑΧΕΙΡΙΣΗ ΔΕΔΟΜΕΝΩΝ",
+                            text = Localization.dataManagement(lang),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
@@ -401,20 +447,20 @@ fun AppSettingsDialog(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Εκκαθάριση όλων των δεδομένων",
+                                        text = Localization.clearAllData(lang),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = "Διαγραφή τοπικών εξόδων & επαναφορά",
+                                        text = Localization.clearAllDataSubtitle(lang),
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
 
                                 Text(
-                                    text = "Επαναφορά",
+                                    text = Localization.resetAction(lang),
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.error
@@ -425,7 +471,7 @@ fun AppSettingsDialog(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // 5. Clean Bottom Close Button
+                    // 6. Bottom Close Button
                     Button(
                         onClick = onDismiss,
                         shape = RoundedCornerShape(14.dp),
@@ -438,7 +484,7 @@ fun AppSettingsDialog(
                             .height(46.dp)
                     ) {
                         Text(
-                            text = "Κλείσιμο",
+                            text = Localization.close(lang),
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -454,14 +500,17 @@ fun AppSettingsDialog(
             shape = RoundedCornerShape(22.dp),
             title = {
                 Text(
-                    text = "Πλήρης Εκκαθάριση;",
+                    text = if (lang == Localization.Language.ENGLISH) "Reset All Data?" else "Πλήρης Εκκαθάριση;",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
             },
             text = {
                 Text(
-                    text = "Θα διαγραφούν όλα τα τοπικά έξοδα και θα αποσυνδεθείτε από τον λογαριασμό σας ώστε η εφαρμογή να επανέλθει στην αρχική της κατάσταση.",
+                    text = if (lang == Localization.Language.ENGLISH)
+                        "All local expenses will be wiped and you will be signed out so the app returns to its initial clean state."
+                    else
+                        "Θα διαγραφούν όλα τα τοπικά έξοδα και θα αποσυνδεθείτε από τον λογαριασμό σας ώστε η εφαρμογή να επανέλθει στην αρχική της κατάσταση.",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -476,15 +525,75 @@ fun AppSettingsDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Εκκαθάριση & Αποσύνδεση", fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "Clear & Sign Out" else "Εκκαθάριση & Αποσύνδεση",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp
+                    )
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showResetConfirmDialog = false }) {
-                    Text("Ακύρωση", fontSize = 12.5.sp)
+                    Text(Localization.cancel(lang), fontSize = 12.5.sp)
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun LanguageOptionCard(
+    title: String,
+    flag: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (isSelected) Emerald700.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        border = BorderStroke(
+            width = if (isSelected) 1.5.dp else 1.dp,
+            color = if (isSelected) Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+        ),
+        modifier = modifier
+            .height(58.dp)
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = flag, fontSize = 20.sp)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) Emerald700 else MaterialTheme.colorScheme.onSurface
+                )
+            }
+            if (isSelected) {
+                Surface(
+                    shape = CircleShape,
+                    color = Emerald700,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

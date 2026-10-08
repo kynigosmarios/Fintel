@@ -5,36 +5,36 @@
     android:viewportWidth="1000"
     android:viewportHeight="1000">
 
-    <!-- Minimalist House Roof (Stroke #FFFFFF, round caps & joins) -->
+    <!-- House Roof (Square line caps, miter join) -->
     <path
-        android:pathData="M46,458 L500,56 L954,458"
+        android:pathData="M36,470 L500,52 L964,470"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="56"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
+        android:strokeWidth="42"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter"
         android:fillColor="#00000000" />
 
     <!-- Left Wall -->
     <path
-        android:pathData="M134,395 L134,944"
+        android:pathData="M115,396 L115,938"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="56"
-        android:strokeLineCap="round"
+        android:strokeWidth="42"
+        android:strokeLineCap="square"
         android:fillColor="#00000000" />
 
     <!-- Right Wall -->
     <path
-        android:pathData="M866,395 L866,944"
+        android:pathData="M885,396 L885,938"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="56"
-        android:strokeLineCap="round"
+        android:strokeWidth="42"
+        android:strokeLineCap="square"
         android:fillColor="#00000000" />
 
-    <!-- Infinity / Economy Flow Symbol in the Center -->
+    <!-- Infinity Symbol - Smooth, continuous, balanced lemniscate -->
     <path
-        android:pathData="M500,650 C555,560 600,495 660,495 C746,495 815,564 815,650 C815,736 746,805 660,805 C600,805 555,740 500,650 C445,560 400,495 340,495 C254,495 185,564 185,650 C185,736 254,805 340,805 C400,805 445,740 500,650 Z"
+        android:pathData="M500,645 C570,535 650,510 720,510 C795,510 850,565 850,645 C850,725 795,780 720,780 C650,780 570,755 500,645 C430,535 350,510 280,510 C205,510 150,565 150,645 C150,725 205,780 280,780 C350,780 430,755 500,645 Z"
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="56"
+        android:strokeWidth="42"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000" />

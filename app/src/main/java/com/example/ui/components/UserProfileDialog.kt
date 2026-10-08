@@ -52,6 +52,7 @@ import com.example.data.model.UserProfile
 import com.example.ui.theme.Amber700
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 import com.google.firebase.auth.FirebaseUser
 
 @Composable
@@ -61,14 +62,16 @@ fun UserProfileDialog(
     expenseCount: Int,
     totalSpent: Double,
     currencySymbol: String,
+    appLanguage: String = "EL",
     onSaveDisplayName: (String) -> Unit,
     onShowPremiumPaywall: () -> Unit,
     onSignOut: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     var isEditingName by remember { mutableStateOf(false) }
-    var editedName by remember(userProfile?.displayName, currentUser?.displayName) {
-        mutableStateOf(userProfile?.displayName?.ifBlank { null } ?: currentUser?.displayName ?: "Χρήστης OikoNomos")
+    var editedName by remember(userProfile?.displayName, currentUser?.displayName, appLanguage) {
+        mutableStateOf(userProfile?.displayName?.ifBlank { null } ?: currentUser?.displayName ?: Localization.oikonomosUser(lang))
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -109,7 +112,7 @@ fun UserProfileDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Το Προφίλ μου",
+                            text = Localization.myProfile(lang),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -126,7 +129,7 @@ fun UserProfileDialog(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Κλείσιμο",
+                                contentDescription = Localization.close(lang),
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
@@ -181,7 +184,7 @@ fun UserProfileDialog(
                                     OutlinedTextField(
                                         value = editedName,
                                         onValueChange = { editedName = it },
-                                        label = { Text("Όνομα Χρήστη") },
+                                        label = { Text(if (lang == Localization.Language.ENGLISH) "User Name" else "Όνομα Χρήστη") },
                                         singleLine = true,
                                         shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.weight(1f)
@@ -193,7 +196,7 @@ fun UserProfileDialog(
                                             isEditingName = false
                                         }
                                     ) {
-                                        Icon(Icons.Default.Check, contentDescription = "Αποθήκευση", tint = Emerald700)
+                                        Icon(Icons.Default.Check, contentDescription = Localization.save(lang), tint = Emerald700)
                                     }
                                 }
                             } else {
@@ -220,7 +223,7 @@ fun UserProfileDialog(
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
                                                 imageVector = Icons.Default.Edit,
-                                                contentDescription = "Επεξεργασία",
+                                                contentDescription = Localization.edit(lang),
                                                 tint = Emerald700,
                                                 modifier = Modifier.size(14.dp)
                                             )
@@ -243,7 +246,7 @@ fun UserProfileDialog(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = currentUser?.email ?: "Συνδεδεμένος λογαριασμός",
+                                    text = currentUser?.email ?: (if (lang == Localization.Language.ENGLISH) "Connected Account" else "Συνδεδεμένος λογαριασμός"),
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -279,13 +282,16 @@ fun UserProfileDialog(
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column {
                                         Text(
-                                            text = if (userProfile?.isPremium == true) "OikoNomos Pro" else "Δωρεάν Πλάνο",
+                                            text = if (userProfile?.isPremium == true) "OikoNomos Pro" else Localization.freePlan(lang),
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 14.sp,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
-                                            text = if (userProfile?.isPremium == true) "Απεριόριστα εξοδολόγια & μέλη" else "1 ενεργό εξοδολόγιο",
+                                            text = if (userProfile?.isPremium == true)
+                                                (if (lang == Localization.Language.ENGLISH) "Unlimited households & members" else "Απεριόριστα εξοδολόγια & μέλη")
+                                            else
+                                                Localization.activeHouseholdCount(lang, 1),
                                             fontSize = 11.5.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -298,7 +304,7 @@ fun UserProfileDialog(
                                         color = Amber700.copy(alpha = 0.15f)
                                     ) {
                                         Text(
-                                            text = "ΕΝΕΡΓΟ",
+                                            text = if (lang == Localization.Language.ENGLISH) "ACTIVE" else "ΕΝΕΡΓΟ",
                                             color = Amber700,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.ExtraBold,
@@ -330,7 +336,7 @@ fun UserProfileDialog(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "Αναβάθμιση σε Pro",
+                                        text = Localization.upgradeToPro(lang),
                                         fontSize = 12.5.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White
@@ -353,7 +359,7 @@ fun UserProfileDialog(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = "Συναλλαγές",
+                                    text = Localization.transactionsLabel(lang),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -376,7 +382,7 @@ fun UserProfileDialog(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = "Σύνολο Εξόδων",
+                                    text = Localization.totalExpensesLabel(lang),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -412,7 +418,7 @@ fun UserProfileDialog(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "Αποσύνδεση Λογαριασμού", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(text = Localization.signOutAccount(lang), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }

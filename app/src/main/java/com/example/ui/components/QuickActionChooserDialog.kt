@@ -38,15 +38,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 
 @Composable
 fun QuickActionChooserDialog(
+    appLanguage: String = "EL",
     onVoiceClick: () -> Unit,
     onManualClick: () -> Unit,
     onIncomeClick: () -> Unit = {},
     onOpenAppClick: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -76,7 +79,7 @@ fun QuickActionChooserDialog(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Επιλέξτε τρόπο καταγραφής",
+                            text = if (lang == Localization.Language.ENGLISH) "Choose entry method" else "Επιλέξτε τρόπο καταγραφής",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -92,7 +95,7 @@ fun QuickActionChooserDialog(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Κλείσιμο",
+                                contentDescription = Localization.close(lang),
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurface
                             )
@@ -104,8 +107,8 @@ fun QuickActionChooserDialog(
 
                 // Option 1: 🎙️ 1. Φωνητική εντολή
                 QuickActionItem(
-                    title = "1. Φωνητική εντολή",
-                    subtitle = "Μιλήστε άμεσα (π.χ. «15€ σούπερ μάρκετ»)",
+                    title = if (lang == Localization.Language.ENGLISH) "1. Voice Command" else "1. Φωνητική εντολή",
+                    subtitle = if (lang == Localization.Language.ENGLISH) "Speak directly (e.g. \"€15 supermarket\")" else "Μιλήστε άμεσα (π.χ. «15€ σούπερ μάρκετ»)",
                     icon = Icons.Default.Mic,
                     iconBgColor = Emerald700,
                     iconTint = Color.White,
@@ -121,8 +124,8 @@ fun QuickActionChooserDialog(
 
                 // Option 2: ⚡ 2. Γρήγορη καταχώρηση εξόδου
                 QuickActionItem(
-                    title = "2. Καταχώρηση Εξόδου",
-                    subtitle = "Άμεση καταχώρηση ποσού, κατηγορίας & μελών",
+                    title = if (lang == Localization.Language.ENGLISH) "2. Add Expense" else "2. Καταχώρηση Εξόδου",
+                    subtitle = if (lang == Localization.Language.ENGLISH) "Direct manual expense logging" else "Άμεση καταχώρηση ποσού, κατηγορίας & μελών",
                     icon = Icons.Default.FlashOn,
                     iconBgColor = Color(0xFF0284C7),
                     iconTint = Color.White,
@@ -138,8 +141,8 @@ fun QuickActionChooserDialog(
 
                 // Option 3: 💰 3. Καταχώρηση Εσόδου
                 QuickActionItem(
-                    title = "3. Καταχώρηση Εσόδου",
-                    subtitle = "Συνεισφορά μέλους (μισθός, ενοίκιο, bonus)",
+                    title = if (lang == Localization.Language.ENGLISH) "3. Add Income" else "3. Καταχώρηση Εσόδου",
+                    subtitle = if (lang == Localization.Language.ENGLISH) "Member income (salary, rent, bonus)" else "Συνεισφορά μέλους (μισθός, ενοίκιο, bonus)",
                     icon = Icons.Default.TrendingUp,
                     iconBgColor = Color(0xFF059669),
                     iconTint = Color.White,
@@ -155,8 +158,8 @@ fun QuickActionChooserDialog(
 
                 // Option 4: 🏠 4. Άνοιγμα εφαρμογής
                 QuickActionItem(
-                    title = "4. Άνοιγμα εφαρμογής",
-                    subtitle = "Προβολή εξόδων, εσόδων, στατιστικών & ρυθμίσεων",
+                    title = if (lang == Localization.Language.ENGLISH) "4. Open App" else "4. Άνοιγμα εφαρμογής",
+                    subtitle = if (lang == Localization.Language.ENGLISH) "View expenses, analytics & settings" else "Προβολή εξόδων, εσόδων, στατιστικών & ρυθμίσεων",
                     icon = Icons.Default.Dashboard,
                     iconBgColor = MaterialTheme.colorScheme.surfaceVariant,
                     iconTint = MaterialTheme.colorScheme.onSurface,

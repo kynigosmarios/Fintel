@@ -32,6 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.MainScreen
 import com.example.ui.theme.Emerald700
@@ -64,6 +67,14 @@ class MainActivity : ComponentActivity() {
                 else -> isSystemInDarkTheme()
             }
 
+            val view = LocalView.current
+            if (!view.isInEditMode) {
+                SideEffect {
+                    val window = (view.context as android.app.Activity).window
+                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDarkTheme
+                }
+            }
+
             MyApplicationTheme(darkTheme = isDarkTheme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     if (!isAuthInitialized) {
@@ -80,6 +91,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        viewModel.onAppResumed()
     }
 
     override fun onNewIntent(intent: Intent) {

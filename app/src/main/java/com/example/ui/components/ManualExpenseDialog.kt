@@ -71,6 +71,7 @@ import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -81,6 +82,7 @@ fun ManualExpenseDialog(
     expenseToEdit: Expense?,
     categories: List<ExpenseCategory>,
     members: List<FamilyMember>,
+    appLanguage: String = "EL",
     onDismiss: () -> Unit,
     onSave: (
         id: Long,
@@ -95,6 +97,8 @@ fun ManualExpenseDialog(
         note: String
     ) -> Unit
 ) {
+    val lang = Localization.Language.fromCode(appLanguage)
+
     var title by remember { mutableStateOf(expenseToEdit?.title ?: "") }
     var amountText by remember {
         mutableStateOf(expenseToEdit?.let { String.format(Locale.US, "%.2f", it.amount) } ?: "")
@@ -110,7 +114,7 @@ fun ManualExpenseDialog(
     var isAllFamily by remember {
         val hasSpecific = expenseToEdit != null && (
             expenseToEdit.splitType == "SPECIFIC_MEMBERS" ||
-            (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true))
+            (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true) && !expenseToEdit.memberNamesDisplay.equals("Family Shared", ignoreCase = true))
         )
         mutableStateOf(if (expenseToEdit != null) !hasSpecific else true)
     }
@@ -121,7 +125,7 @@ fun ManualExpenseDialog(
             val parsedIds = expenseToEdit.memberIdsCsv.split(",").mapNotNull { it.trim().toLongOrNull() }
             if (parsedIds.isNotEmpty()) {
                 list.addAll(parsedIds)
-            } else if (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true)) {
+            } else if (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true) && !expenseToEdit.memberNamesDisplay.equals("Family Shared", ignoreCase = true)) {
                 val matched = members.filter { m -> expenseToEdit.memberNamesDisplay.contains(m.name, ignoreCase = true) }
                 if (matched.isNotEmpty()) list.addAll(matched.map { it.id }) else list.addAll(members.map { it.id })
             } else {
@@ -140,8 +144,8 @@ fun ManualExpenseDialog(
     val activeMemberCount = if (isAllFamily) members.size else selectedMemberIds.size.coerceAtLeast(1)
     val splitPerPerson = currentAmount / activeMemberCount
 
-    // Date formatting in Greek
-    val displayDateFormat = remember { SimpleDateFormat("EEEE, d MMMM yyyy", Locale.forLanguageTag("el-GR")) }
+    // Date formatting localized
+    val displayDateFormat = remember(lang) { SimpleDateFormat("EEEE, d MMMM yyyy", Localization.getDateLocale(lang)) }
     val todayDateString = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) }
     val isSelectedDateToday = remember(selectedTimestamp) {
         val selectedString = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(selectedTimestamp))
@@ -182,12 +186,12 @@ fun ManualExpenseDialog(
                         showDatePicker = false
                     }
                 ) {
-                    Text("Επιλογή", color = Emerald700, fontWeight = FontWeight.Bold)
+                    Text(Localization.select(lang), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Ακύρωση")
+                    Text(Localization.cancel(lang))
                 }
             }
         ) {
@@ -221,7 +225,7 @@ fun ManualExpenseDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (expenseToEdit == null) "Νέο Έξοδο" else "Επεξεργασία Εξόδου",
+                        text = if (expenseToEdit == null) Localization.recordExpenseTitle(lang) else Localization.editExpenseTitle(lang),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = Emerald700
@@ -236,7 +240,7 @@ fun ManualExpenseDialog(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Κλείσιμο",
+                                contentDescription = Localization.close(lang),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -258,7 +262,8 @@ fun ManualExpenseDialog(
                             title = it
                             errorText = null
                         },
-                        label = { Text("Περιγραφή εξόδου (π.χ. Σούπερ Μάρκετ)") },
+                        label = { Text(Localization.expenseDescLabel(lang)) },
+                        placeholder = { Text(Localization.expenseDescPlaceholder(lang)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("expense_title_input"),
@@ -276,7 +281,7 @@ fun ManualExpenseDialog(
                             amountText = it.replace(',', '.')
                             errorText = null
                         },
-                        label = { Text("Ποσό σε Ευρώ (€)") },
+                        label = { Text(Localization.expenseAmountLabel(lang)) },
                         leadingIcon = {
                             Icon(Icons.Default.Euro, contentDescription = null, tint = Emerald700)
                         },
@@ -291,9 +296,9 @@ fun ManualExpenseDialog(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Date Picker Selector (Requirement 1.1)
+                    // Date Picker Selector
                     Text(
-                        text = "Ημερομηνία Εξόδου:",
+                        text = Localization.dateLabel(lang),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -324,7 +329,7 @@ fun ManualExpenseDialog(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {
                                     Text(
-                                        text = if (isSelectedDateToday) "Σήμερα" else "Ημερομηνία",
+                                        text = if (isSelectedDateToday) Localization.today(lang) else Localization.date(lang),
                                         fontSize = 11.sp,
                                         color = Emerald700,
                                         fontWeight = FontWeight.Bold
@@ -343,7 +348,7 @@ fun ManualExpenseDialog(
                                 color = Emerald100
                             ) {
                                 Text(
-                                    text = "Αλλαγή",
+                                    text = Localization.changeAction(lang),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Emerald700,
@@ -357,7 +362,7 @@ fun ManualExpenseDialog(
 
                     // Category Selection
                     Text(
-                        text = "Κατηγορία:",
+                        text = Localization.categoryLabel(lang),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -375,7 +380,7 @@ fun ManualExpenseDialog(
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { selectedCategoryId = cat.id },
-                                label = { Text(cat.name, fontSize = 12.sp) },
+                                label = { Text(Localization.translateCategory(cat.name, lang), fontSize = 12.sp) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = CategoryIconHelper.getIcon(cat.iconKey),
@@ -396,7 +401,7 @@ fun ManualExpenseDialog(
 
                     // Member Split Section
                     Text(
-                        text = "Καταμερισμός Εξόδου:",
+                        text = Localization.memberWhoPaid(lang),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -427,7 +432,7 @@ fun ManualExpenseDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Κοινό έξοδο όλου του σπιτιού (Οικογένεια)",
+                                text = if (lang == Localization.Language.ENGLISH) "Common to entire household (Family)" else "Κοινό έξοδο όλου του σπιτιού (Οικογένεια)",
                                 fontSize = 13.sp,
                                 fontWeight = if (isAllFamily) FontWeight.Bold else FontWeight.Normal
                             )
@@ -437,7 +442,7 @@ fun ManualExpenseDialog(
                     if (!isAllFamily) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Επιλέξτε μέλη που συμμετέχουν:",
+                            text = if (lang == Localization.Language.ENGLISH) "Select participating members:" else "Επιλέξτε μέλη που συμμετέχουν:",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -451,6 +456,7 @@ fun ManualExpenseDialog(
                             members.forEach { member ->
                                 val isChecked = selectedMemberIds.contains(member.id)
                                 val avatarColor = Color(member.avatarColorHex)
+                                val translatedRole = Localization.translateRole(member.role, lang)
 
                                 FilterChip(
                                     selected = isChecked,
@@ -463,7 +469,7 @@ fun ManualExpenseDialog(
                                             selectedMemberIds.add(member.id)
                                         }
                                     },
-                                    label = { Text("${member.name} (${member.role})", fontSize = 12.sp) },
+                                    label = { Text("${member.name} ($translatedRole)", fontSize = 12.sp) },
                                     leadingIcon = {
                                         Box(
                                             modifier = Modifier
@@ -493,12 +499,15 @@ fun ManualExpenseDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Υπολογισμός διαμοιρασμού: ",
+                                    text = if (lang == Localization.Language.ENGLISH) "Split calculation: " else "Υπολογισμός διαμοιρασμού: ",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = String.format(Locale.US, "%.2f € / άτομο", splitPerPerson),
+                                    text = if (lang == Localization.Language.ENGLISH)
+                                        String.format(Locale.US, "%.2f € / person", splitPerPerson)
+                                    else
+                                        String.format(Locale.US, "%.2f € / άτομο", splitPerPerson),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Emerald700
@@ -513,7 +522,8 @@ fun ManualExpenseDialog(
                     OutlinedTextField(
                         value = note,
                         onValueChange = { note = it },
-                        label = { Text("Σημειώσεις (προαιρετικό)") },
+                        label = { Text(Localization.noteLabel(lang)) },
+                        placeholder = { Text(Localization.notePlaceholder(lang)) },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         singleLine = true,
@@ -532,7 +542,7 @@ fun ManualExpenseDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // 3. Fixed Sticky Bottom Action Bar (Cancel + Save) - ALWAYS visible on screen! (Requirement 1.2)
+                // 3. Fixed Sticky Bottom Action Bar (Cancel + Save)
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
                     modifier = Modifier.padding(vertical = 10.dp)
@@ -547,7 +557,7 @@ fun ManualExpenseDialog(
                         onClick = onDismiss,
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text("Ακύρωση")
+                        Text(Localization.cancel(lang))
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -556,11 +566,11 @@ fun ManualExpenseDialog(
                         onClick = {
                             val parsedAmount = amountText.toDoubleOrNull()
                             if (title.isBlank()) {
-                                errorText = "Παρακαλώ συμπληρώστε τίτλο εξόδου"
+                                errorText = Localization.fillDescriptionError(lang)
                                 return@Button
                             }
                             if (parsedAmount == null || parsedAmount <= 0) {
-                                errorText = "Παρακαλώ εισάγετε έγκυρο ποσό"
+                                errorText = Localization.fillAmountError(lang)
                                 return@Button
                             }
 
@@ -575,7 +585,7 @@ fun ManualExpenseDialog(
                             }
 
                             val memberDisplay = if (isAllFamily) {
-                                "Κοινό Οικογένειας"
+                                if (lang == Localization.Language.ENGLISH) "Family Shared" else "Κοινό Οικογένειας"
                             } else {
                                 val active = members.filter { finalMemberIds.contains(it.id) }
                                 active.joinToString(" & ") { it.name }
@@ -600,15 +610,16 @@ fun ManualExpenseDialog(
                                 note.trim()
                             )
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.testTag("save_expense_button")
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Αποθήκευση",
+                            text = Localization.save(lang),
                             fontWeight = FontWeight.Bold,
+                            color = Color.White,
                             maxLines = 1,
                             softWrap = false
                         )

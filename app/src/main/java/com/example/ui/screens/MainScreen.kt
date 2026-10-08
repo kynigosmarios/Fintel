@@ -4,11 +4,18 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -171,11 +178,14 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
 
     val showSettingsDialog by viewModel.showSettingsDialog.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
     val currencySymbol by viewModel.currencySymbol.collectAsStateWithLifecycle()
+    val lang = com.example.util.Localization.Language.fromCode(appLanguage)
 
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val currentHousehold by viewModel.currentHousehold.collectAsStateWithLifecycle()
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val isInitialExpensesLoading by viewModel.isInitialExpensesLoading.collectAsStateWithLifecycle()
 
     val userHouseholds by viewModel.userHouseholds.collectAsStateWithLifecycle()
     val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
@@ -268,9 +278,9 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
         }
     }
 
-    val isDarkTheme = when (themeMode) {
-        "dark" -> true
-        "light" -> false
+    val isDarkTheme = when {
+        themeMode.equals("DARK", ignoreCase = true) -> true
+        themeMode.equals("LIGHT", ignoreCase = true) -> false
         else -> isSystemInDarkTheme()
     }
 
@@ -314,14 +324,20 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = "Μενού Επιλογών",
+                            contentDescription = com.example.util.Localization.menuTitle(lang),
                             tint = if (isDarkTheme) Color.White else Emerald950,
                             modifier = Modifier.size(26.dp)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (isDarkTheme) MaterialTheme.colorScheme.surface else Color.White
+                    containerColor = if (isDarkTheme) Color(0xFF0F172A) else Color.White,
+                    titleContentColor = if (isDarkTheme) Color.White else Emerald950,
+                    actionIconContentColor = if (isDarkTheme) Color.White else Emerald950
+                ),
+                modifier = Modifier.border(
+                    width = 1.dp,
+                    color = if (isDarkTheme) Color(0xFF334155).copy(alpha = 0.5f) else Color(0xFFE2E8F0).copy(alpha = 0.6f)
                 )
             )
         },
@@ -354,10 +370,10 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         icon = {
                             Icon(
                                 imageVector = if (currentTab == 0) Icons.Default.Receipt else Icons.Outlined.Receipt,
-                                contentDescription = "Έξοδα"
+                                contentDescription = com.example.util.Localization.tabExpenses(lang)
                             )
                         },
-                        label = { Text("Έξοδα", fontSize = 10.sp, fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabExpenses(lang), fontSize = 10.sp, fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Emerald700,
                             selectedTextColor = Emerald700,
@@ -372,10 +388,10 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         icon = {
                             Icon(
                                 imageVector = if (currentTab == 1) Icons.Default.PieChart else Icons.Outlined.PieChart,
-                                contentDescription = "Στατιστικά"
+                                contentDescription = com.example.util.Localization.tabAnalytics(lang)
                             )
                         },
-                        label = { Text("Στατιστικά", fontSize = 10.sp, fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabAnalytics(lang), fontSize = 10.sp, fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Emerald700,
                             selectedTextColor = Emerald700,
@@ -390,10 +406,10 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         icon = {
                             Icon(
                                 imageVector = if (currentTab == 2) Icons.Default.Savings else Icons.Outlined.Savings,
-                                contentDescription = "Στόχοι"
+                                contentDescription = com.example.util.Localization.tabSavings(lang)
                             )
                         },
-                        label = { Text("Στόχοι", fontSize = 10.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabSavings(lang), fontSize = 10.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Emerald700,
                             selectedTextColor = Emerald700,
@@ -408,10 +424,10 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         icon = {
                             Icon(
                                 imageVector = if (currentTab == 3) Icons.Default.Group else Icons.Outlined.Group,
-                                contentDescription = "Μέλη"
+                                contentDescription = com.example.util.Localization.tabMembers(lang)
                             )
                         },
-                        label = { Text("Μέλη", fontSize = 10.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabMembers(lang), fontSize = 10.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Emerald700,
                             selectedTextColor = Emerald700,
@@ -426,10 +442,10 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         icon = {
                             Icon(
                                 imageVector = if (currentTab == 4) Icons.Default.Category else Icons.Outlined.Category,
-                                contentDescription = "Κατηγορίες"
+                                contentDescription = com.example.util.Localization.tabCategories(lang)
                             )
                         },
-                        label = { Text("Κατηγορίες", fontSize = 10.sp, fontWeight = if (currentTab == 4) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabCategories(lang), fontSize = 10.sp, fontWeight = if (currentTab == 4) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Emerald700,
                             selectedTextColor = Emerald700,
@@ -452,74 +468,86 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (currentTab) {
-                0 -> ExpensesScreen(
-                    expenses = expenses,
-                    incomes = filteredIncomes,
-                    categories = categories,
-                    members = members,
-                    selectedMemberFilter = selectedMemberFilter,
-                    selectedCategoryFilter = selectedCategoryFilter,
-                    searchQuery = searchQuery,
-                    onMemberFilterChange = { viewModel.setMemberFilter(it) },
-                    onCategoryFilterChange = { viewModel.setCategoryFilter(it) },
-                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
-                    onAddManualExpense = { viewModel.openManualExpenseDialog() },
-                    onAddManualIncome = { viewModel.openManualIncomeDialog() },
-                    onVoiceExpense = { viewModel.openVoiceInputDialog() },
-                    onEditExpense = { viewModel.openManualExpenseDialog(it) },
-                    onDeleteExpense = { viewModel.deleteExpense(it) },
-                    onEditIncome = { viewModel.openManualIncomeDialog(it) },
-                    onDeleteIncome = { viewModel.deleteIncome(it) },
-                    onExportExcel = { viewModel.openExportReportDialog() },
-                    onExportPdf = { viewModel.openExportReportDialog() },
-                    onShareReport = { viewModel.openExportReportDialog() }
-                )
-                1 -> AnalyticsScreen(
-                    expenses = allExpenses,
-                    incomes = allIncomes,
-                    categories = categories,
-                    members = members,
-                    onExportReport = { viewModel.openExportReportDialog() },
-                    onManageCategories = { currentTab = 4 }
-                )
-                2 -> SavingsAndRecurringScreen(
-                    goals = savingsGoals,
-                    recurringExpenses = recurringExpenses,
-                    onAddGoal = { viewModel.openSavingsGoalDialog() },
-                    onEditGoal = { viewModel.openSavingsGoalDialog(it) },
-                    onDeleteGoal = { viewModel.deleteSavingsGoal(it) },
-                    onDepositToGoal = { goal, amt -> viewModel.depositToGoal(goal, amt) },
-                    onAddRecurring = { viewModel.openRecurringExpenseDialog() },
-                    onEditRecurring = { viewModel.openRecurringExpenseDialog(it) },
-                    onDeleteRecurring = { viewModel.deleteRecurringExpense(it) },
-                    onExecuteRecurringNow = { viewModel.executeRecurringExpenseNow(it) },
-                    onToggleRecurringActive = { viewModel.toggleRecurringActive(it) }
-                )
-                3 -> MembersScreen(
-                    members = members,
-                    currentHousehold = currentHousehold,
-                    isPremium = userProfile?.isPremium == true,
-                    onAddMember = { viewModel.openMemberDialog() },
-                    onEditMember = { viewModel.openMemberDialog(it) },
-                    onDeleteMember = { viewModel.deleteMember(it) },
-                    onUpdateMemberColor = { member, color -> viewModel.updateMemberColor(member, color) },
-                    onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
-                    onShareInviteCode = { code ->
-                        val sendIntent = android.content.Intent().apply {
-                            action = android.content.Intent.ACTION_SEND
-                            putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο OikoNomos με τον κωδικό: $code")
-                            type = "text/plain"
+            Crossfade(
+                targetState = currentTab,
+                animationSpec = tween(durationMillis = 150),
+                label = "tab_navigation_crossfade"
+            ) { tabIndex ->
+                when (tabIndex) {
+                    0 -> ExpensesScreen(
+                        expenses = expenses,
+                        incomes = filteredIncomes,
+                        categories = categories,
+                        members = members,
+                        selectedMemberFilter = selectedMemberFilter,
+                        selectedCategoryFilter = selectedCategoryFilter,
+                        searchQuery = searchQuery,
+                        appLanguage = appLanguage,
+                        onMemberFilterChange = { viewModel.setMemberFilter(it) },
+                        onCategoryFilterChange = { viewModel.setCategoryFilter(it) },
+                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                        onAddManualExpense = { viewModel.openManualExpenseDialog() },
+                        onAddManualIncome = { viewModel.openManualIncomeDialog() },
+                        onVoiceExpense = { viewModel.openVoiceInputDialog() },
+                        onEditExpense = { viewModel.openManualExpenseDialog(it) },
+                        onDeleteExpense = { viewModel.deleteExpense(it) },
+                        onEditIncome = { viewModel.openManualIncomeDialog(it) },
+                        onDeleteIncome = { viewModel.deleteIncome(it) },
+                        onExportExcel = { viewModel.openExportReportDialog() },
+                        onExportPdf = { viewModel.openExportReportDialog() },
+                        onShareReport = { viewModel.openExportReportDialog() },
+                        isInitialLoading = isInitialExpensesLoading
+                    )
+                    1 -> AnalyticsScreen(
+                        expenses = allExpenses,
+                        incomes = allIncomes,
+                        categories = categories,
+                        members = members,
+                        appLanguage = appLanguage,
+                        onExportReport = { viewModel.openExportReportDialog() },
+                        onManageCategories = { currentTab = 4 }
+                    )
+                    2 -> SavingsAndRecurringScreen(
+                        goals = savingsGoals,
+                        recurringExpenses = recurringExpenses,
+                        appLanguage = appLanguage,
+                        onAddGoal = { viewModel.openSavingsGoalDialog() },
+                        onEditGoal = { viewModel.openSavingsGoalDialog(it) },
+                        onDeleteGoal = { viewModel.deleteSavingsGoal(it) },
+                        onDepositToGoal = { goal, amt -> viewModel.depositToGoal(goal, amt) },
+                        onAddRecurring = { viewModel.openRecurringExpenseDialog() },
+                        onEditRecurring = { viewModel.openRecurringExpenseDialog(it) },
+                        onDeleteRecurring = { viewModel.deleteRecurringExpense(it) },
+                        onExecuteRecurringNow = { viewModel.executeRecurringExpenseNow(it) },
+                        onToggleRecurringActive = { viewModel.toggleRecurringActive(it) }
+                    )
+                    3 -> MembersScreen(
+                        members = members,
+                        currentHousehold = currentHousehold,
+                        isPremium = userProfile?.isPremium == true,
+                        appLanguage = appLanguage,
+                        onAddMember = { viewModel.openMemberDialog() },
+                        onEditMember = { viewModel.openMemberDialog(it) },
+                        onDeleteMember = { viewModel.deleteMember(it) },
+                        onUpdateMemberColor = { member, color -> viewModel.updateMemberColor(member, color) },
+                        onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
+                        onShareInviteCode = { code ->
+                            val sendIntent = android.content.Intent().apply {
+                                action = android.content.Intent.ACTION_SEND
+                                putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο OikoNomos με τον κωδικό: $code")
+                                type = "text/plain"
+                            }
+                            context.startActivity(android.content.Intent.createChooser(sendIntent, "Κοινοποίηση Κωδικού"))
                         }
-                        context.startActivity(android.content.Intent.createChooser(sendIntent, "Κοινοποίηση Κωδικού"))
-                    }
-                )
-                4 -> CategoriesScreen(
-                    categories = categories,
-                    onAddCategory = { viewModel.openCategoryDialog() },
-                    onEditCategory = { viewModel.openCategoryDialog(it) },
-                    onDeleteCategory = { viewModel.deleteCategory(it) }
-                )
+                    )
+                    4 -> CategoriesScreen(
+                        categories = categories,
+                        appLanguage = appLanguage,
+                        onAddCategory = { viewModel.openCategoryDialog() },
+                        onEditCategory = { viewModel.openCategoryDialog(it) },
+                        onDeleteCategory = { viewModel.deleteCategory(it) }
+                    )
+                }
             }
 
             // Burger Menu Drawer (Requirement 4: Contained between top header and bottom footer)
@@ -529,6 +557,8 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                 userProfile = userProfile,
                 currentHousehold = currentHousehold,
                 currentTab = currentTab,
+                appLanguage = appLanguage,
+                onLanguageChange = { viewModel.setAppLanguage(it) },
                 onSelectTab = { currentTab = it },
                 onOpenProfile = { viewModel.openUserProfileDialog() },
                 onOpenExodologio = { viewModel.openExodologioDetailsDialog() },
@@ -630,6 +660,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
     // Quick Action Chooser (Triggered on App Launch, Widget, or Manual Action)
     if (showQuickActionChooser) {
         QuickActionChooserDialog(
+            appLanguage = appLanguage,
             onVoiceClick = { viewModel.openVoiceInputDialog() },
             onManualClick = { viewModel.openManualExpenseDialog() },
             onIncomeClick = { viewModel.openManualIncomeDialog() },
@@ -646,6 +677,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             expenseCount = expenses.size,
             totalSpent = expenses.sumOf { it.amount },
             currencySymbol = currencySymbol,
+            appLanguage = appLanguage,
             onSaveDisplayName = { viewModel.updateUserDisplayName(it) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall("profile_upgrade") },
             onSignOut = { viewModel.signOutUser() },
@@ -659,6 +691,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             currentHousehold = currentHousehold,
             allHouseholds = userHouseholds,
             isPremium = userProfile?.isPremium == true,
+            appLanguage = appLanguage,
             onRenameHousehold = { viewModel.renameCurrentHousehold(it) },
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
@@ -683,6 +716,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             currentHousehold = currentHousehold,
             allHouseholds = userHouseholds,
             isPremium = userProfile?.isPremium == true,
+            appLanguage = appLanguage,
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
@@ -695,6 +729,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
     if (premiumPaywallReason != null) {
         PremiumPaywallDialog(
             reason = premiumPaywallReason!!,
+            appLanguage = appLanguage,
             onUnlockPro = { viewModel.unlockPro() },
             onDismiss = { viewModel.dismissPremiumPaywall() }
         )
@@ -757,8 +792,10 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             household = currentHousehold,
             isSyncing = isSyncing,
             themeMode = themeMode,
+            appLanguage = appLanguage,
             launchWithChooser = launchWithChooser,
             onThemeChange = { viewModel.setThemeMode(it) },
+            onLanguageChange = { viewModel.setAppLanguage(it) },
             onToggleLaunchWithChooser = { viewModel.setLaunchWithChooser(it) },
             onCreateHousehold = { viewModel.createHousehold(it) },
             onJoinHousehold = { viewModel.joinHousehold(it) },

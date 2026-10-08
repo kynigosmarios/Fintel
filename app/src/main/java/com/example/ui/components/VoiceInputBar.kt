@@ -67,37 +67,48 @@ fun VoiceMicButton(
         label = "pulse_scale"
     )
 
+    val restingGlowScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "resting_glow"
+    )
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.testTag("voice_mic_container")
     ) {
-        // Glowing ripple circle when listening
-        if (isListening) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .scale(pulseScale)
-                    .clip(CircleShape)
-                    .background(Emerald400.copy(alpha = 0.35f))
-            )
-        }
-
-        // Inner FAB button
+        // Ambient soft halo ring around the mic
         Box(
             modifier = Modifier
-                .size(66.dp)
+                .size(76.dp)
+                .scale(if (isListening) pulseScale else restingGlowScale)
                 .clip(CircleShape)
                 .background(
-                    Brush.verticalGradient(
+                    if (isListening) Color(0xFFEF4444).copy(alpha = 0.35f)
+                    else Emerald400.copy(alpha = 0.22f)
+                )
+        )
+
+        // Inner FAB button with luxury gradient and crisp micro-border
+        Box(
+            modifier = Modifier
+                .size(62.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.linearGradient(
                         colors = if (isListening) {
-                            listOf(Color(0xFFDC2626), Color(0xFF991B1B))
+                            listOf(Color(0xFFEF4444), Color(0xFFB91C1C))
                         } else {
-                            listOf(Emerald500, Emerald700)
+                            listOf(Color(0xFF10B981), Color(0xFF047857), Color(0xFF064E3B))
                         }
                     )
                 )
                 .clickable { onMicClick() }
-                .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+                .border(2.dp, Color.White.copy(alpha = 0.85f), CircleShape)
                 .testTag("voice_mic_button"),
             contentAlignment = Alignment.Center
         ) {
@@ -105,7 +116,7 @@ fun VoiceMicButton(
                 imageVector = if (isListening) Icons.Default.GraphicEq else Icons.Default.Mic,
                 contentDescription = if (isListening) "Διακοπή ακρόασης" else "Φωνητική καταχώρηση",
                 tint = Color.White,
-                modifier = Modifier.size(34.dp)
+                modifier = Modifier.size(30.dp)
             )
         }
     }

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,31 +58,39 @@ import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
 import java.util.Locale
 
+import com.example.util.Localization
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CategoriesScreen(
     categories: List<ExpenseCategory>,
+    appLanguage: String = "EL",
     onAddCategory: () -> Unit,
     onEditCategory: (ExpenseCategory) -> Unit,
     onDeleteCategory: (ExpenseCategory) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var categoryToDelete by remember { mutableStateOf<ExpenseCategory?>(null) }
+    val lang = Localization.Language.fromCode(appLanguage)
     val totalBudget = categories.sumOf { it.monthlyBudget }
 
-    LazyColumn(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .testTag("categories_screen"),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .testTag("categories_screen")
     ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         // Header
         item {
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Row(
@@ -105,15 +116,15 @@ fun CategoriesScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Κατηγορίες & Φωνή",
+                                    text = Localization.categoriesAndVoice(lang),
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Συνολικό Budget: ${String.format(Locale.US, "%.0f €", totalBudget)}/μήνα",
+                                    text = Localization.totalBudgetMonthly(lang, totalBudget),
                                     fontSize = 12.sp,
-                                    color = Emerald700,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -122,19 +133,19 @@ fun CategoriesScreen(
                         Button(
                             onClick = onAddCategory,
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
                             modifier = Modifier.testTag("add_category_button")
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Νέα", fontSize = 12.sp)
+                            Text(Localization.newAction(lang), fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Κάθε κατηγορία συνδέεται με φωνητικές λέξεις-κλειδιά. Όταν τις προφέρετε, η εφαρμογή εντοπίζει αυτόματα την κατηγορία.",
+                        text = Localization.categoriesDesc(lang),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -146,6 +157,7 @@ fun CategoriesScreen(
         items(categories, key = { it.id }) { cat ->
             val catColor = Color(cat.colorHex)
             val keywordsList = cat.voiceKeywords.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            val translatedCatName = Localization.translateCategory(cat.name, lang)
 
             Card(
                 shape = RoundedCornerShape(22.dp),
@@ -171,7 +183,7 @@ fun CategoriesScreen(
                         ) {
                             Icon(
                                 imageVector = CategoryIconHelper.getIcon(cat.iconKey),
-                                contentDescription = cat.name,
+                                contentDescription = translatedCatName,
                                 tint = catColor,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -182,16 +194,16 @@ fun CategoriesScreen(
                         // Category Details
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = cat.name,
+                                text = translatedCatName,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Budget: ${String.format(Locale.US, "%.0f € / μήνα", cat.monthlyBudget)}",
+                                text = Localization.budgetMonthlyLabel(lang, cat.monthlyBudget),
                                 fontSize = 12.sp,
-                                color = Emerald700,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -200,7 +212,7 @@ fun CategoriesScreen(
                         IconButton(onClick = { onEditCategory(cat) }) {
                             Icon(
                                 Icons.Default.Edit,
-                                contentDescription = "Επεξεργασία κατηγορίας",
+                                contentDescription = Localization.edit(lang),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -209,7 +221,7 @@ fun CategoriesScreen(
                         IconButton(onClick = { categoryToDelete = cat }) {
                             Icon(
                                 Icons.Default.DeleteOutline,
-                                contentDescription = "Διαγραφή κατηγορίας",
+                                contentDescription = Localization.delete(lang),
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -228,7 +240,7 @@ fun CategoriesScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Λέξεις-κλειδιά φωνής:",
+                            text = Localization.voiceKeywordsLabel(lang),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -244,7 +256,7 @@ fun CategoriesScreen(
                     ) {
                         if (keywordsList.isEmpty()) {
                             Text(
-                                text = "Μόνο το όνομα «${cat.name}»",
+                                text = if (lang == Localization.Language.ENGLISH) "Only name \"$translatedCatName\"" else "Μόνο το όνομα «${cat.name}»",
                                 fontSize = 11.sp,
                                 color = Color.Gray
                             )
@@ -269,13 +281,37 @@ fun CategoriesScreen(
         }
     }
 
+        // Bottom-left aligned action button
+        ExtendedFloatingActionButton(
+            onClick = onAddCategory,
+            containerColor = Emerald700,
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp),
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 20.dp)
+                .testTag("add_category_fab")
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = Localization.addCategoryFab(lang),
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = Color.White
+            )
+        }
+    }
+
     // Delete dialog
     if (categoryToDelete != null) {
         val target = categoryToDelete!!
+        val translatedTargetName = Localization.translateCategory(target.name, lang)
         AlertDialog(
             onDismissRequest = { categoryToDelete = null },
-            title = { Text("Διαγραφή Κατηγορίας") },
-            text = { Text("Είστε σίγουροι ότι θέλετε να διαγράψετε την κατηγορία «${target.name}»;") },
+            title = { Text(Localization.deleteCategoryConfirmTitle(lang)) },
+            text = { Text(Localization.deleteCategoryConfirmMsg(lang, translatedTargetName)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -283,12 +319,12 @@ fun CategoriesScreen(
                         categoryToDelete = null
                     }
                 ) {
-                    Text("Διαγραφή", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text(Localization.delete(lang), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { categoryToDelete = null }) {
-                    Text("Ακύρωση")
+                    Text(Localization.cancel(lang))
                 }
             }
         )
