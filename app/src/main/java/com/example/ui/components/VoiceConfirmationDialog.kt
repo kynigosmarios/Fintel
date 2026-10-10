@@ -587,7 +587,9 @@ fun VoiceConfirmationDialog(
                             }
 
                             val chosenCat = categories.find { it.id == selectedCategoryId }
-                                ?: categories.first()
+                                ?: categories.firstOrNull()
+                            val catId = chosenCat?.id ?: 1L
+                            val catName = chosenCat?.name ?: if (lang == Localization.Language.ENGLISH) "General" else "Γενικά"
 
                             val splitType = if (isAllFamily) "ALL_FAMILY" else "SPECIFIC_MEMBERS"
                             val finalMemberIds = if (isAllFamily) {
@@ -606,8 +608,8 @@ fun VoiceConfirmationDialog(
                             onConfirm(
                                 titleText.trim(),
                                 parsedAmount,
-                                chosenCat.id,
-                                chosenCat.name,
+                                catId,
+                                catName,
                                 selectedTimestamp,
                                 splitType,
                                 finalMemberIds,

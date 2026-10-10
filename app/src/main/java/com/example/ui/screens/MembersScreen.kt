@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -240,6 +241,73 @@ fun MembersScreen(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+
+        // Empty state when user has clean members
+        if (members.isEmpty()) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth().testTag("members_empty_card")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(Emerald100),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Group,
+                                contentDescription = null,
+                                tint = Emerald700,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "No Members Yet" else "Χωρίς Καταχωρημένα Μέλη",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH)
+                                "Add the members of your household or family to track expenses per person and split costs fairly."
+                            else
+                                "Προσθέστε τα μέλη του σπιτιού ή της οικογένειας για να παρακολουθείτε τα έξοδα ανά άτομο και να τα μοιράζετε ισόποσα.",
+                            fontSize = 13.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(18.dp))
+                        Button(
+                            onClick = onAddMember,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                            modifier = Modifier.testTag("empty_add_member_button")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "Add First Member" else "Προσθήκη Πρώτου Μέλους",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }

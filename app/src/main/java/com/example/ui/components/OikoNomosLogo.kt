@@ -40,7 +40,7 @@ fun OikoNomosLogo(
         ) {
             Image(
                 painter = painterResource(id = R.drawable.ic_oikonomos_logo_white),
-                contentDescription = "OikoNomos Logo",
+                contentDescription = "Estia Logo",
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -51,7 +51,7 @@ fun OikoNomosLogo(
         ) {
             Image(
                 painter = painterResource(id = R.drawable.ic_oikonomos_logo),
-                contentDescription = "OikoNomos Logo",
+                contentDescription = "Estia Logo",
                 modifier = Modifier.fillMaxSize()
             )
         }

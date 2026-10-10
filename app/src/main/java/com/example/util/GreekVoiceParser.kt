@@ -44,7 +44,7 @@ object GreekVoiceParser {
         res = res.replace(Regex("(\\d+):(\\d{2})"), "$1.$2")
         // Normalize comma/dot decimals with surrounding digits (e.g. "4,30" or "4 , 30" or "4.30" -> "4.30")
         res = res.replace(Regex("(\\d+)\\s*[,.]\\s*(\\d{1,2})"), "$1.$2")
-        // Any other comma is punctuation (e.g. "12 και 30, Μάριος") -> replace with space
+        // Any other comma is punctuation (e.g. "12 και 30, έξοδα") -> replace with space
         res = res.replace(",", " ")
         return res
     }

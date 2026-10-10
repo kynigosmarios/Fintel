@@ -50,7 +50,7 @@ object ExpenseReportExporter {
         val csvContent = generateCsv(expenses, periodTitle)
         val sendIntent = Intent().apply {
             action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_SUBJECT, "Αναφορά Εξόδων OikoNomos - $periodTitle")
+            putExtra(Intent.EXTRA_SUBJECT, "Αναφορά Εξόδων Estia - $periodTitle")
             putExtra(Intent.EXTRA_TEXT, csvContent)
             type = "text/plain"
         }

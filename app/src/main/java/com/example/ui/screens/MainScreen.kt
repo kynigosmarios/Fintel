@@ -108,6 +108,7 @@ import com.example.ui.components.ExportReportDialog
 import com.example.ui.components.ManualExpenseDialog
 import com.example.ui.components.ManualIncomeDialog
 import com.example.ui.components.MemberDialog
+import com.example.ui.components.OnboardingCarouselDialog
 import com.example.ui.components.PremiumPaywallDialog
 import com.example.ui.components.QuickActionChooserDialog
 import com.example.ui.components.RecurringExpenseDialog
@@ -205,6 +206,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
     val recurringExpenses by viewModel.allRecurringExpenses.collectAsStateWithLifecycle()
     val savingsGoals by viewModel.allSavingsGoals.collectAsStateWithLifecycle()
     val launchWithChooser by viewModel.launchWithChooser.collectAsStateWithLifecycle()
+    val showOnboardingCarousel by viewModel.showOnboardingCarousel.collectAsStateWithLifecycle()
 
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
 
@@ -303,15 +305,15 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                     ) {
                         OikoNomosLogo(
                             isDarkTheme = isDarkTheme,
-                            size = 36.dp
+                            size = 25.dp
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "OikoNomos",
+                            text = "Estia",
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 20.sp,
-                            letterSpacing = (-0.3).sp,
-                            color = if (isDarkTheme) Color.White else Emerald950
+                            letterSpacing = (-0.2).sp,
+                            color = if (isDarkTheme) Color(0xFF34D399) else Color(0xFF157347)
                         )
                     }
                 },
@@ -534,7 +536,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         onShareInviteCode = { code ->
                             val sendIntent = android.content.Intent().apply {
                                 action = android.content.Intent.ACTION_SEND
-                                putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο OikoNomos με τον κωδικό: $code")
+                                putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο Estia με τον κωδικό: $code")
                                 type = "text/plain"
                             }
                             context.startActivity(android.content.Intent.createChooser(sendIntent, "Κοινοποίηση Κωδικού"))
@@ -545,7 +547,8 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         appLanguage = appLanguage,
                         onAddCategory = { viewModel.openCategoryDialog() },
                         onEditCategory = { viewModel.openCategoryDialog(it) },
-                        onDeleteCategory = { viewModel.deleteCategory(it) }
+                        onDeleteCategory = { viewModel.deleteCategory(it) },
+                        onSeedStandardCategories = { viewModel.seedStandardCategories() }
                     )
                 }
             }
@@ -563,6 +566,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                 onOpenProfile = { viewModel.openUserProfileDialog() },
                 onOpenExodologio = { viewModel.openExodologioDetailsDialog() },
                 onOpenSettings = { viewModel.openSettingsDialog() },
+                onOpenGuide = { viewModel.openOnboardingGuide() },
                 onSignOut = { viewModel.signOutUser() },
                 onDismiss = { viewModel.dismissBurgerMenu() }
             )
@@ -679,6 +683,9 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             currencySymbol = currencySymbol,
             appLanguage = appLanguage,
             onSaveDisplayName = { viewModel.updateUserDisplayName(it) },
+            onSaveFullProfile = { first, last, birth, phone, occ, city ->
+                viewModel.updateUserFullProfile(first, last, birth, phone, occ, city)
+            },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall("profile_upgrade") },
             onSignOut = { viewModel.signOutUser() },
             onDismiss = { viewModel.dismissUserProfileDialog() }
@@ -699,7 +706,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             onShareInviteCode = { code ->
                 val sendIntent = android.content.Intent().apply {
                     action = android.content.Intent.ACTION_SEND
-                    putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο OikoNomos με τον κωδικό: $code")
+                    putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο Estia με τον κωδικό: $code")
                     type = "text/plain"
                 }
                 context.startActivity(android.content.Intent.createChooser(sendIntent, "Κοινοποίηση Κωδικού"))
@@ -803,6 +810,13 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             onClearAllDataAndSignOut = { viewModel.factoryResetAndSignOut() },
             onMessage = { viewModel.showSnackbar(it) },
             onDismiss = { viewModel.dismissSettingsDialog() }
+        )
+    }
+
+    // Onboarding Pop-up Carousel for New Users (Next-Next-Next with Auto-advance every 5 seconds)
+    if (showOnboardingCarousel) {
+        OnboardingCarouselDialog(
+            onDismiss = { viewModel.dismissOnboardingCarousel() }
         )
     }
 }

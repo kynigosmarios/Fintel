@@ -203,7 +203,7 @@ fun AppSettingsDialog(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = currentUser.displayName?.ifBlank { null } ?: if (lang == Localization.Language.ENGLISH) "OikoNomos User" else "Χρήστης OikoNomos",
+                                        text = currentUser.displayName?.ifBlank { null } ?: if (lang == Localization.Language.ENGLISH) "Estia User" else "Χρήστης Estia",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurface,

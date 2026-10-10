@@ -15,7 +15,7 @@ data class Expense(
     val timestamp: Long = System.currentTimeMillis(),
     val splitType: String, // "ALL_FAMILY" or "SPECIFIC_MEMBERS"
     val memberIdsCsv: String = "", // e.g. "1,2"
-    val memberNamesDisplay: String = "Κοινό Οικογένειας", // e.g. "Μάριος & Βασιλική" or "Κοινό Οικογένειας"
+    val memberNamesDisplay: String = "Κοινό Οικογένειας", // e.g. "Κοινό Οικογένειας" ή ονόματα μελών
     val splitAmountPerPerson: Double = 0.0,
     val originalVoicePrompt: String = "",
     val note: String = ""

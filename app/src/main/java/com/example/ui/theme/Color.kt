@@ -72,7 +72,38 @@ val WarningOrange = Color(0xFFF97316)
 val WarningContainer = Color(0xFFFFEDD5)
 val SuccessGreen = Color(0xFF10B981)
 
-// Neo-Fintech Luxury Gradients
+// Neo-Fintech Luxury Gradients & FinTech Palettes (Inspired by modern digital banking)
+val FintechNavyHero = Brush.linearGradient(
+    colors = listOf(
+        Color(0xFF0F172A),
+        Color(0xFF1E293B),
+        Color(0xFF1E1B4B)
+    )
+)
+
+val FintechCardMint = Brush.linearGradient(
+    colors = listOf(
+        Color(0xFFD1FAE5),
+        Color(0xFFA7F3D0),
+        Color(0xFF6EE7B7)
+    )
+)
+
+val FintechCardIndigo = Brush.linearGradient(
+    colors = listOf(
+        Color(0xFF4338CA),
+        Color(0xFF6366F1),
+        Color(0xFF818CF8)
+    )
+)
+
+val FintechCardSky = Brush.linearGradient(
+    colors = listOf(
+        Color(0xFF0284C7),
+        Color(0xFF38BDF8)
+    )
+)
+
 val HeroEmeraldGradient = Brush.linearGradient(
     colors = listOf(
         Color(0xFF022C22), // Deep Forest
@@ -112,3 +143,4 @@ val GlassBorderBrush = Brush.linearGradient(
 
 val SubtleCardBorderLight = Color(0xFFE2E8F0).copy(alpha = 0.8f)
 val SubtleCardBorderDark = Color(0xFF1E3A2F).copy(alpha = 0.8f)
+

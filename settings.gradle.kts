@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "OikoNomos"
+rootProject.name = "Estia"
 
 include(":app")

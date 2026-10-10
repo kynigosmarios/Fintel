@@ -8,7 +8,7 @@
     <!-- House Roof -->
     <path
         android:pathData="M20.59,51.84 L54.00,21.74 L87.41,51.84"
-        android:strokeWidth="3.0"
+        android:strokeWidth="4.2"
         android:strokeColor="#157347"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
@@ -17,7 +17,7 @@
     <!-- Left Wall -->
     <path
         android:pathData="M26.28,46.51 L26.28,85.54"
-        android:strokeWidth="3.0"
+        android:strokeWidth="4.2"
         android:strokeColor="#157347"
         android:strokeLineCap="square"
         android:fillColor="#00000000" />
@@ -25,7 +25,7 @@
     <!-- Right Wall -->
     <path
         android:pathData="M81.72,46.51 L81.72,85.54"
-        android:strokeWidth="3.0"
+        android:strokeWidth="4.2"
         android:strokeColor="#157347"
         android:strokeLineCap="square"
         android:fillColor="#00000000" />
@@ -33,7 +33,7 @@
     <!-- Special Interlocking Infinity Symbol - Left Loop and Lower Diagonal -->
     <path
         android:pathData="M51.84,57.24 C49.68,54.72 46.44,53.42 42.84,53.42 C36.58,53.42 31.54,58.54 31.54,64.80 C31.54,71.06 36.58,76.18 42.84,76.18 C46.08,76.18 48.96,74.88 51.12,72.86 L60.84,64.80"
-        android:strokeWidth="3.0"
+        android:strokeWidth="4.2"
         android:strokeColor="#157347"
         android:strokeLineCap="square"
         android:strokeLineJoin="round"
@@ -42,7 +42,7 @@
     <!-- Special Interlocking Infinity Symbol - Right Loop and Upper Diagonal (180-deg rotated) -->
     <path
         android:pathData="M47.16,64.80 L56.88,56.74 C59.04,54.72 61.92,53.42 65.16,53.42 C71.42,53.42 76.46,58.54 76.46,64.80 C76.46,71.06 71.42,76.18 65.16,76.18 C61.56,76.18 58.32,74.88 56.16,72.36"
-        android:strokeWidth="3.0"
+        android:strokeWidth="4.2"
         android:strokeColor="#157347"
         android:strokeLineCap="square"
         android:strokeLineJoin="round"

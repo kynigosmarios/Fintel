@@ -26,9 +26,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.TableChart
@@ -36,10 +41,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,8 +55,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import java.text.SimpleDateFormat
+import java.util.Date
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -111,11 +122,12 @@ fun PieChartView(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.size(160.dp),
+            modifier = Modifier.size(190.dp),
             contentAlignment = Alignment.Center
         ) {
+            val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             Canvas(modifier = Modifier.fillMaxSize().padding(14.dp)) {
-                val strokeWidth = 24.dp.toPx()
+                val strokeWidth = 20.dp.toPx()
                 val radius = (size.minDimension - strokeWidth) / 2
                 val centerOffset = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
                 val rect = androidx.compose.ui.geometry.Rect(
@@ -125,33 +137,52 @@ fun PieChartView(
                     centerOffset.y + radius
                 )
 
+                // Background subtle ring track
+                drawArc(
+                    color = trackColor,
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = rect.topLeft,
+                    size = rect.size,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+
                 var startAngle = -90f
                 validSlices.forEach { slice ->
                     val sweepAngle = ((slice.value / total) * 360f).toFloat()
+                    val gap = if (validSlices.size > 1) 4f else 0f
+                    val effectiveSweep = (sweepAngle - gap).coerceAtLeast(1f)
                     drawArc(
                         color = slice.color,
-                        startAngle = startAngle,
-                        sweepAngle = sweepAngle,
+                        startAngle = startAngle + (gap / 2),
+                        sweepAngle = effectiveSweep,
                         useCenter = false,
                         topLeft = rect.topLeft,
                         size = rect.size,
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                     )
                     startAngle += sweepAngle
                 }
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
-                    text = String.format(Locale.US, "%.1f€", totalAmount),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Black,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = Localization.total(lang),
+                    text = Localization.total(lang).uppercase(),
                     fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = String.format(Locale.US, "%.2f €", totalAmount),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
@@ -206,21 +237,80 @@ fun AnalyticsScreen(
     var chartTypeMembers by remember { mutableIntStateOf(0) } // 0 = Μπάρες, 1 = Πίτα (Requirement 6)
     var chartTypeIncome by remember { mutableIntStateOf(0) } // 0 = Μπάρες, 1 = Πίτα
 
-    val totalSpend = expenses.sumOf { it.amount }
-    val totalIncome = incomes.sumOf { it.amount }
+    // Month Selection State (Requirement 2)
+    val currentMonthKey = remember { SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date()) }
+    val currentMonthLabel = remember(lang) {
+        val cal = java.util.Calendar.getInstance()
+        SimpleDateFormat("LLLL yyyy", Localization.getDateLocale(lang)).format(cal.time).replaceFirstChar { it.uppercase() }
+    }
+
+    val availableMonths = remember(expenses, incomes) {
+        val set = linkedSetOf<String>()
+        set.add(currentMonthKey)
+        val fmt = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+        expenses.forEach { exp -> set.add(fmt.format(Date(exp.timestamp))) }
+        incomes.forEach { inc -> set.add(fmt.format(Date(inc.timestamp))) }
+        set.toList().sortedDescending()
+    }
+
+    var selectedPeriodKey by remember { mutableStateOf("CURRENT_MONTH") }
+    var showPeriodDropdown by remember { mutableStateOf(false) }
+
+    fun getMonthLabel(key: String): String {
+        return try {
+            val date = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(key) ?: Date()
+            SimpleDateFormat("LLLL yyyy", Localization.getDateLocale(lang)).format(date).replaceFirstChar { it.uppercase() }
+        } catch (e: Exception) {
+            key
+        }
+    }
+
+    val activePeriodDisplay = when (selectedPeriodKey) {
+        "ALL" -> Localization.allMonthsCombined(lang)
+        "CURRENT_MONTH" -> currentMonthLabel
+        else -> getMonthLabel(selectedPeriodKey)
+    }
+
+    // Filter expenses and incomes by selected period
+    val periodExpenses = remember(expenses, selectedPeriodKey) {
+        when (selectedPeriodKey) {
+            "ALL" -> expenses
+            "CURRENT_MONTH" -> expenses.filter {
+                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == currentMonthKey
+            }
+            else -> expenses.filter {
+                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == selectedPeriodKey
+            }
+        }
+    }
+
+    val periodIncomes = remember(incomes, selectedPeriodKey) {
+        when (selectedPeriodKey) {
+            "ALL" -> incomes
+            "CURRENT_MONTH" -> incomes.filter {
+                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == currentMonthKey
+            }
+            else -> incomes.filter {
+                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == selectedPeriodKey
+            }
+        }
+    }
+
+    val totalSpend = periodExpenses.sumOf { it.amount }
+    val totalIncome = periodIncomes.sumOf { it.amount }
     val netBalance = totalIncome - totalSpend
     val savingsRate = if (totalIncome > 0) ((netBalance / totalIncome) * 100).coerceIn(-100.0, 100.0) else 0.0
 
     // Income breakdown by Member
     val memberIncomeMap = members.associateWith { member ->
-        incomes.filter { it.memberId == member.id }.sumOf { it.amount }
+        periodIncomes.filter { it.memberId == member.id }.sumOf { it.amount }
     }
-    val unassignedMemberIncomes = incomes.filter { inc ->
+    val unassignedMemberIncomes = periodIncomes.filter { inc ->
         members.none { it.id == inc.memberId }
     }.sumOf { it.amount }
 
     // Income breakdown by Category
-    val categoryIncomeMap = incomes.groupBy { it.category }
+    val categoryIncomeMap = periodIncomes.groupBy { it.category }
         .mapValues { entry -> entry.value.sumOf { it.amount } }
         .toList()
         .sortedByDescending { it.second }
@@ -288,7 +378,7 @@ fun AnalyticsScreen(
     val individualSpendMap = members.associateWith { 0.0 }.toMutableMap()
     var commonHouseholdSpend = 0.0
 
-    expenses.forEach { exp ->
+    periodExpenses.forEach { exp ->
         val assigned = getMembersForExpense(exp)
         if (assigned.isEmpty()) {
             commonHouseholdSpend += exp.amount
@@ -336,7 +426,7 @@ fun AnalyticsScreen(
 
     // 4. Category budget analysis
     val categorySpendMap = categories.associateWith { cat ->
-        expenses.filter { it.categoryId == cat.id }.sumOf { it.amount }
+        periodExpenses.filter { it.categoryId == cat.id }.sumOf { it.amount }
     }
 
     LazyColumn(
@@ -346,10 +436,168 @@ fun AnalyticsScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // Month Selector Bar (Requirement 2)
+        item {
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("analytics_month_selector_card")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            val effKey = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == "ALL") currentMonthKey else selectedPeriodKey
+                            try {
+                                val cal = java.util.Calendar.getInstance().apply {
+                                    time = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(effKey) ?: Date()
+                                    add(java.util.Calendar.MONTH, -1)
+                                }
+                                val prevKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(cal.time)
+                                selectedPeriodKey = if (prevKey == currentMonthKey) "CURRENT_MONTH" else prevKey
+                            } catch (e: Exception) {
+                                selectedPeriodKey = "CURRENT_MONTH"
+                            }
+                        },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronLeft,
+                            contentDescription = "Previous Month",
+                            tint = Emerald700
+                        )
+                    }
+
+                    Box(contentAlignment = Alignment.Center) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = Emerald700.copy(alpha = 0.09f),
+                            border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.25f)),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable { showPeriodDropdown = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = Emerald700,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = activePeriodDisplay,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = Localization.selectMonthYear(lang),
+                                    tint = Emerald700,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = showPeriodDropdown,
+                            onDismissRequest = { showPeriodDropdown = false }
+                        ) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(Icons.Default.Receipt, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
+                                },
+                                text = {
+                                    Text(
+                                        text = Localization.allMonthsCombined(lang),
+                                        fontWeight = if (selectedPeriodKey == "ALL") FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                onClick = {
+                                    selectedPeriodKey = "ALL"
+                                    showPeriodDropdown = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
+                                },
+                                text = {
+                                    Text(
+                                        text = "${Localization.currentMonth(lang)} ($currentMonthLabel)",
+                                        fontWeight = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == currentMonthKey) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                onClick = {
+                                    selectedPeriodKey = "CURRENT_MONTH"
+                                    showPeriodDropdown = false
+                                }
+                            )
+                            availableMonths.filter { it != currentMonthKey }.forEach { monthKey ->
+                                val label = getMonthLabel(monthKey)
+                                DropdownMenuItem(
+                                    leadingIcon = {
+                                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
+                                    },
+                                    text = {
+                                        Text(
+                                            text = label,
+                                            fontWeight = if (selectedPeriodKey == monthKey) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    onClick = {
+                                        selectedPeriodKey = monthKey
+                                        showPeriodDropdown = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    IconButton(
+                        onClick = {
+                            val effKey = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == "ALL") currentMonthKey else selectedPeriodKey
+                            try {
+                                val cal = java.util.Calendar.getInstance().apply {
+                                    time = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(effKey) ?: Date()
+                                    add(java.util.Calendar.MONTH, 1)
+                                }
+                                val nextKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(cal.time)
+                                selectedPeriodKey = if (nextKey == currentMonthKey) "CURRENT_MONTH" else nextKey
+                            } catch (e: Exception) {
+                                selectedPeriodKey = "CURRENT_MONTH"
+                            }
+                        },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Next Month",
+                            tint = Emerald700
+                        )
+                    }
+                }
+            }
+        }
+
         // Feature 3: Monthly Budget Health & Exceeded Alerts Card
         item {
             BudgetAlertsCard(
-                expenses = expenses,
+                expenses = periodExpenses,
                 categories = categories,
                 appLanguage = appLanguage,
                 onManageBudgets = onManageCategories
@@ -394,7 +642,7 @@ fun AnalyticsScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = Localization.familyMonthlyBalance(lang),
+                                    text = "$activePeriodDisplay • ${Localization.familyMonthlyBalance(lang)}",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -456,7 +704,7 @@ fun AnalyticsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = Localization.entriesCount(incomes.size, lang),
+                                    text = Localization.entriesCount(periodIncomes.size, lang),
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -480,7 +728,7 @@ fun AnalyticsScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = Localization.transactionsCount(expenses.size, lang),
+                                    text = Localization.transactionsCount(periodExpenses.size, lang),
                                     fontSize = 10.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -575,7 +823,7 @@ fun AnalyticsScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    if (incomes.isEmpty()) {
+                    if (periodIncomes.isEmpty()) {
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),

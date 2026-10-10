@@ -36,6 +36,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.example.ui.screens.AuthScreen
+import com.example.ui.screens.EmailVerificationScreen
 import com.example.ui.screens.MainScreen
 import com.example.ui.theme.Emerald700
 import com.example.ui.theme.Emerald950
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
             val isAuthInitialized by viewModel.isAuthInitialized.collectAsStateWithLifecycle()
+            val isUserVerified by viewModel.isUserVerifiedState.collectAsStateWithLifecycle()
 
             val isDarkTheme = when (themeMode) {
                 "DARK" -> true
@@ -81,6 +83,8 @@ class MainActivity : ComponentActivity() {
                         SplashScreen()
                     } else if (currentUser == null) {
                         AuthScreen(viewModel = viewModel)
+                    } else if (!isUserVerified) {
+                        EmailVerificationScreen(user = currentUser!!, viewModel = viewModel)
                     } else {
                         MainScreen(viewModel = viewModel)
                     }
@@ -125,12 +129,12 @@ private fun SplashScreen() {
         ) {
             Image(
                 painter = painterResource(id = R.drawable.ic_oikonomos_logo_white),
-                contentDescription = "OikoNomos",
+                contentDescription = "Estia",
                 modifier = Modifier.size(72.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "OikoNomos",
+                text = "Estia",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White

@@ -36,6 +36,7 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +69,7 @@ fun CategoriesScreen(
     onAddCategory: () -> Unit,
     onEditCategory: (ExpenseCategory) -> Unit,
     onDeleteCategory: (ExpenseCategory) -> Unit,
+    onSeedStandardCategories: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var categoryToDelete by remember { mutableStateOf<ExpenseCategory?>(null) }
@@ -149,6 +151,91 @@ fun CategoriesScreen(
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+
+        // Empty state when user has clean categories
+        if (categories.isEmpty()) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth().testTag("categories_empty_card")
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(Emerald100),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Category,
+                                contentDescription = null,
+                                tint = Emerald700,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "Clean Category List" else "Καθαρό Εξοδολόγιο",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH)
+                                "You haven't added any expense categories yet. Create your own categories or load a starter set."
+                            else
+                                "Δεν έχετε καταχωρήσει ακόμη κατηγορίες εξόδων. Μπορείτε να δημιουργήσετε τις δικές σας κατηγορίες ή να φορτώσετε ένα βασικό σετ.",
+                            fontSize = 13.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(modifier = Modifier.height(18.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Button(
+                                onClick = onAddCategory,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                                modifier = Modifier.weight(1f).testTag("empty_add_category_button")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "New Category" else "Νέα Κατηγορία",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (onSeedStandardCategories != null) {
+                                OutlinedButton(
+                                    onClick = onSeedStandardCategories,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f).testTag("load_standard_categories_button")
+                                ) {
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Load Starter" else "Φόρτωση Βασικών",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

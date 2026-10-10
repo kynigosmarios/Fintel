@@ -82,6 +82,7 @@ import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
 import com.example.data.entity.Income
 import com.example.ui.components.CategoryIconHelper
+import com.example.util.GreekVoiceParser
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald200
 import com.example.ui.theme.Emerald300
@@ -212,7 +213,11 @@ fun ExpensesScreen(
     val netBalance = totalIncome - totalSpend
     val commonSpend = periodFilteredExpenses.filter { it.splitType == "ALL_FAMILY" }.sumOf { it.amount }
     val individualSpend = totalSpend - commonSpend
-    val totalBudget = categories.sumOf { it.monthlyBudget }.coerceAtLeast(1.0)
+    val totalBudget = if (categories.isNotEmpty()) {
+        categories.sumOf { it.monthlyBudget }.coerceAtLeast(1.0)
+    } else {
+        1150.0 // Standard fallback monthly budget so UI never flickers to 0.00€
+    }
     val budgetProgress = (totalSpend / totalBudget).toFloat().coerceIn(0f, 1f)
     val remainingBudget = (totalBudget - totalSpend).coerceAtLeast(0.0)
 
@@ -1297,7 +1302,7 @@ fun ExpensesScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = if (expenses.isEmpty()) {
-                                if (lang == Localization.Language.ENGLISH) "Welcome to OikoNomos!" else "Καλώς ήρθατε στο OikoNomos!"
+                                if (lang == Localization.Language.ENGLISH) "Welcome to Estia!" else "Καλώς ήρθατε στο Estia!"
                             } else {
                                 Localization.noExpensesFound(lang)
                             },
@@ -1457,8 +1462,9 @@ fun ExpensesScreen(
 
                     items(dayExpenses, key = { it.id }) { expense ->
                         val category = categories.find { it.id == expense.categoryId }
-                        val catColor = category?.let { Color(it.colorHex) } ?: Emerald700
-                        val catIcon = CategoryIconHelper.getIcon(category?.iconKey ?: "other")
+                            ?: categories.find { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) == GreekVoiceParser.normalizeGreek(expense.categoryName.trim().lowercase()) }
+                        val catColor = category?.let { Color(it.colorHex) } ?: CategoryIconHelper.getColorForCategoryName(expense.categoryName)
+                        val catIcon = CategoryIconHelper.getIconForCategoryName(expense.categoryName, category?.iconKey)
 
                         Card(
                             modifier = Modifier

@@ -23,6 +23,11 @@ service cloud.firestore {
       }
     }
 
+    // Phone password reset codes (6-digit verification)
+    match /phone_password_resets/{phone} {
+      allow read, write: if true;
+    }
+
     // Shared Household Database (Multi-user sync)
     match /households/{householdId} {
       allow read: if isAuthenticated();

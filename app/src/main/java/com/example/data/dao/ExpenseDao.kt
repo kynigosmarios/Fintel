@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
@@ -63,6 +64,13 @@ interface ExpenseDao {
     @Query("DELETE FROM family_members")
     suspend fun deleteAllMembers()
 
+    @Transaction
+    suspend fun replaceAllMembersTransaction(members: List<FamilyMember>) {
+        if (members.isEmpty()) return
+        deleteAllMembers()
+        insertMembers(members)
+    }
+
     // Categories
     @Query("SELECT * FROM expense_categories ORDER BY id ASC")
     fun getAllCategories(): Flow<List<ExpenseCategory>>
@@ -85,6 +93,13 @@ interface ExpenseDao {
     @Query("DELETE FROM expense_categories")
     suspend fun deleteAllCategories()
 
+    @Transaction
+    suspend fun replaceAllCategoriesTransaction(categories: List<ExpenseCategory>) {
+        if (categories.isEmpty()) return
+        deleteAllCategories()
+        insertCategories(categories)
+    }
+
     // Recurring Expenses
     @Query("SELECT * FROM recurring_expenses ORDER BY id ASC")
     fun getAllRecurringExpenses(): Flow<List<RecurringExpense>>
@@ -100,6 +115,9 @@ interface ExpenseDao {
 
     @Delete
     suspend fun deleteRecurringExpense(recurring: RecurringExpense)
+
+    @Query("DELETE FROM recurring_expenses")
+    suspend fun deleteAllRecurringExpenses()
 
     @Query("SELECT COUNT(*) FROM recurring_expenses")
     suspend fun getRecurringCount(): Int
@@ -119,6 +137,9 @@ interface ExpenseDao {
 
     @Delete
     suspend fun deleteSavingsGoal(goal: SavingsGoal)
+
+    @Query("DELETE FROM savings_goals")
+    suspend fun deleteAllSavingsGoals()
 
     @Query("SELECT COUNT(*) FROM savings_goals")
     suspend fun getSavingsGoalCount(): Int
@@ -144,4 +165,23 @@ interface ExpenseDao {
 
     @Query("DELETE FROM incomes")
     suspend fun deleteAllIncomes()
+
+    // Safety & Bi-directional Sync One-shot Getters
+    @Query("SELECT * FROM expense_categories ORDER BY id ASC")
+    suspend fun getAllCategoriesList(): List<ExpenseCategory>
+
+    @Query("SELECT * FROM family_members ORDER BY id ASC")
+    suspend fun getAllMembersList(): List<FamilyMember>
+
+    @Query("SELECT * FROM savings_goals ORDER BY id ASC")
+    suspend fun getAllSavingsGoalsList(): List<SavingsGoal>
+
+    @Query("SELECT * FROM recurring_expenses ORDER BY id ASC")
+    suspend fun getAllRecurringExpensesList(): List<RecurringExpense>
+
+    @Query("SELECT * FROM expenses ORDER BY timestamp DESC")
+    suspend fun getAllExpensesList(): List<Expense>
+
+    @Query("SELECT * FROM incomes ORDER BY timestamp DESC")
+    suspend fun getAllIncomesList(): List<Income>
 }

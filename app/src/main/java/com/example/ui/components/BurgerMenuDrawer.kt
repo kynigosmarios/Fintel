@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
@@ -69,6 +70,7 @@ fun BurgerMenuDrawer(
     onOpenProfile: () -> Unit,
     onOpenExodologio: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenGuide: (() -> Unit)? = null,
     onSignOut: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -189,7 +191,7 @@ fun BurgerMenuDrawer(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = currentUser.displayName?.ifBlank { null } ?: if (lang == Localization.Language.ENGLISH) "OikoNomos User" else "Χρήστης OikoNomos",
+                                        text = currentUser.displayName?.ifBlank { null } ?: if (lang == Localization.Language.ENGLISH) "Estia User" else "Χρήστης Estia",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -363,7 +365,7 @@ fun BurgerMenuDrawer(
                     BurgerNavigationItem(
                         title = Localization.myProfile(lang),
                         subtitle = if (userProfile?.isPremium == true)
-                            (if (lang == Localization.Language.ENGLISH) "OikoNomos Pro Subscriber" else "OikoNomos Pro συνδρομητής")
+                            (if (lang == Localization.Language.ENGLISH) "Estia Pro Subscriber" else "Estia Pro συνδρομητής")
                         else
                             (if (lang == Localization.Language.ENGLISH) "Account details & Pro" else "Στοιχεία λογαριασμού & Pro"),
                         icon = Icons.Default.Person,
@@ -375,6 +377,22 @@ fun BurgerMenuDrawer(
                             onOpenProfile()
                         }
                     )
+
+                    if (onOpenGuide != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        BurgerNavigationItem(
+                            title = if (lang == Localization.Language.ENGLISH) "Getting Started Guide" else "Οδηγός Ξεκινήματος",
+                            subtitle = if (lang == Localization.Language.ENGLISH) "6-step tutorial for new users" else "Οδηγός 6 βημάτων για νέα μέλη",
+                            icon = Icons.Default.Info,
+                            iconTint = Color(0xFFD97706),
+                            iconBg = Color(0xFFD97706).copy(alpha = 0.12f),
+                            testTag = "burger_item_guide",
+                            onClick = {
+                                onDismiss()
+                                onOpenGuide()
+                            }
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(18.dp))
                     HorizontalDivider(
@@ -418,7 +436,7 @@ fun BurgerMenuDrawer(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
-                        text = "OikoNomos • ${Localization.appTagline(lang)}",
+                        text = "Estia • ${Localization.appTagline(lang)}",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),

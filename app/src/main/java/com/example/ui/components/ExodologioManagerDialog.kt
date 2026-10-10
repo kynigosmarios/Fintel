@@ -480,7 +480,7 @@ fun PremiumPaywallDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "OikoNomos Pro",
+                    text = "Estia Pro",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -494,7 +494,7 @@ fun PremiumPaywallDialog(
                     } else if (reason == "invite_member") {
                         if (lang == Localization.Language.ENGLISH) "Adding members is a Pro feature" else "Η προσθήκη μελών είναι δυνατότητα Pro"
                     } else {
-                        if (lang == Localization.Language.ENGLISH) "Unlock all OikoNomos Pro features" else "Ξεκλειδώστε όλες τις δυνατότητες του OikoNomos"
+                        if (lang == Localization.Language.ENGLISH) "Unlock all Estia Pro features" else "Ξεκλειδώστε όλες τις δυνατότητες του Estia"
                     },
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,

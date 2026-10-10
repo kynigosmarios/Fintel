@@ -59,10 +59,11 @@ fun MyApplicationTheme(
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val chosenTypography = ClassicTypography
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = chosenTypography,
         content = content
     )
 }

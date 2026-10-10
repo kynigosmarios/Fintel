@@ -20,7 +20,7 @@ class ExampleRobolectricTest {
     fun `read string from context`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
-        assertEquals("OikoNomos", appName)
+        assertEquals("Estia", appName)
     }
 
     @Test
@@ -69,5 +69,14 @@ class ExampleRobolectricTest {
         assertEquals(18.0, p4.amount, 0.01)
         assertEquals("Έξοδα γατιών", p4.categoryName)
         assertEquals("ALL_FAMILY", p4.splitType)
+    }
+
+    @Test
+    fun `test greek voice parser with clean empty categories and members`() {
+        val result = GreekVoiceParser.parse("Σούπερ μάρκετ 25 ευρώ", emptyList(), emptyList())
+        assertEquals(25.0, result.amount, 0.01)
+        assertEquals("Σούπερ Μάρκετ", result.title)
+        assertTrue(result.memberIds.isEmpty())
+        assertEquals("ALL_FAMILY", result.splitType)
     }
 }

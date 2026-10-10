@@ -22,7 +22,7 @@ object Localization {
     }
 
     // App Branding & Navigation
-    fun appName(lang: Language) = "OikoNomos"
+    fun appName(lang: Language) = "Estia"
     fun appTagline(lang: Language) = if (lang == Language.ENGLISH) "Smart Expense Tracker" else "Έξυπνο Εξοδολόγιο"
 
     // Bottom Nav Tabs
@@ -127,7 +127,7 @@ object Localization {
 
     // Members Screen
     fun inviteMembersTitle(lang: Language) = if (lang == Language.ENGLISH) "Invite Users to Household" else "Πρόσκληση Χρηστών στο Εξοδολόγιο"
-    fun proPaidFeature(lang: Language) = if (lang == Language.ENGLISH) "🔒 Paid feature (OikoNomos Pro)" else "🔒 Λειτουργία επί πληρωμή (OikoNomos Pro)"
+    fun proPaidFeature(lang: Language) = if (lang == Language.ENGLISH) "🔒 Paid feature (Estia Pro)" else "🔒 Λειτουργία επί πληρωμή (Estia Pro)"
     fun proActiveLiveSync(lang: Language) = if (lang == Language.ENGLISH) "Pro Active: Real-time expense sharing" else "Pro Ενεργό: Μοιραστείτε τα έξοδα ζωντανά"
     fun inviteCardDesc(lang: Language) = if (lang == Language.ENGLISH)
         "Connect family, partner or roommates to the same household to view and log expenses in real-time."
@@ -203,25 +203,25 @@ object Localization {
     fun perMonthSuffix(lang: Language) = if (lang == Language.ENGLISH) "/ month" else "/ μήνα"
     fun everyDayOfMonth(lang: Language, day: Int) = if (lang == Language.ENGLISH) "Every day $day of the month" else "Κάθε ${day}η του μήνα"
     fun executeNowAction(lang: Language) = if (lang == Language.ENGLISH) "Execute now" else "Εκτέλεση τώρα"
-    fun goalTitleLabel(lang: Language) = if (lang == Language.ENGLISH) "Goal Title *" else "Τίτλος Στόχου *"
-    fun goalTitlePlaceholder(lang: Language) = if (lang == Language.ENGLISH) "e.g. Summer Vacation, New Car" else "π.χ. Καλοκαιρινές Διακοπές, Αυτοκίνητο"
-    fun targetAmountLabel(lang: Language) = if (lang == Language.ENGLISH) "Target Amount (€) *" else "Στόχος Ποσού (€) *"
-    fun currentSavedLabel(lang: Language) = if (lang == Language.ENGLISH) "Currently Saved Amount (€)" else "Τρέχουσα Αποταμίευση (€)"
-    fun recurringDescLabel(lang: Language) = if (lang == Language.ENGLISH) "Order Description *" else "Περιγραφή Εντολής *"
-    fun recurringDescPlaceholder(lang: Language) = if (lang == Language.ENGLISH) "e.g. Rent, Netflix, Internet" else "π.χ. Ενοίκιο, Netflix, Cosmote"
-    fun dayOfMonthLabel(lang: Language) = if (lang == Language.ENGLISH) "Day of Month (1-31) *" else "Ημέρα του Μήνα (1-31) *"
+    fun goalTitleLabel(lang: Language) = if (lang == Language.ENGLISH) "Goal Title" else "Τίτλος στόχου"
+    fun goalTitlePlaceholder(lang: Language) = if (lang == Language.ENGLISH) "e.g. Vacation, Car, Emergency" else "π.χ. Διακοπές, Αυτοκίνητο, Έκτακτη ανάγκη"
+    fun targetAmountLabel(lang: Language) = if (lang == Language.ENGLISH) "Target Amount (€)" else "Ποσό στόχου (€)"
+    fun currentSavedLabel(lang: Language) = if (lang == Language.ENGLISH) "Already Saved (€)" else "Αρχικό ποσό (€)"
+    fun recurringDescLabel(lang: Language) = if (lang == Language.ENGLISH) "Description" else "Περιγραφή πάγιας"
+    fun recurringDescPlaceholder(lang: Language) = if (lang == Language.ENGLISH) "e.g. Rent, Netflix, Electric bill" else "π.χ. Ενοίκιο, Netflix, ΔΕΗ"
+    fun dayOfMonthLabel(lang: Language) = if (lang == Language.ENGLISH) "Day of month (1-31)" else "Ημέρα μήνα (1-31)"
 
     // Manual Expense Dialog
     fun recordExpenseTitle(lang: Language) = if (lang == Language.ENGLISH) "Record Expense" else "Καταγραφή Εξόδου"
     fun editExpenseTitle(lang: Language) = if (lang == Language.ENGLISH) "Edit Expense" else "Επεξεργασία Εξόδου"
-    fun expenseDescLabel(lang: Language) = if (lang == Language.ENGLISH) "Expense Description *" else "Περιγραφή Εξόδου *"
+    fun expenseDescLabel(lang: Language) = if (lang == Language.ENGLISH) "Description" else "Περιγραφή εξόδου"
     fun expenseDescPlaceholder(lang: Language) = if (lang == Language.ENGLISH) "e.g. Sklavenitis, Pharmacy, Coffee" else "π.χ. Σκλαβενίτης, Φαρμακείο, Καφές"
-    fun expenseAmountLabel(lang: Language) = if (lang == Language.ENGLISH) "Expense Amount (€) *" else "Ποσό Εξόδου (€) *"
-    fun memberWhoPaid(lang: Language) = if (lang == Language.ENGLISH) "MEMBER WHO PAID *" else "ΜΕΛΟΣ ΠΟΥ ΠΛΗΡΩΣΕ *"
+    fun expenseAmountLabel(lang: Language) = if (lang == Language.ENGLISH) "Amount (€)" else "Ποσό (€)"
+    fun memberWhoPaid(lang: Language) = if (lang == Language.ENGLISH) "Member who paid" else "Μέλος που πλήρωσε"
     fun noMembersExpenseHint(lang: Language) = if (lang == Language.ENGLISH) "No members registered. The expense will be logged as Common." else "Δεν έχουν καταχωρηθεί μέλη. Το έξοδο θα καταχωρηθεί ως Κοινό."
-    fun categoryLabel(lang: Language) = if (lang == Language.ENGLISH) "CATEGORY" else "ΚΑΤΗΓΟΡΙΑ"
+    fun categoryLabel(lang: Language) = if (lang == Language.ENGLISH) "Category" else "Κατηγορία"
     fun date(lang: Language) = if (lang == Language.ENGLISH) "Date" else "Ημερομηνία"
-    fun dateLabel(lang: Language) = if (lang == Language.ENGLISH) "Date:" else "Ημερομηνία:"
+    fun dateLabel(lang: Language) = if (lang == Language.ENGLISH) "Target Date" else "Προθεσμία"
     fun changeAction(lang: Language) = if (lang == Language.ENGLISH) "Change" else "Αλλαγή"
     fun noteLabel(lang: Language) = if (lang == Language.ENGLISH) "Note (optional)" else "Σημείωση (προαιρετικό)"
     fun notePlaceholder(lang: Language) = if (lang == Language.ENGLISH) "e.g. Paid by card" else "π.χ. Πληρώθηκε με κάρτα"
@@ -282,7 +282,8 @@ object Localization {
 
     // User Profile Dialog
     fun myProfile(lang: Language) = if (lang == Language.ENGLISH) "My Profile" else "Το Προφίλ μου"
-    fun oikonomosUser(lang: Language) = if (lang == Language.ENGLISH) "OikoNomos User" else "Χρήστης OikoNomos"
+    fun oikonomosUser(lang: Language) = if (lang == Language.ENGLISH) "Estia User" else "Χρήστης Estia"
+    fun estiaUser(lang: Language) = if (lang == Language.ENGLISH) "Estia User" else "Χρήστης Estia"
     fun freePlan(lang: Language) = if (lang == Language.ENGLISH) "Free Plan" else "Δωρεάν Πλάνο"
     fun proSubscriber(lang: Language) = if (lang == Language.ENGLISH) "Pro Subscriber" else "Συνδρομητής Pro"
     fun activeHouseholdCount(lang: Language, count: Int) = if (lang == Language.ENGLISH) "$count active household" else "$count ενεργό εξοδολόγιο"
@@ -316,6 +317,11 @@ object Localization {
     fun themeLight(lang: Language) = if (lang == Language.ENGLISH) "Light" else "Φωτεινό"
     fun themeDark(lang: Language) = if (lang == Language.ENGLISH) "Dark" else "Σκοτεινό"
     fun themeSystem(lang: Language) = if (lang == Language.ENGLISH) "System" else "Σύστημα"
+    fun visualDesign(lang: Language) = if (lang == Language.ENGLISH) "VISUAL DESIGN & FONTS" else "ΣΧΕΔΙΑΣΜΟΣ & ΓΡΑΜΜΑΤΟΣΕΙΡΕΣ"
+    fun styleModernFintech(lang: Language) = if (lang == Language.ENGLISH) "Modern FinTech" else "Μοντέρνο FinTech"
+    fun styleModernFintechDesc(lang: Language) = if (lang == Language.ENGLISH) "New rounded geometric cards, donut chart & Plus Jakarta Sans" else "Νέες στρογγυλεμένες κάρτες, Plus Jakarta Sans & γραφιστικά"
+    fun styleClassic(lang: Language) = if (lang == Language.ENGLISH) "Classic" else "Κλασικό"
+    fun styleClassicDesc(lang: Language) = if (lang == Language.ENGLISH) "Original clean Material 3 look" else "Αρχικό κλασικό στυλ Material 3"
     fun preferencesSection(lang: Language) = if (lang == Language.ENGLISH) "PREFERENCES" else "ΠΡΟΤΙΜΗΣΕΙΣ"
     fun quickActionLaunch(lang: Language) = if (lang == Language.ENGLISH) "Quick Action on Launch" else "Γρήγορη επιλογή κατά την έναρξη"
     fun quickActionLaunchSubtitle(lang: Language) = if (lang == Language.ENGLISH) "Show Voice / Typing prompt dialog" else "Εμφάνιση μενού φωνής/πληκτρολόγησης"

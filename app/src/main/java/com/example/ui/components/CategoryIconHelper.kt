@@ -20,7 +20,9 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.util.GreekVoiceParser
 
 object CategoryIconHelper {
     fun getIcon(key: String): ImageVector {
@@ -44,6 +46,36 @@ object CategoryIconHelper {
             "gift" -> Icons.Default.CardGiftcard
             "bill" -> Icons.AutoMirrored.Filled.ReceiptLong
             else -> Icons.Default.Category
+        }
+    }
+
+    fun getIconForCategoryName(categoryName: String, iconKey: String? = null): ImageVector {
+        if (!iconKey.isNullOrBlank() && iconKey != "other") {
+            return getIcon(iconKey)
+        }
+        val norm = GreekVoiceParser.normalizeGreek(categoryName.trim().lowercase())
+        return when {
+            norm.contains("σουπερ") || norm.contains("supermarket") || norm.contains("μαρκετ") -> getIcon("cart")
+            norm.contains("φαγητο") || norm.contains("food") || norm.contains("ταβερν") || norm.contains("σουβλακ") || norm.contains("πιτσ") -> getIcon("food")
+            norm.contains("καφ") || norm.contains("coffee") -> getIcon("coffee")
+            norm.contains("βενζιν") || norm.contains("καυσιμ") || norm.contains("διοδι") -> getIcon("gas_station")
+            norm.contains("λογαριασμ") || norm.contains("σπιτι") || norm.contains("ενοικι") || norm.contains("δεη") || norm.contains("ρευμα") || norm.contains("νερο") -> getIcon("house")
+            norm.contains("υγεια") || norm.contains("φαρμακ") || norm.contains("γιατρ") -> getIcon("medical")
+            norm.contains("διασκεδασ") || norm.contains("ψυχαγωγ") || norm.contains("ποτο") || norm.contains("σινεμα") -> getIcon("entertainment")
+            else -> getIcon(iconKey ?: "other")
+        }
+    }
+
+    fun getColorForCategoryName(categoryName: String): Color {
+        val norm = GreekVoiceParser.normalizeGreek(categoryName.trim().lowercase())
+        return when {
+            norm.contains("σουπερ") || norm.contains("supermarket") || norm.contains("μαρκετ") -> Color(0xFF059669)
+            norm.contains("φαγητο") || norm.contains("food") || norm.contains("καφ") -> Color(0xFFEF4444)
+            norm.contains("λογαριασμ") || norm.contains("σπιτι") || norm.contains("ενοικι") -> Color(0xFF0D9488)
+            norm.contains("βενζιν") || norm.contains("καυσιμ") || norm.contains("μετακινησ") -> Color(0xFFEA580C)
+            norm.contains("υγεια") || norm.contains("φαρμακ") -> Color(0xFFEC4899)
+            norm.contains("διασκεδασ") || norm.contains("ψυχαγωγ") -> Color(0xFF8B5CF6)
+            else -> Color(0xFF059669)
         }
     }
 

@@ -1,4 +1,4 @@
-# 🛒 MarketWise (OikoNomos) - Android Smart Family Expense Tracker
+# 🏡 Estia - Android Smart Family Expense Tracker
 
 Εφαρμογή έξυπνης διαχείρισης και κατανομής οικογενειακών εξόδων με φωνητική καταχώρηση στα Ελληνικά, σάρωση αποδείξεων (Receipt OCR), ανάλυση ορίων προϋπολογισμού και **διπλή αρχιτεκτονική βάσης δεδομένων** (Τοπική SQLite/Room + Cloud Firebase Firestore).
 
