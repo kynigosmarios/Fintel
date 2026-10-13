@@ -1,6 +1,10 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,11 +30,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Euro
+import androidx.compose.material.icons.filled.FormatColorText
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -40,15 +47,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -70,20 +80,27 @@ fun CategoryDialog(
         iconKey: String,
         monthlyBudget: Double,
         colorHex: Long,
-        voiceKeywords: String
+        voiceKeywords: String,
+        fontColorHex: Long
     ) -> Unit
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
 
-    var name by remember { mutableStateOf(categoryToEdit?.name ?: "") }
-    var budgetText by remember {
+    var name by remember(categoryToEdit) { mutableStateOf(categoryToEdit?.name ?: "") }
+    var budgetText by remember(categoryToEdit) {
         mutableStateOf(
             categoryToEdit?.let { String.format(Locale.US, "%.0f", it.monthlyBudget) } ?: "100"
         )
     }
-    var selectedIconKey by remember { mutableStateOf(categoryToEdit?.iconKey ?: "cart") }
-    var voiceKeywords by remember { mutableStateOf(categoryToEdit?.voiceKeywords ?: "") }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    var selectedIconKey by remember(categoryToEdit) { mutableStateOf(categoryToEdit?.iconKey ?: "cart") }
+    var selectedColorHex by remember(categoryToEdit) {
+        mutableLongStateOf(categoryToEdit?.colorHex ?: 0xFF059669L)
+    }
+    var selectedFontColorHex by remember(categoryToEdit) {
+        mutableLongStateOf(categoryToEdit?.fontColorHex ?: 0L)
+    }
+    var voiceKeywords by remember(categoryToEdit) { mutableStateOf(categoryToEdit?.voiceKeywords ?: "") }
+    var errorText by remember(categoryToEdit) { mutableStateOf<String?>(null) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -92,8 +109,8 @@ fun CategoryDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .widthIn(max = 500.dp)
-                .fillMaxHeight(0.88f)
+                .widthIn(max = 520.dp)
+                .fillMaxHeight(0.92f)
                 .padding(vertical = 12.dp)
                 .testTag("category_dialog"),
             shape = RoundedCornerShape(24.dp),
@@ -115,7 +132,7 @@ fun CategoryDialog(
                         text = if (categoryToEdit == null) Localization.addCategory(lang) else Localization.editCategoryTitle(lang),
                         fontSize = 19.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Emerald700
+                        color = Color(selectedColorHex)
                     )
                     Surface(
                         shape = CircleShape,
@@ -130,7 +147,7 @@ fun CategoryDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // 2. Middle Scrollable Form Content
                 Column(
@@ -139,6 +156,108 @@ fun CategoryDialog(
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
                 ) {
+                    // LIVE PREVIEW CARD
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 14.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                        ),
+                        border = BorderStroke(1.5.dp, Color(selectedColorHex).copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "Ledger Appearance Preview" else "Προεπισκόπηση στο Εξοδολόγιο",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Live",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(selectedColorHex)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Simulated expense item inside ledger
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                shadowElevation = 1.dp,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val previewFontColor = if (selectedFontColorHex != 0L) {
+                                    Color(selectedFontColorHex)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                                val previewCatColor = Color(selectedColorHex)
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(previewCatColor.copy(alpha = 0.16f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = CategoryIconHelper.getIcon(selectedIconKey),
+                                            contentDescription = null,
+                                            tint = previewCatColor,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(10.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = name.ifBlank { if (lang == Localization.Language.ENGLISH) "Sample Expense" else "Παράδειγμα Εξόδου" },
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = previewFontColor,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = name.ifBlank { Localization.translateCategory(selectedIconKey, lang) },
+                                            fontSize = 11.5.sp,
+                                            color = previewCatColor,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    Text(
+                                        text = "35.50 €",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = previewFontColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Name
                     OutlinedTextField(
                         value = name,
@@ -172,12 +291,133 @@ fun CategoryDialog(
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // Icon selection
+                    // 1. CATEGORY COLOR SELECTION
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = null,
+                            tint = Color(selectedColorHex),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "Category & Icon Color" else "Χρώμα Κατηγορίας & Εικονιδίου",
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CategoryIconHelper.availableCategoryColors.forEach { (colorLong, _) ->
+                            val color = Color(colorLong)
+                            val isSelected = selectedColorHex == colorLong
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(
+                                        width = if (isSelected) 3.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                        shape = CircleShape
+                                    )
+                                    .clickable { selectedColorHex = colorLong },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 2. FONT COLOR SELECTION FOR LEDGER EXPENSES
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.FormatColorText,
+                            contentDescription = null,
+                            tint = if (selectedFontColorHex != 0L) Color(selectedFontColorHex) else Emerald700,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "Ledger Font Color" else "Χρώμα Γραμματοσειράς στο Εξοδολόγιο",
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH)
+                                    "Expenses in this category will display with this text color"
+                                else
+                                    "Τα έξοδα αυτής της κατηγορίας θα εμφανίζονται με αυτό το χρώμα κειμένου",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        CategoryIconHelper.availableFontColors.forEach { (fontColorLong, label) ->
+                            val isSelected = selectedFontColorHex == fontColorLong
+                            val swatchColor = if (fontColorLong != 0L) Color(fontColorLong) else MaterialTheme.colorScheme.onSurface
+
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { selectedFontColorHex = fontColorLong },
+                                label = {
+                                    Text(
+                                        text = label,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (fontColorLong != 0L) swatchColor else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clip(CircleShape)
+                                            .background(swatchColor)
+                                            .border(1.dp, Color.Gray.copy(alpha = 0.4f), CircleShape)
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = if (fontColorLong != 0L) swatchColor.copy(alpha = 0.15f) else Emerald700.copy(alpha = 0.15f)
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 3. ICON SELECTION
                     Text(
                         text = Localization.categoryIconLabel(lang),
-                        fontSize = 13.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -199,7 +439,7 @@ fun CategoryDialog(
                                         imageVector = CategoryIconHelper.getIcon(key),
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp),
-                                        tint = if (isSelected) Emerald700 else Color.Gray
+                                        tint = if (isSelected) Color(selectedColorHex) else Color.Gray
                                     )
                                 }
                             )
@@ -278,11 +518,12 @@ fun CategoryDialog(
                                 name.trim(),
                                 selectedIconKey,
                                 parsedBudget,
-                                categoryToEdit?.colorHex ?: 0xFF059669,
-                                voiceKeywords.trim()
+                                selectedColorHex,
+                                voiceKeywords.trim(),
+                                selectedFontColorHex
                             )
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(selectedColorHex), contentColor = Color.White),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier
                             .weight(1.3f)

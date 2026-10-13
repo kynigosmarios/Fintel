@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -65,10 +68,12 @@ import com.example.util.Localization
 @Composable
 fun CategoriesScreen(
     categories: List<ExpenseCategory>,
-    appLanguage: String = "EL",
+    appLanguage: String = "EN",
     onAddCategory: () -> Unit,
     onEditCategory: (ExpenseCategory) -> Unit,
     onDeleteCategory: (ExpenseCategory) -> Unit,
+    onMoveCategoryUp: (ExpenseCategory) -> Unit = {},
+    onMoveCategoryDown: (ExpenseCategory) -> Unit = {},
     onSeedStandardCategories: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -241,7 +246,7 @@ fun CategoriesScreen(
         }
 
         // Categories list
-        items(categories, key = { it.id }) { cat ->
+        itemsIndexed(categories, key = { _, cat -> cat.id }) { index, cat ->
             val catColor = Color(cat.colorHex)
             val keywordsList = cat.voiceKeywords.split(",").map { it.trim() }.filter { it.isNotBlank() }
             val translatedCatName = Localization.translateCategory(cat.name, lang)
@@ -287,12 +292,78 @@ fun CategoriesScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = Localization.budgetMonthlyLabel(lang, cat.monthlyBudget),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = Localization.budgetMonthlyLabel(lang, cat.monthlyBudget),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                if (cat.fontColorHex != 0L) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Color(cat.fontColorHex).copy(alpha = 0.12f),
+                                        border = BorderStroke(1.dp, Color(cat.fontColorHex).copy(alpha = 0.35f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(cat.fontColorHex))
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = if (lang == Localization.Language.ENGLISH) "Font Color" else "Χρώμα Γραμματοσειράς",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(cat.fontColorHex)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Reorder buttons (Up / Down)
+                        if (categories.size > 1) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(0.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { onMoveCategoryUp(cat) },
+                                    enabled = index > 0,
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .testTag("category_move_up_${cat.id}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowUp,
+                                        contentDescription = if (lang == Localization.Language.ENGLISH) "Move up" else "Μετακίνηση πάνω",
+                                        tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onMoveCategoryDown(cat) },
+                                    enabled = index < categories.size - 1,
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .testTag("category_move_down_${cat.id}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = if (lang == Localization.Language.ENGLISH) "Move down" else "Μετακίνηση κάτω",
+                                        tint = if (index < categories.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
                         }
 
                         // Actions

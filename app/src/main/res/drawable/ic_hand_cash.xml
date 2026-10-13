@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Banknote / cash in palm -->
+    <path
+        android:fillColor="#059669"
+        android:pathData="M7,3h10c1.1,0 2,0.9 2,2v5c0,1.1 -0.9,2 -2,2H7c-1.1,0 -2,-0.9 -2,-2V5c0,-1.1 0.9,-2 2,-2zM12,5.5a2,2 0 1,0 0.001,0z" />
+    <!-- Hand outstretched palm holding the money -->
+    <path
+        android:fillColor="#059669"
+        android:pathData="M1,16.5c0,0 3.2,-1.2 5.5,-0.8c2,0.4 3.8,1.3 5.8,1.3c2.2,0 4.2,-1.5 6.2,-1.5c1.2,0 2.2,0.8 2.2,2c0,0.6 -0.3,1.2 -0.8,1.6c-2.3,1.6 -4.8,2.4 -7.4,2.4c-2.4,0 -4.3,-0.8 -6.5,-0.8c-1.8,0 -3.6,0.8 -3.6,0.8l-1.4,-5z" />
+</vector>

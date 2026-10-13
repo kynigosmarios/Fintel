@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Receipt
@@ -76,6 +77,7 @@ import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
 import com.example.data.entity.Income
+import com.example.data.entity.getPayerShares
 import com.example.ui.components.BudgetAlertsCard
 import com.example.ui.components.CategoryIconHelper
 import com.example.ui.theme.Emerald100
@@ -94,7 +96,7 @@ data class PieChartSlice(
 fun PieChartView(
     slices: List<PieChartSlice>,
     totalAmount: Double,
-    appLanguage: String = "EL",
+    appLanguage: String = "EN",
     modifier: Modifier = Modifier
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
@@ -226,7 +228,7 @@ fun AnalyticsScreen(
     incomes: List<Income> = emptyList(),
     categories: List<ExpenseCategory>,
     members: List<FamilyMember>,
-    appLanguage: String = "EL",
+    appLanguage: String = "EN",
     onExportReport: () -> Unit = {},
     onManageCategories: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -406,22 +408,43 @@ fun AnalyticsScreen(
     val parentsTotalSpend = directParentsSpend + commonHouseholdSpend
     val parentsList = members.filter { it.role.equals("Γονέας", ignoreCase = true) }
 
-    // 3. Member spending distribution based on splitMode: 0 = Ατομικά, 1 = Γονείς, 2 = Παιδιά
+    // 2b. Calculate Who Actually Paid (Payer spending, supporting multiple payers and custom splits)
+    val payerSpendMap = members.associateWith { 0.0 }.toMutableMap()
+    periodExpenses.forEach { exp ->
+        val shares = exp.getPayerShares(members)
+        shares.forEach { share ->
+            val payer = members.find { it.id == share.memberId }
+                ?: members.find { it.name.equals(share.memberName, ignoreCase = true) }
+                ?: members.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) }
+                ?: members.firstOrNull()
+
+            if (payer != null) {
+                payerSpendMap[payer] = (payerSpendMap[payer] ?: 0.0) + share.amount
+            }
+        }
+    }
+
+    // 3. Member spending distribution based on splitMode: 0 = Ατομικά (Αφορά), 1 = Γονείς, 2 = Παιδιά, 3 = Ποιος Πλήρωσε
     val displayedMembers = when (splitMode) {
         0 -> members // Ατομικά
         1 -> if (parentsList.isNotEmpty()) parentsList else members.filter { !it.role.equals("Παιδί", ignoreCase = true) }.ifEmpty { members } // Γονείς
         2 -> members.filter { it.role.equals("Παιδί", ignoreCase = true) } // Παιδιά
+        3 -> members // Ποιος Πλήρωσε
         else -> members
     }
 
     val memberSpendMap = displayedMembers.associateWith { member ->
-        val ind = individualSpendMap[member] ?: 0.0
-        val comShare = if (splitMode == 1) {
-            if (parentsList.isNotEmpty()) commonHouseholdSpend / parentsList.size else 0.0
+        if (splitMode == 3) {
+            payerSpendMap[member] ?: 0.0
         } else {
-            0.0
+            val ind = individualSpendMap[member] ?: 0.0
+            val comShare = if (splitMode == 1) {
+                if (parentsList.isNotEmpty()) commonHouseholdSpend / parentsList.size else 0.0
+            } else {
+                0.0
+            }
+            ind + comShare
         }
-        ind + comShare
     }
 
     // 4. Category budget analysis
@@ -1055,6 +1078,131 @@ fun AnalyticsScreen(
             }
         }
 
+        // Section: Deficit Alert if any member paid more in expenses than declared income
+        val membersWithDeficit = members.mapNotNull { m ->
+            val paid = payerSpendMap[m] ?: 0.0
+            val income = memberIncomeMap[m] ?: 0.0
+            val deficit = paid - income
+            if (deficit > 0.01 && (paid > 0.0 || income > 0.0)) {
+                Triple(m, paid, income)
+            } else null
+        }
+
+        if (membersWithDeficit.isNotEmpty()) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.45f)),
+                    modifier = Modifier.fillMaxWidth().testTag("members_deficit_alert_card")
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFFEF4444).copy(alpha = 0.14f),
+                                modifier = Modifier.size(38.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Error,
+                                        contentDescription = null,
+                                        tint = Color(0xFFDC2626),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = Localization.memberIncomeDeficitTitle(lang),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFDC2626)
+                                )
+                                Text(
+                                    text = Localization.memberIncomeDeficitDesc(lang),
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            membersWithDeficit.forEach { (m, paid, income) ->
+                                val deficit = paid - income
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = Color(0xFFFEF2F2),
+                                    border = BorderStroke(1.dp, Color(0xFFFCA5A5).copy(alpha = 0.5f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(m.avatarColorHex)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = m.name.take(1),
+                                                    color = Color.White,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = m.name,
+                                                    fontSize = 13.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF991B1B)
+                                                )
+                                                Text(
+                                                    text = "Έσοδα: ${String.format(Locale.US, "%.1f€", income)} • Έξοδα: ${String.format(Locale.US, "%.1f€", paid)}",
+                                                    fontSize = 11.sp,
+                                                    color = Color(0xFFB91C1C)
+                                                )
+                                            }
+                                        }
+
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color(0xFFDC2626)
+                                        ) {
+                                            Text(
+                                                text = "-${String.format(Locale.US, "%.2f €", deficit)}",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Section: Γονείς vs Παιδιά vs Κοινό
         item {
             Card(
@@ -1191,6 +1339,168 @@ fun AnalyticsScreen(
             }
         }
 
+        // Dedicated Card: Έξοδα Γονέων για τα Παιδιά (Feature requested by user)
+        val kidsMembers = members.filter { it.role.equals("Παιδί", ignoreCase = true) }
+        if (kidsMembers.isNotEmpty()) {
+            item {
+                Card(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = BorderStroke(1.dp, Color(0xFF6366F1).copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth().testTag("kids_spending_highlight_card")
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFF6366F1).copy(alpha = 0.12f),
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.FamilyRestroom,
+                                            contentDescription = null,
+                                            tint = Color(0xFF4F46E5),
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Parents' Expenses for Children" else "Έξοδα Γονέων για τα Παιδιά",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Total amount parents covered for kids" else "Συνολικό ποσό που κάλυψαν οι γονείς για τα παιδιά",
+                                        fontSize = 11.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFF4F46E5).copy(alpha = 0.10f)
+                            ) {
+                                Text(
+                                    text = String.format(Locale.US, "%.2f €", kidsSpend),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF4338CA),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Per-child breakdown
+                        if (kidsMembers.isEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = Localization.noKidsRegisteredHint(lang),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(14.dp)
+                                )
+                            }
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                kidsMembers.forEach { kid ->
+                                    val kidSpend = individualSpendMap[kid] ?: 0.0
+                                    val kidPercent = if (kidsSpend > 0) (kidSpend / kidsSpend).toFloat().coerceIn(0f, 1f) else 0f
+                                    val kidColor = Color(kid.avatarColorHex)
+
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(30.dp)
+                                                            .clip(CircleShape)
+                                                            .background(kidColor),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = kid.name.take(1),
+                                                            color = Color.White,
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                    Column {
+                                                        Text(
+                                                            text = kid.name,
+                                                            fontSize = 13.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                            text = if (lang == Localization.Language.ENGLISH) "100% Covered by parents" else "🛡️ 100% Κάλυψη από γονείς",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Medium,
+                                                            color = Emerald700
+                                                        )
+                                                    }
+                                                }
+
+                                                Text(
+                                                    text = String.format(Locale.US, "%.2f €", kidSpend),
+                                                    fontSize = 14.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+
+                                            if (kidsSpend > 0) {
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                LinearProgressIndicator(
+                                                    progress = { kidPercent },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(5.dp)
+                                                        .clip(CircleShape),
+                                                    color = kidColor,
+                                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Section: Καταμερισμός ανά Μέλος Οικογένειας
         item {
             Card(
@@ -1226,7 +1536,8 @@ fun AnalyticsScreen(
                         text = when (splitMode) {
                             0 -> Localization.individualSpendingSubtitle(lang)
                             1 -> Localization.parentsSpendingSubtitle(lang)
-                            else -> Localization.kidsSpendingSubtitle(lang)
+                            2 -> Localization.kidsSpendingSubtitle(lang)
+                            else -> if (lang == Localization.Language.ENGLISH) "Breakdown of who actually paid the expenses" else "Ανάλυση για το ποιο μέλος κατέβαλε τις πληρωμές"
                         },
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1234,7 +1545,7 @@ fun AnalyticsScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Mode selection modern segmented pill control: Individual, Parents, Kids
+                    // Mode selection modern segmented pill control: Individual, Parents, Kids, Who Paid
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -1242,7 +1553,12 @@ fun AnalyticsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(modifier = Modifier.padding(3.dp)) {
-                            val modes = listOf(Localization.individualMode(lang), Localization.parentsMode(lang), Localization.kidsMode(lang))
+                            val modes = listOf(
+                                Localization.individualMode(lang),
+                                Localization.parentsMode(lang),
+                                Localization.kidsMode(lang),
+                                if (lang == Localization.Language.ENGLISH) "Who Paid" else "Ποιος Πλήρωσε"
+                            )
                             modes.forEachIndexed { index, title ->
                                 val isSelected = splitMode == index
                                 val bgColor by animateColorAsState(
@@ -1265,11 +1581,13 @@ fun AnalyticsScreen(
                                 ) {
                                     Text(
                                         text = title,
-                                        fontSize = 12.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = textColor,
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 8.dp)
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -1335,15 +1653,36 @@ fun AnalyticsScreen(
                                         }
                                         Spacer(modifier = Modifier.width(10.dp))
                                         Column {
-                                            Text(
-                                                text = member.name,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = member.name,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                val mPaid = payerSpendMap[member] ?: 0.0
+                                                val mInc = memberIncomeMap[member] ?: 0.0
+                                                if (mPaid > mInc && (mPaid > 0.0 || mInc > 0.0)) {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Surface(
+                                                        shape = RoundedCornerShape(4.dp),
+                                                        color = Color(0xFFEF4444).copy(alpha = 0.12f)
+                                                    ) {
+                                                        Text(
+                                                            text = Localization.expensesExceedIncomeTag(lang),
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Color(0xFFDC2626),
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
                                             val subtitle = when (splitMode) {
                                                 0 -> Localization.individualExpensesSubtitle(member.role, lang)
                                                 1 -> if (com > 0.01) "${Localization.translateRole(member.role, lang)} • ${if (lang == Localization.Language.ENGLISH) "Ind" else "Ατομ"}: ${String.format(Locale.US, "%.1f€", ind)} + ${if (lang == Localization.Language.ENGLISH) "Home" else "Σπίτι"}: ${String.format(Locale.US, "%.1f€", com)}" else Localization.individualExpensesSubtitle(member.role, lang)
-                                                else -> Localization.kidsExpensesSubtitle(lang)
+                                                2 -> Localization.kidsExpensesSubtitle(lang)
+                                                3 -> if (lang == Localization.Language.ENGLISH) "Total paid: ${String.format(Locale.US, "%.2f €", spend)}" else "Πλήρωσε συνολικά: ${String.format(Locale.US, "%.2f €", spend)}"
+                                                else -> Localization.individualExpensesSubtitle(member.role, lang)
                                             }
                                             Text(
                                                 text = subtitle,
@@ -1432,15 +1771,21 @@ fun AnalyticsScreen(
                         val ratio = if (budget > 0) spent / budget else 0.0
                         val progress = ratio.toFloat().coerceIn(0f, 1f)
 
+                        val isExact = budget > 0 && (Math.abs(spent - budget) < 0.05 || (ratio >= 0.999 && ratio <= 1.001))
+                        val isExceeded = budget > 0 && spent > budget + 0.05
+                        val isWarning = budget > 0 && !isExact && !isExceeded && ratio >= 0.75
+
                         val statusText = when {
-                            ratio >= 1.0 -> Localization.exceededBudget(lang)
-                            ratio >= 0.75 -> Localization.warningBudget(lang)
-                            else -> Localization.withinBudget(lang)
+                            isExact -> Localization.atBudget(lang)
+                            isExceeded -> Localization.exceededBudget(lang)
+                            isWarning -> Localization.warningBudget(lang)
+                            else -> Localization.withinLimit(lang)
                         }
 
                         val barColor = when {
-                            ratio >= 1.0 -> Color(0xFFEF4444)
-                            ratio >= 0.75 -> Color(0xFFF59E0B)
+                            isExact -> Color(0xFF2563EB)
+                            isExceeded -> Color(0xFFEF4444)
+                            isWarning -> Color(0xFFF59E0B)
                             else -> Emerald700
                         }
 
@@ -1530,7 +1875,7 @@ private fun ChartTypeToggle(
     selectedType: Int, // 0 = Bar, 1 = Pie
     onSelectType: (Int) -> Unit,
     activeColor: Color = Emerald700,
-    appLanguage: String = "EL",
+    appLanguage: String = "EN",
     modifier: Modifier = Modifier
 ) {
     val lang = Localization.Language.fromCode(appLanguage)

@@ -28,7 +28,36 @@ interface ExpenseDao {
     suspend fun insertExpenses(expenses: List<Expense>)
 
     @Update
-    suspend fun updateExpense(expense: Expense)
+    suspend fun updateExpense(expense: Expense): Int
+
+    @Transaction
+    suspend fun saveOrUpdateExpense(expense: Expense): Long {
+        if (expense.id > 0) {
+            val updated = updateExpense(expense)
+            if (updated > 0) return expense.id
+        }
+        if (expense.cloudId.isNotBlank()) {
+            val byCloud = getExpenseByCloudId(expense.cloudId)
+            if (byCloud != null) {
+                val updated = updateExpense(expense.copy(id = byCloud.id))
+                if (updated > 0) return byCloud.id
+            }
+        }
+        return insertExpense(expense)
+    }
+
+    @Query("SELECT * FROM expenses WHERE cloudId = :cloudId LIMIT 1")
+    suspend fun getExpenseByCloudId(cloudId: String): Expense?
+
+    @Query("DELETE FROM expenses WHERE cloudId = :cloudId AND id != :keepId")
+    suspend fun deleteDuplicateExpensesByCloudId(cloudId: String, keepId: Long)
+
+    @Transaction
+    suspend fun replaceAllExpensesTransaction(expenses: List<Expense>) {
+        if (expenses.isEmpty()) return
+        deleteAllExpenses()
+        insertExpenses(expenses)
+    }
 
     @Delete
     suspend fun deleteExpense(expense: Expense)
@@ -43,7 +72,7 @@ interface ExpenseDao {
     suspend fun getExpenseCount(): Int
 
     // Family Members
-    @Query("SELECT * FROM family_members ORDER BY id ASC")
+    @Query("SELECT * FROM family_members ORDER BY sortOrder ASC, id ASC")
     fun getAllMembers(): Flow<List<FamilyMember>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -54,6 +83,9 @@ interface ExpenseDao {
 
     @Update
     suspend fun updateMember(member: FamilyMember)
+
+    @Update
+    suspend fun updateMembers(members: List<FamilyMember>)
 
     @Delete
     suspend fun deleteMember(member: FamilyMember)
@@ -72,7 +104,7 @@ interface ExpenseDao {
     }
 
     // Categories
-    @Query("SELECT * FROM expense_categories ORDER BY id ASC")
+    @Query("SELECT * FROM expense_categories ORDER BY sortOrder ASC, id ASC")
     fun getAllCategories(): Flow<List<ExpenseCategory>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -83,6 +115,9 @@ interface ExpenseDao {
 
     @Update
     suspend fun updateCategory(category: ExpenseCategory)
+
+    @Update
+    suspend fun updateCategories(categories: List<ExpenseCategory>)
 
     @Delete
     suspend fun deleteCategory(category: ExpenseCategory)
@@ -167,10 +202,10 @@ interface ExpenseDao {
     suspend fun deleteAllIncomes()
 
     // Safety & Bi-directional Sync One-shot Getters
-    @Query("SELECT * FROM expense_categories ORDER BY id ASC")
+    @Query("SELECT * FROM expense_categories ORDER BY sortOrder ASC, id ASC")
     suspend fun getAllCategoriesList(): List<ExpenseCategory>
 
-    @Query("SELECT * FROM family_members ORDER BY id ASC")
+    @Query("SELECT * FROM family_members ORDER BY sortOrder ASC, id ASC")
     suspend fun getAllMembersList(): List<FamilyMember>
 
     @Query("SELECT * FROM savings_goals ORDER BY id ASC")

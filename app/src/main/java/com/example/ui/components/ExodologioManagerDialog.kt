@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.Household
 import com.example.ui.theme.Amber700
 import com.example.ui.theme.Emerald700
@@ -72,13 +74,17 @@ fun ExodologioManagerDialog(
     var showCreateDialog by remember { mutableStateOf(false) }
     var newHouseholdName by remember { mutableStateOf("") }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .padding(vertical = 12.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+                .widthIn(max = 500.dp)
                 .testTag("exodologio_manager_dialog"),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -227,18 +233,21 @@ fun ExodologioManagerDialog(
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
 
-                    // Action 1: Add New Exodologio
+                    // Action 1: Add New Exodologio (Pro feature with star & coloring)
                     Surface(
                         shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                        color = if (isPremium) Emerald700.copy(alpha = 0.08f) else Amber700.copy(alpha = 0.08f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isPremium) Emerald700.copy(alpha = 0.3f) else Amber700.copy(alpha = 0.35f)
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                if (!isPremium && allHouseholds.size >= 1) {
-                                    onShowPremiumPaywall("multi_exodologio")
-                                } else {
+                                if (isPremium) {
                                     showCreateDialog = true
+                                } else {
+                                    onShowPremiumPaywall("multi_exodologio")
                                 }
                             }
                             .testTag("add_new_exodologio_button")
@@ -249,14 +258,14 @@ fun ExodologioManagerDialog(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = Emerald700.copy(alpha = 0.12f),
+                                color = if (isPremium) Emerald700.copy(alpha = 0.15f) else Amber700.copy(alpha = 0.15f),
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.Add,
+                                        imageVector = if (isPremium) Icons.Default.Add else Icons.Default.Star,
                                         contentDescription = null,
-                                        tint = Emerald700,
+                                        tint = if (isPremium) Emerald700 else Amber700,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -272,25 +281,37 @@ fun ExodologioManagerDialog(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = if (lang == Localization.Language.ENGLISH) "Separate space for home, business, etc." else "Ξεχωριστός χώρος για σπίτι, δουλειά κ.α.",
+                                    text = if (lang == Localization.Language.ENGLISH)
+                                        "Unlimited households for home, business, etc."
+                                    else
+                                        "Απεριόριστα εξοδολόγια για σπίτι, δουλειά κ.α.",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
 
-                            if (!isPremium && allHouseholds.size >= 1) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Amber700.copy(alpha = 0.15f)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Amber700.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, Amber700.copy(alpha = 0.3f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.Lock, contentDescription = null, tint = Amber700, modifier = Modifier.size(11.dp))
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text("Pro", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Amber700)
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = Amber700,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "PRO",
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Amber700
+                                    )
                                 }
                             }
                         }
@@ -480,7 +501,7 @@ fun PremiumPaywallDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Estia Pro",
+                    text = "Fintel Pro",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -494,7 +515,7 @@ fun PremiumPaywallDialog(
                     } else if (reason == "invite_member") {
                         if (lang == Localization.Language.ENGLISH) "Adding members is a Pro feature" else "Η προσθήκη μελών είναι δυνατότητα Pro"
                     } else {
-                        if (lang == Localization.Language.ENGLISH) "Unlock all Estia Pro features" else "Ξεκλειδώστε όλες τις δυνατότητες του Estia"
+                        if (lang == Localization.Language.ENGLISH) "Unlock all Fintel Pro features" else "Ξεκλειδώστε όλες τις δυνατότητες του Fintel"
                     },
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,

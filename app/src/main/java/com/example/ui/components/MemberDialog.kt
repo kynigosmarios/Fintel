@@ -81,15 +81,15 @@ fun MemberDialog(
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
 
-    var name by remember { mutableStateOf(memberToEdit?.name ?: "") }
-    var role by remember { mutableStateOf(memberToEdit?.role ?: "Γονέας") }
-    var selectedColor by remember {
+    var name by remember(memberToEdit) { mutableStateOf(memberToEdit?.name ?: "") }
+    var role by remember(memberToEdit) { mutableStateOf(memberToEdit?.role ?: "Γονέας") }
+    var selectedColor by remember(memberToEdit) {
         mutableLongStateOf(memberToEdit?.avatarColorHex ?: 0xFF0284C7)
     }
-    var voiceKeywords by remember {
+    var voiceKeywords by remember(memberToEdit) {
         mutableStateOf(memberToEdit?.voiceKeywords ?: "")
     }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    var errorText by remember(memberToEdit) { mutableStateOf<String?>(null) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -174,7 +174,7 @@ fun MemberDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        listOf("Γονέας", "Παιδί", "Σύντροφος", "Άλλο").forEach { r ->
+                        listOf("Γονέας", "Παιδί", "Σύντροφος", "Συγκάτοικος", "Συνεργάτης", "Φίλος / Φίλη", "Άλλο").forEach { r ->
                             val translatedRole = Localization.translateRole(r, lang)
                             FilterChip(
                                 selected = role == r,

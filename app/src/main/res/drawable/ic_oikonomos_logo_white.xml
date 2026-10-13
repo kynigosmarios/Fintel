@@ -1,48 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="26dp"
-    android:height="26dp"
-    android:viewportWidth="72"
-    android:viewportHeight="72">
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
 
-    <!-- House Roof -->
+    <!-- House Outline: Gable roof, eaves, walls and rounded bottom floor -->
     <path
-        android:pathData="M2.59,34.34 L36.00,4.24 L69.41,34.34"
-        android:strokeWidth="5.6"
+        android:pathData="M 50.0,7.5 L 4.5,46.5 L 12.0,46.5 L 12.0,81.0 Q 12.0,92.0 23.0,92.0 L 77.0,92.0 Q 88.0,92.0 88.0,81.0 L 88.0,46.5 L 95.5,46.5 Z"
+        android:strokeWidth="5.2"
         android:strokeColor="#FFFFFF"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000" />
 
-    <!-- Left Wall -->
+    <!-- Infinity Symbol: Left piece -->
     <path
-        android:pathData="M8.28,29.01 L8.28,68.04"
-        android:strokeWidth="5.6"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
-
-    <!-- Right Wall -->
-    <path
-        android:pathData="M63.72,29.01 L63.72,68.04"
-        android:strokeWidth="5.6"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000" />
-
-    <!-- Special Interlocking Infinity Symbol - Left Loop and Lower Diagonal -->
-    <path
-        android:pathData="M33.84,39.74 C31.68,37.22 28.44,35.92 24.84,35.92 C18.58,35.92 13.54,41.04 13.54,47.30 C13.54,53.56 18.58,58.68 24.84,58.68 C28.08,58.68 30.96,57.38 33.12,55.36 L42.84,47.30"
-        android:strokeWidth="5.6"
+        android:pathData="M 47.0,53.0 C 41.0,48.7 34.0,48.7 28.0,50.2 C 19.2,53.0 19.2,63.5 19.2,63.5 C 19.2,73.0 26.0,78.3 34.0,78.3 C 40.5,78.3 46.5,74.5 50.0,69.5 L 58.0,62.0"
+        android:strokeWidth="5.2"
         android:strokeColor="#FFFFFF"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000" />
 
-    <!-- Special Interlocking Infinity Symbol - Right Loop and Upper Diagonal (180-deg rotated) -->
+    <!-- Infinity Symbol: Right piece (180-deg symmetric) -->
     <path
-        android:pathData="M29.16,47.30 L38.88,39.24 C41.04,37.22 43.92,35.92 47.16,35.92 C53.42,35.92 58.46,41.04 58.46,47.30 C58.46,53.56 53.42,58.68 47.16,58.68 C43.56,58.68 40.32,57.38 38.16,54.86"
-        android:strokeWidth="5.6"
+        android:pathData="M 53.0,74.0 C 59.0,78.3 66.0,78.3 72.0,76.8 C 80.8,74.0 80.8,63.5 80.8,63.5 C 80.8,54.0 74.0,48.7 66.0,48.7 C 59.5,48.7 53.5,52.5 50.0,57.5 L 42.0,65.0"
+        android:strokeWidth="5.2"
         android:strokeColor="#FFFFFF"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"

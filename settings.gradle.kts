@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Estia"
+rootProject.name = "Fintel"
 
 include(":app")

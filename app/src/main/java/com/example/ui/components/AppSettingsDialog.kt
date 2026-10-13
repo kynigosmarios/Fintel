@@ -1,5 +1,9 @@
 package com.example.ui.components
 
+import android.app.TimePickerDialog
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7,8 +11,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,9 +23,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -26,6 +37,8 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material3.AlertDialog
@@ -49,8 +62,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +76,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.Household
+import com.example.data.model.UserProfile
 import com.example.ui.theme.Emerald700
 import com.example.util.Localization
 import com.google.firebase.auth.FirebaseUser
@@ -70,6 +89,13 @@ fun AppSettingsDialog(
     themeMode: String,
     appLanguage: String = "EL",
     launchWithChooser: Boolean,
+    userProfile: UserProfile? = null,
+    reminderEnabled: Boolean = false,
+    reminderHour: Int = 21,
+    reminderMinute: Int = 30,
+    onToggleReminder: (Boolean) -> Unit = {},
+    onSetReminderTime: (Int, Int) -> Unit = { _, _ -> },
+    onTestReminder: () -> Unit = {},
     onThemeChange: (String) -> Unit,
     onLanguageChange: (String) -> Unit = {},
     onToggleLaunchWithChooser: (Boolean) -> Unit,
@@ -82,16 +108,42 @@ fun AppSettingsDialog(
 ) {
     var showResetConfirmDialog by remember { mutableStateOf(false) }
     val lang = Localization.Language.fromCode(appLanguage)
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            onToggleReminder(true)
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(reminderEnabled) {
+        if (reminderEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-                .widthIn(max = 420.dp)
+                .fillMaxHeight(0.92f)
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .imePadding()
+                .widthIn(max = 430.dp)
                 .testTag("app_settings_dialog"),
             shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -99,8 +151,8 @@ fun AppSettingsDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(22.dp)
+                    .fillMaxSize()
+                    .padding(20.dp)
             ) {
                 // Header (Icon + Title + Close Button)
                 Row(
@@ -161,12 +213,13 @@ fun AppSettingsDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Scrollable Content
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -184,26 +237,18 @@ fun AppSettingsDialog(
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Emerald700,
-                                    modifier = Modifier.size(42.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = currentUser.displayName?.firstOrNull()?.uppercase() ?: "O",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 17.sp
-                                        )
-                                    }
-                                }
+                                UserAvatar(
+                                    photoUrl = userProfile?.photoUrl?.ifBlank { null } ?: currentUser.photoUrl?.toString(),
+                                    displayName = userProfile?.displayName?.ifBlank { null } ?: currentUser.displayName,
+                                    modifier = Modifier.size(42.dp),
+                                    fontSize = 17.sp
+                                )
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = currentUser.displayName?.ifBlank { null } ?: if (lang == Localization.Language.ENGLISH) "Estia User" else "Χρήστης Estia",
+                                        text = currentUser.displayName?.ifBlank { null } ?: Localization.fintelUser(lang),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -296,7 +341,7 @@ fun AppSettingsDialog(
                         }
                     }
 
-                    // 3. Section: Θέμα Εμφάνισης (Theme - Light, Dark, System)
+                    // 3. Section: Θέμα Εμφάνισης (Theme - Light, Dark, System) - Only Icons
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = Localization.themeDisplay(lang),
@@ -309,10 +354,9 @@ fun AppSettingsDialog(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             ThemeCardOption(
-                                label = Localization.themeLight(lang),
                                 icon = Icons.Default.LightMode,
                                 isSelected = themeMode == "LIGHT",
                                 onClick = { onThemeChange("LIGHT") },
@@ -320,7 +364,6 @@ fun AppSettingsDialog(
                             )
 
                             ThemeCardOption(
-                                label = Localization.themeDark(lang),
                                 icon = Icons.Default.DarkMode,
                                 isSelected = themeMode == "DARK",
                                 onClick = { onThemeChange("DARK") },
@@ -328,7 +371,6 @@ fun AppSettingsDialog(
                             )
 
                             ThemeCardOption(
-                                label = Localization.themeSystem(lang),
                                 icon = Icons.Default.SettingsBrightness,
                                 isSelected = themeMode == "SYSTEM",
                                 onClick = { onThemeChange("SYSTEM") },
@@ -337,16 +379,26 @@ fun AppSettingsDialog(
                         }
                     }
 
-                    // 4. Section: Προτιμήσεις Εκκίνησης (Launch Chooser Toggle)
+                    // 4. Section: Υπενθύμιση καταχώρησης (Entry Reminder)
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = Localization.preferencesSection(lang),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                            letterSpacing = 0.5.sp,
-                            modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Bedtime,
+                                contentDescription = null,
+                                tint = Emerald700,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "ENTRY REMINDER" else "ΥΠΕΝΘΥΜΙΣΗ ΚΑΤΑΧΩΡΗΣΗΣ",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         Surface(
                             shape = RoundedCornerShape(16.dp),
@@ -354,51 +406,195 @@ fun AppSettingsDialog(
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(14.dp)
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = Emerald700.copy(alpha = 0.12f),
-                                    modifier = Modifier.size(34.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.Bolt,
-                                            contentDescription = null,
-                                            tint = Emerald700,
-                                            modifier = Modifier.size(18.dp)
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Emerald700.copy(alpha = 0.12f),
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = if (reminderEnabled) Icons.Default.NotificationsActive else Icons.Default.Bedtime,
+                                                contentDescription = null,
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "Entry Reminder" else "Υπενθύμιση καταχώρησης",
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
+
+                                    Switch(
+                                        checked = reminderEnabled,
+                                        onCheckedChange = { isChecked ->
+                                            if (isChecked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                            }
+                                            onToggleReminder(isChecked)
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = Emerald700
+                                        ),
+                                        modifier = Modifier.testTag("daily_reminder_switch")
+                                    )
                                 }
 
-                                Spacer(modifier = Modifier.width(12.dp))
+                                if (reminderEnabled) {
+                                    Spacer(modifier = Modifier.height(14.dp))
 
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = Localization.quickActionLaunch(lang),
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = Localization.quickActionLaunchSubtitle(lang),
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    var timeInput by remember(reminderHour, reminderMinute) {
+                                        mutableStateOf("%02d:%02d".format(reminderHour, reminderMinute))
+                                    }
+                                    val focusManager = LocalFocusManager.current
+                                    val keyboardController = LocalSoftwareKeyboardController.current
+
+                                    // Function to commit time parsing
+                                    fun commitTime(str: String) {
+                                        val parts = str.trim().split(":", ".")
+                                        if (parts.size == 2) {
+                                            val h = parts[0].toIntOrNull()
+                                            val m = parts[1].toIntOrNull()
+                                            if (h != null && m != null && h in 0..23 && m in 0..59) {
+                                                onSetReminderTime(h, m)
+                                                timeInput = "%02d:%02d".format(h, m)
+                                            }
+                                        }
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.clickable {
+                                                TimePickerDialog(
+                                                    context,
+                                                    { _, pickedHour, pickedMinute ->
+                                                        onSetReminderTime(pickedHour, pickedMinute)
+                                                        timeInput = "%02d:%02d".format(pickedHour, pickedMinute)
+                                                    },
+                                                    reminderHour,
+                                                    reminderMinute,
+                                                    true
+                                                ).show()
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Schedule,
+                                                contentDescription = null,
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (lang == Localization.Language.ENGLISH) "Reminder Time:" else "Ώρα ειδοποίησης:",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Surface(
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = MaterialTheme.colorScheme.surface,
+                                                border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.5f)),
+                                                modifier = Modifier
+                                                    .width(88.dp)
+                                                    .height(40.dp)
+                                            ) {
+                                                Box(
+                                                    contentAlignment = Alignment.Center,
+                                                    modifier = Modifier.padding(horizontal = 6.dp)
+                                                ) {
+                                                    BasicTextField(
+                                                        value = timeInput,
+                                                        onValueChange = { newVal ->
+                                                            if (newVal.length <= 5) {
+                                                                timeInput = newVal
+                                                                commitTime(newVal)
+                                                            }
+                                                        },
+                                                        keyboardOptions = KeyboardOptions(
+                                                            keyboardType = KeyboardType.Number,
+                                                            imeAction = ImeAction.Done
+                                                        ),
+                                                        keyboardActions = KeyboardActions(
+                                                            onDone = {
+                                                                commitTime(timeInput)
+                                                                focusManager.clearFocus()
+                                                                keyboardController?.hide()
+                                                            }
+                                                        ),
+                                                        singleLine = true,
+                                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                                            fontSize = 15.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Emerald700,
+                                                            textAlign = TextAlign.Center
+                                                        ),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .testTag("reminder_time_input")
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.width(6.dp))
+
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = Emerald700.copy(alpha = 0.12f),
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .clickable {
+                                                        focusManager.clearFocus()
+                                                        keyboardController?.hide()
+                                                        TimePickerDialog(
+                                                            context,
+                                                            { _, pickedHour, pickedMinute ->
+                                                                onSetReminderTime(pickedHour, pickedMinute)
+                                                                timeInput = "%02d:%02d".format(pickedHour, pickedMinute)
+                                                            },
+                                                            reminderHour,
+                                                            reminderMinute,
+                                                            true
+                                                        ).show()
+                                                    }
+                                                    .testTag("reminder_time_picker_button")
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Schedule,
+                                                        contentDescription = "Pick Time",
+                                                        tint = Emerald700,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-
-                                Switch(
-                                    checked = launchWithChooser,
-                                    onCheckedChange = onToggleLaunchWithChooser,
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = Emerald700
-                                    )
-                                )
                             }
                         }
                     }
@@ -452,11 +648,6 @@ fun AppSettingsDialog(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
-                                    Text(
-                                        text = Localization.clearAllDataSubtitle(lang),
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
                                 }
 
                                 Text(
@@ -469,26 +660,28 @@ fun AppSettingsDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
-                    // 6. Bottom Close Button
-                    Button(
-                        onClick = onDismiss,
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Emerald700,
-                            contentColor = Color.White
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(46.dp)
-                    ) {
-                        Text(
-                            text = Localization.close(lang),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                    }
+                // Fixed Bottom Save Button (Always visible and scroll never cuts it off)
+                Spacer(modifier = Modifier.height(14.dp))
+                Button(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Emerald700,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("app_settings_save_button")
+                ) {
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "Save & Close" else "Αποθήκευση",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }
@@ -599,7 +792,6 @@ private fun LanguageOptionCard(
 
 @Composable
 private fun ThemeCardOption(
-    label: String,
     icon: ImageVector,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -607,47 +799,25 @@ private fun ThemeCardOption(
 ) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = if (isSelected) Emerald700.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        color = if (isSelected) Emerald700.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(
             width = if (isSelected) 1.5.dp else 1.dp,
             color = if (isSelected) Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
         ),
         modifier = modifier
-            .height(72.dp)
+            .height(46.dp)
             .clickable { onClick() }
     ) {
-        Column(
-            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(22.dp),
                 tint = if (isSelected) Emerald700 else MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = Emerald700,
-                        modifier = Modifier.size(11.dp)
-                    )
-                    Spacer(modifier = Modifier.width(3.dp))
-                }
-                Text(
-                    text = label,
-                    fontSize = 12.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) Emerald700 else MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-            }
         }
     }
 }

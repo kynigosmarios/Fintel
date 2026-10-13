@@ -41,12 +41,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,6 +80,8 @@ fun BurgerMenuDrawer(
     onDismiss: () -> Unit
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
+    var showLegalDialog by remember { mutableStateOf(false) }
+    var selectedLegalTab by remember { mutableStateOf("PRIVACY") }
 
     AnimatedVisibility(
         visible = isOpen,
@@ -172,26 +179,18 @@ fun BurgerMenuDrawer(
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Emerald700,
-                                    modifier = Modifier.size(40.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = currentUser.displayName?.firstOrNull()?.uppercase() ?: "O",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 17.sp
-                                        )
-                                    }
-                                }
+                                UserAvatar(
+                                    photoUrl = userProfile?.photoUrl?.ifBlank { null } ?: currentUser.photoUrl?.toString(),
+                                    displayName = userProfile?.displayName?.ifBlank { null } ?: currentUser.displayName,
+                                    modifier = Modifier.size(42.dp),
+                                    fontSize = 17.sp
+                                )
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = currentUser.displayName?.ifBlank { null } ?: if (lang == Localization.Language.ENGLISH) "Estia User" else "Χρήστης Estia",
+                                        text = currentUser.displayName?.ifBlank { null } ?: Localization.fintelUser(lang),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -365,7 +364,7 @@ fun BurgerMenuDrawer(
                     BurgerNavigationItem(
                         title = Localization.myProfile(lang),
                         subtitle = if (userProfile?.isPremium == true)
-                            (if (lang == Localization.Language.ENGLISH) "Estia Pro Subscriber" else "Estia Pro συνδρομητής")
+                            (if (lang == Localization.Language.ENGLISH) "Fintel Pro Subscriber" else "Fintel Pro συνδρομητής")
                         else
                             (if (lang == Localization.Language.ENGLISH) "Account details & Pro" else "Στοιχεία λογαριασμού & Pro"),
                         icon = Icons.Default.Person,
@@ -381,7 +380,7 @@ fun BurgerMenuDrawer(
                     if (onOpenGuide != null) {
                         Spacer(modifier = Modifier.height(6.dp))
                         BurgerNavigationItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Getting Started Guide" else "Οδηγός Ξεκινήματος",
+                            title = if (lang == Localization.Language.ENGLISH) "Instructions" else "Οδηγίες",
                             subtitle = if (lang == Localization.Language.ENGLISH) "6-step tutorial for new users" else "Οδηγός 6 βημάτων για νέα μέλη",
                             icon = Icons.Default.Info,
                             iconTint = Color(0xFFD97706),
@@ -433,20 +432,63 @@ fun BurgerMenuDrawer(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(
-                        text = "Estia • ${Localization.appTagline(lang)}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                    )
+                    // Discreet Legal Links (Terms & Conditions, Privacy Policy)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "Terms of Service" else "Όροι Χρήσης",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Emerald700,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier
+                                .clickable {
+                                    selectedLegalTab = "TERMS"
+                                    showLegalDialog = true
+                                }
+                                .testTag("terms_of_service_link")
+                        )
+                        Text(
+                            text = "  •  ",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "Privacy Policy" else "Πολιτική Απορρήτου",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Emerald700,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier
+                                .clickable {
+                                    selectedLegalTab = "PRIVACY"
+                                    showLegalDialog = true
+                                }
+                                .testTag("privacy_policy_link")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
         }
     }
 }
+
+    if (showLegalDialog) {
+        LegalDocumentsDialog(
+            initialTab = selectedLegalTab,
+            appLanguage = appLanguage,
+            onDismiss = { showLegalDialog = false }
+        )
+    }
 }
 
 @Composable

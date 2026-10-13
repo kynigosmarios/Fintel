@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -25,6 +28,9 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.RadioButtonChecked
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,9 +56,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.model.Household
 import com.example.ui.theme.Amber700
 import com.example.ui.theme.Emerald700
@@ -81,13 +90,17 @@ fun ExodologioDetailsDialog(
     var newHouseholdName by remember { mutableStateOf("") }
     var showClearConfirmDialog by remember { mutableStateOf(false) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .padding(vertical = 12.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+                .widthIn(max = 500.dp)
                 .testTag("exodologio_details_dialog"),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
@@ -118,12 +131,22 @@ fun ExodologioDetailsDialog(
                             }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = Localization.myExodologio(lang),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Column {
+                            Text(
+                                text = Localization.householdManager(lang),
+                                fontSize = 17.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isPremium)
+                                    (if (lang == Localization.Language.ENGLISH) "Pro • Unlimited Households" else "Pro • Απεριόριστα εξοδολόγια")
+                                else
+                                    (if (lang == Localization.Language.ENGLISH) "Basic • 1 Household" else "Βασικό • 1 εξοδολόγιο"),
+                                fontSize = 11.5.sp,
+                                color = if (isPremium) Amber700 else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     Surface(
@@ -172,26 +195,55 @@ fun ExodologioDetailsDialog(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             if (isEditingName) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     OutlinedTextField(
                                         value = editedName,
                                         onValueChange = { editedName = it },
-                                        label = { Text(if (lang == Localization.Language.ENGLISH) "Name" else "Όνομα") },
+                                        label = { Text(if (lang == Localization.Language.ENGLISH) "Household Name" else "Όνομα Εξοδολογίου", fontSize = 12.sp) },
                                         singleLine = true,
                                         shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.weight(1f)
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = Emerald700,
+                                            focusedLabelColor = Emerald700,
+                                            cursorColor = Emerald700
+                                        ),
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                        keyboardActions = KeyboardActions(onDone = {
+                                            if (editedName.isNotBlank()) {
+                                                onRenameHousehold(editedName.trim())
+                                                isEditingName = false
+                                            }
+                                        }),
+                                        modifier = Modifier.fillMaxWidth()
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    IconButton(
-                                        onClick = {
-                                            onRenameHousehold(editedName)
-                                            isEditingName = false
-                                        }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.Check, contentDescription = Localization.save(lang), tint = Emerald700)
+                                        TextButton(
+                                            onClick = {
+                                                editedName = currentHousehold?.name ?: ""
+                                                isEditingName = false
+                                            }
+                                        ) {
+                                            Text(Localization.cancel(lang), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Button(
+                                            onClick = {
+                                                if (editedName.isNotBlank()) {
+                                                    onRenameHousehold(editedName.trim())
+                                                    isEditingName = false
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White)
+                                        ) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(Localization.save(lang), fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.5.sp)
+                                        }
                                     }
                                 }
                             } else {
@@ -274,36 +326,118 @@ fun ExodologioDetailsDialog(
                         }
                     }
 
-                    // Actions: New Exodologio & Clear
+                    // List of All Households (if more than 1 exist)
+                    if (allHouseholds.size > 1) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "YOUR HOUSEHOLDS" else "ΤΑ ΕΞΟΔΟΛΟΓΙΑ ΣΑΣ",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    letterSpacing = 0.5.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    allHouseholds.forEach { household ->
+                                        val isSelected = household.id == currentHousehold?.id
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (isSelected) Emerald700.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                            border = BorderStroke(
+                                                width = if (isSelected) 1.5.dp else 1.dp,
+                                                color = if (isSelected) Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                            ),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    if (!isSelected) {
+                                                        onSelectHousehold(household)
+                                                    }
+                                                }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (isSelected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
+                                                        contentDescription = null,
+                                                        tint = if (isSelected) Emerald700 else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                    Text(
+                                                        text = Localization.translateHouseholdName(household.name, lang).ifBlank { household.name },
+                                                        fontSize = 13.5.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                                if (isSelected) {
+                                                    Surface(
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        color = Emerald700,
+                                                        modifier = Modifier.padding(start = 6.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = if (lang == Localization.Language.ENGLISH) "ACTIVE" else "ΕΝΕΡΓΟ",
+                                                            color = Color.White,
+                                                            fontSize = 9.5.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Actions: New Exodologio (Pro Card) - ALWAYS VISIBLE with Pro Star, Coloring & Pro Badge
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Amber700.copy(alpha = 0.09f),
+                        border = BorderStroke(1.2.dp, Amber700.copy(alpha = 0.5f)),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                if (!isPremium && allHouseholds.size >= 1) {
-                                    onShowPremiumPaywall("multi_exodologio")
-                                } else {
+                                if (isPremium) {
                                     showCreateDialog = true
+                                } else {
+                                    onShowPremiumPaywall("multi_exodologio")
                                 }
                             }
+                            .testTag("add_new_exodologio_button")
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = Emerald700.copy(alpha = 0.12f),
-                                modifier = Modifier.size(36.dp)
+                                color = Amber700.copy(alpha = 0.2f),
+                                modifier = Modifier.size(38.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.Add,
+                                        imageVector = Icons.Default.Star,
                                         contentDescription = null,
-                                        tint = Emerald700,
-                                        modifier = Modifier.size(20.dp)
+                                        tint = Amber700,
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
@@ -318,25 +452,37 @@ fun ExodologioDetailsDialog(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = Localization.separateExodologio(lang),
+                                    text = if (lang == Localization.Language.ENGLISH)
+                                        "Add multiple households for home, business, etc."
+                                    else
+                                        "Προσθήκη επιπλέον εξοδολογίων (Σπίτι, Εργασία, Εξοχικό)",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
 
-                            if (!isPremium && allHouseholds.size >= 1) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Amber700.copy(alpha = 0.15f)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = Amber700.copy(alpha = 0.18f),
+                                border = BorderStroke(1.dp, Amber700.copy(alpha = 0.45f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.Lock, contentDescription = null, tint = Amber700, modifier = Modifier.size(11.dp))
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text("Pro", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Amber700)
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = Amber700,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "PRO",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = Amber700
+                                    )
                                 }
                             }
                         }

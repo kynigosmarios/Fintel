@@ -2,6 +2,8 @@ package com.example.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -25,11 +28,14 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,15 +54,17 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.entity.ExpenseCategory
+import com.example.data.entity.FamilyMember
 import com.example.data.entity.RecurringExpense
 import com.example.ui.theme.Emerald700
 import com.example.util.Localization
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun RecurringExpenseDialog(
     recurringToEdit: RecurringExpense? = null,
     categories: List<ExpenseCategory>,
+    members: List<FamilyMember> = emptyList(),
     appLanguage: String = "EL",
     onDismiss: () -> Unit,
     onSave: (
@@ -66,7 +74,9 @@ fun RecurringExpenseDialog(
         categoryId: Long,
         categoryName: String,
         dayOfMonth: Int,
-        note: String
+        note: String,
+        payerMemberId: Long,
+        payerMemberName: String
     ) -> Unit
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
@@ -80,6 +90,19 @@ fun RecurringExpenseDialog(
         mutableStateOf(
             recurringToEdit?.note ?: (if (lang == Localization.Language.ENGLISH) "Standing order" else "Πάγια εντολή")
         )
+    }
+
+    val defaultPayer = remember(recurringToEdit, members) {
+        if (recurringToEdit != null && recurringToEdit.payerMemberId != 0L) {
+            members.find { it.id == recurringToEdit.payerMemberId }
+        } else if (recurringToEdit != null && recurringToEdit.payerMemberName.isNotBlank()) {
+            members.find { it.name.equals(recurringToEdit.payerMemberName, ignoreCase = true) }
+        } else {
+            members.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) } ?: members.firstOrNull()
+        }
+    }
+    var selectedPayerId by remember(recurringToEdit, members) {
+        mutableLongStateOf(defaultPayer?.id ?: members.firstOrNull()?.id ?: 0L)
     }
 
     var categoryDropdownExpanded by remember { mutableStateOf(false) }
@@ -135,7 +158,32 @@ fun RecurringExpenseDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Emerald700.copy(alpha = 0.08f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("⚡", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH)
+                                "Automatically registered in your expenses on the day you set, with the description and category chosen."
+                            else
+                                "Καταχωρείται αυτόματα στα έξοδα την ημέρα που ορίζετε, με την περιγραφή και την κατηγορία που επιλέγετε.",
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Field 1: Description
                 OutlinedTextField(
@@ -226,7 +274,48 @@ fun RecurringExpenseDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Field 5: Note
+                // Field 5: Payer Selection (Who pays for this recurring expense)
+                if (members.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CreditCard,
+                            contentDescription = null,
+                            tint = Emerald700,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "Payer:" else "Μέλος που πληρώνει:",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        members.forEach { member ->
+                            val isPayer = member.id == selectedPayerId
+                            FilterChip(
+                                selected = isPayer,
+                                onClick = { selectedPayerId = member.id },
+                                label = { Text(member.name, fontSize = 12.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Emerald700.copy(alpha = 0.15f),
+                                    selectedLabelColor = Emerald700
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // Field 6: Note
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -245,7 +334,12 @@ fun RecurringExpenseDialog(
                     onClick = {
                         val amount = amountText.replace(',', '.').toDoubleOrNull() ?: 0.0
                         if (amount > 0.0 && title.isNotBlank()) {
-                            onSave(recurringToEdit?.id ?: 0L, title, amount, selectedCategoryId, selectedCategoryName, dayOfMonth, note)
+                            val payerMember = members.find { it.id == selectedPayerId }
+                                ?: members.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) }
+                                ?: members.firstOrNull()
+                            val payerId = payerMember?.id ?: 0L
+                            val payerName = payerMember?.name ?: ""
+                            onSave(recurringToEdit?.id ?: 0L, title, amount, selectedCategoryId, selectedCategoryName, dayOfMonth, note, payerId, payerName)
                             onDismiss()
                         }
                     },

@@ -8,7 +8,15 @@
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "occupation": { "type": "string" },
+        "city": { "type": "string" },
         "householdId": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "isPremium": { "type": "boolean" },
         "createdAt": { "type": "number" }
       },
       "required": ["uid", "email", "displayName"]

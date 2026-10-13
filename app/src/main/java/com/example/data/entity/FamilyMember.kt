@@ -10,6 +10,7 @@ data class FamilyMember(
     val name: String,
     val role: String, // "Γονέας", "Παιδί", "Άλλο"
     val avatarColorHex: Long = 0xFF059669,
-    val voiceKeywords: String, // Comma separated: "μάριος, μπαμπάς, πατέρας"
-    val isDefault: Boolean = false
+    val voiceKeywords: String = "", // Comma separated: "μάριος, μπαμπάς, πατέρας"
+    val isDefault: Boolean = false,
+    val sortOrder: Int = 0
 )

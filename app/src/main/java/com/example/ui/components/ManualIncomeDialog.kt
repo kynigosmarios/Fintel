@@ -106,7 +106,14 @@ fun ManualIncomeDialog(
         mutableStateOf(incomeToEdit?.category ?: "Μισθός")
     }
     var selectedMemberId by remember {
-        mutableStateOf(incomeToEdit?.memberId ?: members.firstOrNull()?.id ?: 0L)
+        val initialId = if (incomeToEdit != null) {
+            if (incomeToEdit.memberId == 0L || incomeToEdit.memberName.isBlank()) 0L
+            else if (members.any { it.id == incomeToEdit.memberId }) incomeToEdit.memberId
+            else 0L
+        } else {
+            members.firstOrNull()?.id ?: 0L
+        }
+        mutableStateOf(initialId)
     }
     var selectedTimestamp by remember {
         mutableLongStateOf(incomeToEdit?.timestamp ?: System.currentTimeMillis())
@@ -302,7 +309,7 @@ fun ManualIncomeDialog(
                             val isSelected = member.id == selectedMemberId
                             FilterChip(
                                 selected = isSelected,
-                                onClick = { selectedMemberId = member.id },
+                                onClick = { selectedMemberId = if (isSelected) 0L else member.id },
                                 label = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Box(
@@ -346,7 +353,7 @@ fun ManualIncomeDialog(
                         val isSelected = cat == selectedCategory
                         FilterChip(
                             selected = isSelected,
-                            onClick = { selectedCategory = cat },
+                            onClick = { selectedCategory = if (isSelected) "" else cat },
                             label = { Text(Localization.translateCategory(cat, lang), fontSize = 12.sp) },
                             shape = RoundedCornerShape(10.dp),
                             colors = FilterChipDefaults.filterChipColors(
@@ -422,7 +429,7 @@ fun ManualIncomeDialog(
                         }
 
                         val member = members.find { it.id == selectedMemberId }
-                        val memberName = member?.name ?: (if (lang == Localization.Language.ENGLISH) "Member" else "Μέλος")
+                        val memberName = member?.name ?: ""
 
                         onSave(
                             incomeToEdit?.id ?: 0L,

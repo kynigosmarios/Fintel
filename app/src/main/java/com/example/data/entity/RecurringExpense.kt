@@ -18,5 +18,9 @@ data class RecurringExpense(
     val memberNamesDisplay: String = "Κοινό Οικογένειας",
     val note: String = "",
     val isActive: Boolean = true,
-    val lastGeneratedMonth: String = "" // e.g. "2026-10"
+    val lastGeneratedMonth: String = "", // e.g. "2026-10"
+    val payerMemberId: Long = 0L,
+    val payerMemberName: String = "",
+    val payerMemberIdsCsv: String = "",
+    val payerAmountsCsv: String = ""
 )

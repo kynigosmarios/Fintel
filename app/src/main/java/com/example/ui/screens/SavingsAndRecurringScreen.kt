@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EventRepeat
@@ -66,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.entity.RecurringExpense
@@ -79,7 +81,7 @@ import com.example.util.Localization
 fun SavingsAndRecurringScreen(
     goals: List<SavingsGoal>,
     recurringExpenses: List<RecurringExpense>,
-    appLanguage: String = "EL",
+    appLanguage: String = "EN",
     onAddGoal: () -> Unit,
     onEditGoal: (SavingsGoal) -> Unit,
     onDeleteGoal: (SavingsGoal) -> Unit,
@@ -144,7 +146,7 @@ fun SavingsAndRecurringScreen(
                         .testTag("tab_goals_segmented")
                 ) {
                     Row(
-                        modifier = Modifier.padding(vertical = 10.dp),
+                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 2.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -152,12 +154,15 @@ fun SavingsAndRecurringScreen(
                             Icons.Default.Savings,
                             contentDescription = null,
                             tint = goalsTextColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "${Localization.savingsTabTitle(lang)} (${goals.size})",
-                            fontSize = 13.sp,
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
                             fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
                             color = goalsTextColor
                         )
@@ -173,7 +178,7 @@ fun SavingsAndRecurringScreen(
                         .testTag("tab_recurring_segmented")
                 ) {
                     Row(
-                        modifier = Modifier.padding(vertical = 10.dp),
+                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 2.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -181,12 +186,15 @@ fun SavingsAndRecurringScreen(
                             Icons.Default.EventRepeat,
                             contentDescription = null,
                             tint = recurringTextColor,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = "${Localization.recurringTabTitle(lang)} (${recurringExpenses.size})",
-                            fontSize = 13.sp,
+                            fontSize = 10.5.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
                             fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
                             color = recurringTextColor
                         )
@@ -468,6 +476,75 @@ fun SavingsAndRecurringScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = Emerald700
                                 )
+                                if (recurring.payerMemberName.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Emerald700.copy(alpha = 0.12f)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CreditCard,
+                                                contentDescription = null,
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(11.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = if (lang == Localization.Language.ENGLISH) "Paid by: ${recurring.payerMemberName}" else "Πληρωμή από: ${recurring.payerMemberName}",
+                                                fontSize = 10.5.sp,
+                                                color = Emerald700,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                val currentMonthKey = remember { java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).format(java.util.Date()) }
+                                val isGeneratedThisMonth = recurring.lastGeneratedMonth == currentMonthKey
+                                Spacer(modifier = Modifier.height(4.dp))
+                                if (isGeneratedThisMonth) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Emerald700.copy(alpha = 0.12f)
+                                    ) {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "Registered for this month ✓" else "Καταχωρήθηκε για αυτόν τον μήνα ✓",
+                                            fontSize = 10.5.sp,
+                                            color = Emerald700,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                } else if (recurring.isActive) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "Auto on day ${recurring.dayOfMonth}" else "Αυτόματη καταχώρηση στις ${recurring.dayOfMonth}η",
+                                            fontSize = 10.5.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                } else {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    ) {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "Inactive" else "Ανενεργή",
+                                            fontSize = 10.5.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically) {

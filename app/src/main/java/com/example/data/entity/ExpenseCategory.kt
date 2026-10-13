@@ -11,5 +11,7 @@ data class ExpenseCategory(
     val iconKey: String, // "cart", "coffee", "sports", "bill", "food", "car", "medical", "other"
     val monthlyBudget: Double,
     val colorHex: Long,
-    val voiceKeywords: String
+    val voiceKeywords: String,
+    val sortOrder: Int = 0,
+    val fontColorHex: Long = 0L
 )

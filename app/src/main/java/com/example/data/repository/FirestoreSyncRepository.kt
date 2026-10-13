@@ -15,6 +15,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -70,7 +71,8 @@ class FirestoreSyncRepository(
         birthDate: String = "",
         phoneNumber: String = "",
         occupation: String = "",
-        city: String = ""
+        city: String = "",
+        authProvider: String = ""
     ): UserProfile {
         val userRef = db.collection("users").document(uid)
         val snapshot = userRef.get().await()
@@ -79,28 +81,40 @@ class FirestoreSyncRepository(
             val existing = snapshot.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
                 ?: UserProfile(uid = uid, email = email, displayName = displayName)
 
-            val profileDisplayName = if (displayName.isNotBlank()) displayName else existing.displayName
-            val derivedFirst = if (existing.firstName.isBlank()) {
-                if (firstName.isNotBlank()) firstName else {
-                    profileDisplayName.split(" ").firstOrNull() ?: ""
-                }
-            } else existing.firstName
+            // Respect whatever name was saved in Firestore first; only fallback to Auth displayName if blank
+            val profileDisplayName = if (existing.displayName.isNotBlank()) existing.displayName else displayName.ifBlank { "Χρήστης Fintel" }
+            val derivedFirst = if (existing.firstName.isNotBlank()) {
+                existing.firstName
+            } else if (firstName.isNotBlank()) {
+                firstName
+            } else {
+                profileDisplayName.split(" ").firstOrNull() ?: ""
+            }
 
-            val derivedLast = if (existing.lastName.isBlank()) {
-                if (lastName.isNotBlank()) lastName else {
-                    val parts = profileDisplayName.split(" ")
-                    if (parts.size > 1) parts.drop(1).joinToString(" ") else ""
-                }
-            } else existing.lastName
+            val derivedLast = if (existing.lastName.isNotBlank()) {
+                existing.lastName
+            } else if (lastName.isNotBlank()) {
+                lastName
+            } else {
+                val parts = profileDisplayName.split(" ")
+                if (parts.size > 1) parts.drop(1).joinToString(" ") else ""
+            }
+
+            val effectiveAuthProvider = if (authProvider.isNotBlank()) {
+                authProvider
+            } else if (existing.authProvider.isNotBlank()) {
+                existing.authProvider
+            } else "password"
 
             val merged = existing.copy(
                 displayName = profileDisplayName,
                 firstName = derivedFirst,
                 lastName = derivedLast,
-                birthDate = if (existing.birthDate.isBlank()) birthDate else existing.birthDate,
-                phoneNumber = if (existing.phoneNumber.isBlank()) phoneNumber else existing.phoneNumber,
-                occupation = if (existing.occupation.isBlank()) occupation else existing.occupation,
-                city = if (existing.city.isBlank()) city else existing.city
+                birthDate = if (existing.birthDate.isNotBlank()) existing.birthDate else birthDate,
+                phoneNumber = if (existing.phoneNumber.isNotBlank()) existing.phoneNumber else phoneNumber,
+                occupation = if (existing.occupation.isNotBlank()) existing.occupation else occupation,
+                city = if (existing.city.isNotBlank()) existing.city else city,
+                authProvider = effectiveAuthProvider
             )
 
             if (merged.householdId.isBlank() || merged.householdIds.isEmpty()) {
@@ -109,15 +123,16 @@ class FirestoreSyncRepository(
                     householdId = newHousehold.id,
                     householdIds = listOf(newHousehold.id)
                 )
-                userRef.set(updated).await()
+                userRef.set(updated, SetOptions.merge()).await()
                 updated
             } else {
-                userRef.set(merged).await()
+                // Merge safely without overwriting other collections or existing fields
+                userRef.set(merged, SetOptions.merge()).await()
                 merged
             }
         } else {
             val householdId = UUID.randomUUID().toString().take(12)
-            val inviteCode = "OIKO-" + Random.nextInt(1000, 9999).toString()
+            val inviteCode = "FINTEL-" + Random.nextInt(1000, 9999).toString()
             val household = Household(
                 id = householdId,
                 name = "Το Εξοδολόγιό μου",
@@ -129,7 +144,7 @@ class FirestoreSyncRepository(
             db.collection("households").document(householdId).set(household).await()
 
             val profileDisplayName = displayName.ifBlank {
-                if (firstName.isNotBlank() || lastName.isNotBlank()) "$firstName $lastName".trim() else "Χρήστης Estia"
+                if (firstName.isNotBlank() || lastName.isNotBlank()) "$firstName $lastName".trim() else "Χρήστης Fintel"
             }
             val derivedFirst = if (firstName.isNotBlank()) firstName else profileDisplayName.split(" ").firstOrNull().orEmpty()
             val derivedLast = if (lastName.isNotBlank()) lastName else {
@@ -150,11 +165,17 @@ class FirestoreSyncRepository(
                 householdId = householdId,
                 householdIds = listOf(householdId),
                 isPremium = false,
+                authProvider = authProvider.ifBlank { "password" },
                 createdAt = Timestamp.now()
             )
             userRef.set(newProfile).await()
             newProfile
         }
+    }
+
+    suspend fun updateUserAuthProvider(uid: String, provider: String) {
+        if (uid.isBlank()) return
+        db.collection("users").document(uid).set(mapOf("authProvider" to provider), SetOptions.merge()).await()
     }
 
     suspend fun createHousehold(ownerUid: String, exodologioName: String): Household {
@@ -206,12 +227,41 @@ class FirestoreSyncRepository(
 
     suspend fun renameHousehold(householdId: String, newName: String) {
         if (householdId.isBlank() || newName.isBlank()) return
-        db.collection("households").document(householdId).update("name", newName).await()
+        db.collection("households").document(householdId).set(
+            mapOf("name" to newName.trim(), "updatedAt" to Timestamp.now()),
+            com.google.firebase.firestore.SetOptions.merge()
+        ).await()
     }
 
     suspend fun updateUserProfileName(uid: String, newDisplayName: String) {
         if (uid.isBlank() || newDisplayName.isBlank()) return
-        db.collection("users").document(uid).update("displayName", newDisplayName).await()
+        db.collection("users").document(uid).set(
+            mapOf("displayName" to newDisplayName.trim()),
+            SetOptions.merge()
+        ).await()
+    }
+
+    suspend fun updateUserProfilePhoto(uid: String, photoUrl: String) {
+        if (uid.isBlank()) return
+        db.collection("users").document(uid).set(
+            mapOf("photoUrl" to photoUrl),
+            SetOptions.merge()
+        ).await()
+    }
+
+    fun observeUserProfile(userId: String): Flow<UserProfile?> {
+        if (userId.isBlank()) return flowOf(null)
+        return db.collection("users").document(userId)
+            .snapshots()
+            .map { snapshot ->
+                if (snapshot.exists()) {
+                    val p = snapshot.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (p != null && p.uid.isBlank()) {
+                        p.uid = snapshot.id
+                    }
+                    p
+                } else null
+            }
     }
 
     suspend fun updateUserFullProfile(
@@ -224,7 +274,7 @@ class FirestoreSyncRepository(
         city: String
     ): Result<UserProfile> {
         if (uid.isBlank()) return Result.failure(Exception("Μη έγκυρο αναγνωριστικό χρήστη"))
-        val fullName = "$firstName $lastName".trim().ifBlank { "Χρήστης Estia" }
+        val fullName = "$firstName $lastName".trim().ifBlank { "Χρήστης Fintel" }
         val updates = mapOf(
             "displayName" to fullName,
             "firstName" to firstName.trim(),
@@ -232,27 +282,75 @@ class FirestoreSyncRepository(
             "birthDate" to birthDate.trim(),
             "phoneNumber" to phoneNumber.trim(),
             "occupation" to occupation.trim(),
-            "city" to city.trim()
+            "city" to city.trim(),
+            "updatedAt" to Timestamp.now()
         )
-        db.collection("users").document(uid).update(updates).await()
+        // Use SetOptions.merge() so document is created or merged without NOT_FOUND exception
+        db.collection("users").document(uid).set(updates, SetOptions.merge()).await()
         val doc = db.collection("users").document(uid).get().await()
-        val updated = doc.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-            ?: return Result.failure(Exception("Αποτυχία ανάγνωσης ενημερωμένου προφίλ"))
-        return Result.success(updated)
+        val updatedFromDoc = doc.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+        val finalProfile = (updatedFromDoc ?: UserProfile(uid = uid)).copy(
+            uid = uid,
+            displayName = if (updatedFromDoc?.displayName.isNullOrBlank()) fullName else updatedFromDoc!!.displayName,
+            firstName = if (updatedFromDoc?.firstName.isNullOrBlank()) firstName.trim() else updatedFromDoc!!.firstName,
+            lastName = if (updatedFromDoc?.lastName.isNullOrBlank()) lastName.trim() else updatedFromDoc!!.lastName,
+            birthDate = if (updatedFromDoc?.birthDate.isNullOrBlank()) birthDate.trim() else updatedFromDoc!!.birthDate,
+            phoneNumber = if (updatedFromDoc?.phoneNumber.isNullOrBlank()) phoneNumber.trim() else updatedFromDoc!!.phoneNumber,
+            occupation = if (updatedFromDoc?.occupation.isNullOrBlank()) occupation.trim() else updatedFromDoc!!.occupation,
+            city = if (updatedFromDoc?.city.isNullOrBlank()) city.trim() else updatedFromDoc!!.city
+        )
+        return Result.success(finalProfile)
     }
 
     suspend fun findUserByPhoneNumber(phone: String): UserProfile? {
-        val cleanPhone = phone.trim().replace(" ", "").replace("-", "")
-        if (cleanPhone.isBlank()) return null
-        val query = db.collection("users").whereEqualTo("phoneNumber", cleanPhone).get().await()
-        if (!query.isEmpty) {
-            return query.documents.first().toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+        val raw = phone.trim().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+        if (raw.isBlank()) return null
+        
+        val digitsOnly = when {
+            raw.startsWith("0030") -> raw.removePrefix("0030")
+            raw.startsWith("+30") -> raw.removePrefix("+30")
+            else -> raw
         }
-        // Also check if phone was stored with or without Greek country code +30
-        val alternate = if (cleanPhone.startsWith("+30")) cleanPhone.removePrefix("+30") else "+30$cleanPhone"
-        val altQuery = db.collection("users").whereEqualTo("phoneNumber", alternate).get().await()
-        if (!altQuery.isEmpty) {
-            return altQuery.documents.first().toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+
+        // Try direct lookups with variations
+        val variations = listOf(raw, digitsOnly, "+30$digitsOnly", "0030$digitsOnly").distinct()
+        for (v in variations) {
+            val query = db.collection("users").whereEqualTo("phoneNumber", v).get().await()
+            if (!query.isEmpty) {
+                val profile = query.documents.first().toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (profile != null) return profile
+            }
+        }
+
+        // Fallback: Scan users collection to match normalized phone numbers
+        try {
+            val allUsers = db.collection("users").limit(50).get().await()
+            for (doc in allUsers.documents) {
+                val u = doc.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE) ?: continue
+                val uDigits = u.phoneNumber.trim().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+                    .let { if (it.startsWith("+30")) it.removePrefix("+30") else if (it.startsWith("0030")) it.removePrefix("0030") else it }
+                if (uDigits.isNotBlank() && (uDigits == digitsOnly || u.phoneNumber == raw)) {
+                    return u
+                }
+            }
+        } catch (_: Exception) {}
+
+        return null
+    }
+
+    suspend fun findUserByEmail(email: String): UserProfile? {
+        val clean = email.trim()
+        if (clean.isBlank()) return null
+        val q1 = db.collection("users").whereEqualTo("email", clean).get().await()
+        if (!q1.isEmpty) {
+            return q1.documents.first().toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+        }
+        val lower = clean.lowercase()
+        if (lower != clean) {
+            val q2 = db.collection("users").whereEqualTo("email", lower).get().await()
+            if (!q2.isEmpty) {
+                return q2.documents.first().toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+            }
         }
         return null
     }
@@ -327,12 +425,17 @@ class FirestoreSyncRepository(
             .collection("expenses")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedWith(
-                        compareByDescending<FirebaseExpense> { it.timestamp }
-                            .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                            .thenByDescending { it.id }
-                    )
+                querySnapshot.documents.mapNotNull { doc ->
+                    val obj = doc.toObject(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) {
+                        obj.id = doc.id
+                    }
+                    obj
+                }.sortedWith(
+                    compareByDescending<FirebaseExpense> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
             }
     }
 
@@ -340,7 +443,7 @@ class FirestoreSyncRepository(
         if (expense.householdId.isBlank()) return
 
         val docId = if (expense.id.isNotBlank()) expense.id else UUID.randomUUID().toString()
-        val expenseToSave = expense.copy(id = docId, createdAt = Timestamp.now())
+        val expenseToSave = expense.copy(id = docId, createdAt = expense.createdAt ?: Timestamp.now())
 
         db.collection("households").document(expense.householdId)
             .collection("expenses").document(docId)
@@ -363,19 +466,24 @@ class FirestoreSyncRepository(
             .collection("expenses")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedWith(
-                        compareByDescending<FirebaseExpense> { it.timestamp }
-                            .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                            .thenByDescending { it.id }
-                    )
+                querySnapshot.documents.mapNotNull { doc ->
+                    val obj = doc.toObject(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) {
+                        obj.id = doc.id
+                    }
+                    obj
+                }.sortedWith(
+                    compareByDescending<FirebaseExpense> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
             }
     }
 
     suspend fun syncUserExpense(userId: String, expense: FirebaseExpense) {
         if (userId.isBlank()) return
         val docId = if (expense.id.isNotBlank()) expense.id else UUID.randomUUID().toString()
-        val expenseToSave = expense.copy(id = docId, createdAt = Timestamp.now())
+        val expenseToSave = expense.copy(id = docId, createdAt = expense.createdAt ?: Timestamp.now())
 
         db.collection("users").document(userId)
             .collection("expenses").document(docId)
@@ -420,12 +528,17 @@ class FirestoreSyncRepository(
             .collection("incomes")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedWith(
-                        compareByDescending<FirebaseIncome> { it.timestamp }
-                            .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                            .thenByDescending { it.id }
-                    )
+                querySnapshot.documents.mapNotNull { doc ->
+                    val obj = doc.toObject(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) {
+                        obj.id = doc.id
+                    }
+                    obj
+                }.sortedWith(
+                    compareByDescending<FirebaseIncome> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
             }
     }
 
@@ -433,7 +546,7 @@ class FirestoreSyncRepository(
         if (income.householdId.isBlank()) return
 
         val docId = if (income.id.isNotBlank()) income.id else UUID.randomUUID().toString()
-        val incomeToSave = income.copy(id = docId, createdAt = Timestamp.now())
+        val incomeToSave = income.copy(id = docId, createdAt = income.createdAt ?: Timestamp.now())
 
         db.collection("households").document(income.householdId)
             .collection("incomes").document(docId)
@@ -456,19 +569,24 @@ class FirestoreSyncRepository(
             .collection("incomes")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedWith(
-                        compareByDescending<FirebaseIncome> { it.timestamp }
-                            .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                            .thenByDescending { it.id }
-                    )
+                querySnapshot.documents.mapNotNull { doc ->
+                    val obj = doc.toObject(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) {
+                        obj.id = doc.id
+                    }
+                    obj
+                }.sortedWith(
+                    compareByDescending<FirebaseIncome> { it.timestamp }
+                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                        .thenByDescending { it.id }
+                )
             }
     }
 
     suspend fun syncUserIncome(userId: String, income: FirebaseIncome) {
         if (userId.isBlank()) return
         val docId = if (income.id.isNotBlank()) income.id else UUID.randomUUID().toString()
-        val incomeToSave = income.copy(id = docId, createdAt = Timestamp.now())
+        val incomeToSave = income.copy(id = docId, createdAt = income.createdAt ?: Timestamp.now())
 
         db.collection("users").document(userId)
             .collection("incomes").document(docId)
@@ -491,12 +609,17 @@ class FirestoreSyncRepository(
                 .collection("expenses")
                 .get(com.google.firebase.firestore.Source.CACHE)
                 .await()
-            snapshot.toObjects(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(
-                    compareByDescending<FirebaseExpense> { it.timestamp }
-                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                        .thenByDescending { it.id }
-                )
+            snapshot.documents.mapNotNull { doc ->
+                val obj = doc.toObject(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (obj != null && obj.id.isBlank()) {
+                    obj.id = doc.id
+                }
+                obj
+            }.sortedWith(
+                compareByDescending<FirebaseExpense> { it.timestamp }
+                    .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                    .thenByDescending { it.id }
+            )
         } catch (e: Exception) {
             emptyList()
         }
@@ -509,12 +632,17 @@ class FirestoreSyncRepository(
                 .collection("incomes")
                 .get(com.google.firebase.firestore.Source.CACHE)
                 .await()
-            snapshot.toObjects(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(
-                    compareByDescending<FirebaseIncome> { it.timestamp }
-                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                        .thenByDescending { it.id }
-                )
+            snapshot.documents.mapNotNull { doc ->
+                val obj = doc.toObject(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (obj != null && obj.id.isBlank()) {
+                    obj.id = doc.id
+                }
+                obj
+            }.sortedWith(
+                compareByDescending<FirebaseIncome> { it.timestamp }
+                    .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                    .thenByDescending { it.id }
+            )
         } catch (e: Exception) {
             emptyList()
         }
@@ -527,12 +655,17 @@ class FirestoreSyncRepository(
                 .collection("expenses")
                 .get()
                 .await()
-            snapshot.toObjects(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(
-                    compareByDescending<FirebaseExpense> { it.timestamp }
-                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                        .thenByDescending { it.id }
-                )
+            snapshot.documents.mapNotNull { doc ->
+                val obj = doc.toObject(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (obj != null && obj.id.isBlank()) {
+                    obj.id = doc.id
+                }
+                obj
+            }.sortedWith(
+                compareByDescending<FirebaseExpense> { it.timestamp }
+                    .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                    .thenByDescending { it.id }
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Error fetching expenses once", e)
             emptyList()
@@ -546,12 +679,17 @@ class FirestoreSyncRepository(
                 .collection("incomes")
                 .get()
                 .await()
-            snapshot.toObjects(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(
-                    compareByDescending<FirebaseIncome> { it.timestamp }
-                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                        .thenByDescending { it.id }
-                )
+            snapshot.documents.mapNotNull { doc ->
+                val obj = doc.toObject(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (obj != null && obj.id.isBlank()) {
+                    obj.id = doc.id
+                }
+                obj
+            }.sortedWith(
+                compareByDescending<FirebaseIncome> { it.timestamp }
+                    .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                    .thenByDescending { it.id }
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Error fetching incomes once", e)
             emptyList()
@@ -565,12 +703,17 @@ class FirestoreSyncRepository(
                 .collection("expenses")
                 .get()
                 .await()
-            snapshot.toObjects(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(
-                    compareByDescending<FirebaseExpense> { it.timestamp }
-                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                        .thenByDescending { it.id }
-                )
+            snapshot.documents.mapNotNull { doc ->
+                val obj = doc.toObject(FirebaseExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (obj != null && obj.id.isBlank()) {
+                    obj.id = doc.id
+                }
+                obj
+            }.sortedWith(
+                compareByDescending<FirebaseExpense> { it.timestamp }
+                    .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                    .thenByDescending { it.id }
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Error fetching user expenses once", e)
             emptyList()
@@ -584,12 +727,17 @@ class FirestoreSyncRepository(
                 .collection("incomes")
                 .get()
                 .await()
-            snapshot.toObjects(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(
-                    compareByDescending<FirebaseIncome> { it.timestamp }
-                        .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
-                        .thenByDescending { it.id }
-                )
+            snapshot.documents.mapNotNull { doc ->
+                val obj = doc.toObject(FirebaseIncome::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (obj != null && obj.id.isBlank()) {
+                    obj.id = doc.id
+                }
+                obj
+            }.sortedWith(
+                compareByDescending<FirebaseIncome> { it.timestamp }
+                    .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                    .thenByDescending { it.id }
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Error fetching user incomes once", e)
             emptyList()
@@ -612,7 +760,7 @@ class FirestoreSyncRepository(
             .snapshots()
             .map { querySnapshot ->
                 querySnapshot.toObjects(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedBy { it.name }
+                    .sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
             }
     }
 
@@ -642,7 +790,7 @@ class FirestoreSyncRepository(
             .snapshots()
             .map { querySnapshot ->
                 querySnapshot.toObjects(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedBy { it.name }
+                    .sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
             }
     }
 
@@ -673,7 +821,7 @@ class FirestoreSyncRepository(
                 .get()
                 .await()
             snapshot.toObjects(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedBy { it.name }
+                .sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
         } catch (e: Exception) {
             emptyList()
         }
@@ -687,7 +835,7 @@ class FirestoreSyncRepository(
                 .get()
                 .await()
             snapshot.toObjects(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedBy { it.name }
+                .sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
         } catch (e: Exception) {
             emptyList()
         }
@@ -700,7 +848,7 @@ class FirestoreSyncRepository(
             .snapshots()
             .map { querySnapshot ->
                 querySnapshot.toObjects(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedBy { it.name }
+                    .sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
             }
     }
 
@@ -731,7 +879,7 @@ class FirestoreSyncRepository(
                 .get()
                 .await()
             snapshot.toObjects(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedBy { it.name }
+                .sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
         } catch (e: Exception) {
             emptyList()
         }
@@ -745,7 +893,7 @@ class FirestoreSyncRepository(
                 .get()
                 .await()
             snapshot.toObjects(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedBy { it.name }
+                .sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
         } catch (e: Exception) {
             emptyList()
         }
@@ -758,7 +906,7 @@ class FirestoreSyncRepository(
             .snapshots()
             .map { querySnapshot ->
                 querySnapshot.toObjects(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedBy { it.name }
+                    .sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
             }
     }
 
@@ -985,13 +1133,103 @@ class FirestoreSyncRepository(
         return result
     }
 
-    suspend fun deleteMemberFromAllScopes(memberId: String, householdIds: List<String>, userId: String) {
-        if (memberId.isBlank()) return
+    suspend fun syncAndCleanMember(
+        householdIds: List<String>,
+        userId: String,
+        member: FirebaseMember,
+        oldName: String = ""
+    ) {
+        val canonicalDocId = member.id.ifBlank { "1" }
+        val toSave = member.copy(id = canonicalDocId, createdAt = Timestamp.now())
+
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+            try {
+                db.collection("households").document(hId)
+                    .collection("members").document(canonicalDocId)
+                    .set(toSave.copy(householdId = hId))
+                    .await()
+            } catch (e: Exception) {
+                Log.w("FirestoreSyncRepo", "Error syncing member to household $hId: ${e.message}")
+            }
+        }
         if (userId.isNotBlank()) {
-            try { deleteUserMember(userId, memberId) } catch (e: Exception) {}
+            try {
+                db.collection("users").document(userId)
+                    .collection("members").document(canonicalDocId)
+                    .set(toSave.copy(userId = userId))
+                    .await()
+            } catch (e: Exception) {
+                Log.w("FirestoreSyncRepo", "Error syncing member to user $userId: ${e.message}")
+            }
+        }
+
+        // Purge old stale documents with old name or duplicate doc IDs
+        val namesToPurge = mutableListOf<String>()
+        if (oldName.isNotBlank() && !oldName.equals(member.name, ignoreCase = true)) {
+            namesToPurge.add(oldName.trim().lowercase())
+        }
+
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+            try {
+                val snapshot = db.collection("households").document(hId).collection("members").get().await()
+                for (doc in snapshot.documents) {
+                    if (doc.id == canonicalDocId) continue
+                    val remoteName = doc.getString("name").orEmpty().trim().lowercase()
+                    val remoteIsDef = doc.getBoolean("isDefault") ?: false
+                    if ((namesToPurge.isNotEmpty() && namesToPurge.contains(remoteName)) ||
+                        (canonicalDocId == "1" && remoteIsDef) ||
+                        (remoteName == member.name.trim().lowercase())) {
+                        doc.reference.delete().await()
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+
+        if (userId.isNotBlank()) {
+            try {
+                val snapshot = db.collection("users").document(userId).collection("members").get().await()
+                for (doc in snapshot.documents) {
+                    if (doc.id == canonicalDocId) continue
+                    val remoteName = doc.getString("name").orEmpty().trim().lowercase()
+                    val remoteIsDef = doc.getBoolean("isDefault") ?: false
+                    if ((namesToPurge.isNotEmpty() && namesToPurge.contains(remoteName)) ||
+                        (canonicalDocId == "1" && remoteIsDef) ||
+                        (remoteName == member.name.trim().lowercase())) {
+                        doc.reference.delete().await()
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
+    suspend fun deleteMemberFromAllScopes(memberId: String, householdIds: List<String>, userId: String, memberName: String = "") {
+        if (memberId.isBlank() && memberName.isBlank()) return
+        val targetNameNorm = memberName.trim().lowercase()
+        if (userId.isNotBlank()) {
+            try { 
+                if (memberId.isNotBlank()) deleteUserMember(userId, memberId)
+                if (targetNameNorm.isNotBlank()) {
+                    val snap = db.collection("users").document(userId).collection("members").get().await()
+                    for (doc in snap.documents) {
+                        if (doc.getString("name").orEmpty().trim().lowercase() == targetNameNorm) {
+                            doc.reference.delete().await()
+                        }
+                    }
+                }
+            } catch (e: Exception) {}
         }
         for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
-            try { deleteMember(hId, memberId) } catch (e: Exception) {}
+            try { 
+                if (memberId.isNotBlank()) deleteMember(hId, memberId)
+                if (targetNameNorm.isNotBlank()) {
+                    val snap = db.collection("households").document(hId).collection("members").get().await()
+                    for (doc in snap.documents) {
+                        if (doc.getString("name").orEmpty().trim().lowercase() == targetNameNorm) {
+                            doc.reference.delete().await()
+                        }
+                    }
+                }
+            } catch (e: Exception) {}
         }
     }
 

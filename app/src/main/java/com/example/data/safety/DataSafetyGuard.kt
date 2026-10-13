@@ -5,6 +5,7 @@ import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
 import com.example.data.entity.RecurringExpense
 import com.example.data.entity.SavingsGoal
+import com.example.data.entity.toFirebaseExpense
 import com.example.data.model.FirebaseCategory
 import com.example.data.model.FirebaseMember
 import com.example.data.model.FirebaseRecurringExpense
@@ -101,13 +102,12 @@ object DataSafetyGuard {
         try {
             val userId = user.uid
 
-            // 1. Audit & Secure Members (skip combination names and deduplicate)
+            // 1. Audit & Secure Members (skip combination names and deduplicate by ID)
             val localMembers = repository.getAllMembersList()
             if (localMembers.isNotEmpty()) {
                 val cleanLocal = localMembers
                     .filter { m -> !isCombinationOrInvalidMemberName(m.name) }
-                    .groupBy { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) }
-                    .map { (_, list) -> list.find { it.isDefault } ?: list.minByOrNull { it.id } ?: list.first() }
+                    .distinctBy { it.id }
 
                 if (cleanLocal.size != localMembers.size) {
                     repository.replaceAllMembers(cleanLocal)
@@ -122,7 +122,8 @@ object DataSafetyGuard {
                         role = member.role,
                         avatarColorHex = member.avatarColorHex,
                         voiceKeywords = member.voiceKeywords,
-                        isDefault = member.isDefault
+                        isDefault = member.isDefault,
+                        sortOrder = member.sortOrder
                     )
                     if (activeHouseholdId.isNotBlank()) {
                         firestoreSyncRepo.syncMember(activeHouseholdId, fbMember)
@@ -132,12 +133,10 @@ object DataSafetyGuard {
                 Log.d(TAG, "Secured ${cleanLocal.size} members to cloud.")
             }
 
-            // 2. Audit & Secure Categories (strictly deduplicate by normalized name)
+            // 2. Audit & Secure Categories (each category is a unique entity by ID)
             val localCategories = repository.getAllCategoriesList()
             if (localCategories.isNotEmpty()) {
-                val cleanCategories = localCategories
-                    .groupBy { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) }
-                    .map { (_, list) -> list.minByOrNull { it.id } ?: list.first() }
+                val cleanCategories = localCategories.distinctBy { it.id }
 
                 if (cleanCategories.size != localCategories.size) {
                     repository.replaceAllCategories(cleanCategories)
@@ -152,7 +151,8 @@ object DataSafetyGuard {
                         iconKey = cat.iconKey,
                         monthlyBudget = cat.monthlyBudget,
                         colorHex = cat.colorHex,
-                        voiceKeywords = cat.voiceKeywords
+                        voiceKeywords = cat.voiceKeywords,
+                        sortOrder = cat.sortOrder
                     )
                     if (activeHouseholdId.isNotBlank()) {
                         firestoreSyncRepo.syncCategory(activeHouseholdId, fbCat)
@@ -205,7 +205,11 @@ object DataSafetyGuard {
                         memberNamesDisplay = rec.memberNamesDisplay,
                         note = rec.note,
                         isActive = rec.isActive,
-                        lastGeneratedMonth = rec.lastGeneratedMonth
+                        lastGeneratedMonth = rec.lastGeneratedMonth,
+                        payerMemberId = rec.payerMemberId,
+                        payerMemberName = rec.payerMemberName,
+                        payerMemberIdsCsv = rec.payerMemberIdsCsv,
+                        payerAmountsCsv = rec.payerAmountsCsv
                     )
                     if (activeHouseholdId.isNotBlank()) {
                         firestoreSyncRepo.syncRecurringExpense(activeHouseholdId, fbRec)
@@ -213,6 +217,23 @@ object DataSafetyGuard {
                     firestoreSyncRepo.syncUserRecurringExpense(userId, fbRec)
                 }
                 Log.d(TAG, "Secured ${localRecurring.size} recurring expenses to cloud.")
+            }
+
+            // 5. Audit & Secure Expenses (ensure any local expenses are mirrored in cloud with full multi-payer details)
+            val localExpenses = repository.getAllExpensesList()
+            if (localExpenses.isNotEmpty()) {
+                localExpenses.forEach { exp ->
+                    val fbExp = exp.toFirebaseExpense(
+                        householdId = activeHouseholdId,
+                        userId = userId,
+                        userName = user.displayName ?: "Χρήστης"
+                    )
+                    if (activeHouseholdId.isNotBlank()) {
+                        firestoreSyncRepo.syncExpense(fbExp)
+                    }
+                    firestoreSyncRepo.syncUserExpense(userId, fbExp)
+                }
+                Log.d(TAG, "Secured ${localExpenses.size} expenses to cloud.")
             }
 
             Log.i(TAG, "Audit complete. All user data is 100% mirrored in Firebase Cloud.")

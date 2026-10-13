@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +32,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -78,11 +81,13 @@ fun MembersScreen(
     members: List<FamilyMember>,
     currentHousehold: Household? = null,
     isPremium: Boolean = false,
-    appLanguage: String = "EL",
+    appLanguage: String = "EN",
     onAddMember: () -> Unit,
     onEditMember: (FamilyMember) -> Unit,
     onDeleteMember: (FamilyMember) -> Unit,
     onUpdateMemberColor: (FamilyMember, Long) -> Unit = { _, _ -> },
+    onMoveMemberUp: (FamilyMember) -> Unit = {},
+    onMoveMemberDown: (FamilyMember) -> Unit = {},
     onShowPremiumPaywall: (String) -> Unit = {},
     onShareInviteCode: (String) -> Unit = {},
     modifier: Modifier = Modifier
@@ -313,7 +318,7 @@ fun MembersScreen(
         }
 
         // Members list
-        items(members, key = { it.id }) { member ->
+        itemsIndexed(members, key = { _, member -> member.id }) { index, member ->
             val avatarColor = Color(member.avatarColorHex)
             val keywordsList = member.voiceKeywords.split(",").map { it.trim() }.filter { it.isNotBlank() }
 
@@ -372,8 +377,48 @@ fun MembersScreen(
                             }
                         }
 
-                        // Actions
-                        IconButton(onClick = { onEditMember(member) }) {
+                        // Reorder buttons (Up / Down)
+                        if (members.size > 1) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(0.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { onMoveMemberUp(member) },
+                                    enabled = index > 0,
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .testTag("member_move_up_${member.id}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowUp,
+                                        contentDescription = if (lang == Localization.Language.ENGLISH) "Move up" else "Μετακίνηση πάνω",
+                                        tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { onMoveMemberDown(member) },
+                                    enabled = index < members.size - 1,
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .testTag("member_move_down_${member.id}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = if (lang == Localization.Language.ENGLISH) "Move down" else "Μετακίνηση κάτω",
+                                        tint = if (index < members.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Actions (Edit & Delete)
+                        IconButton(
+                            onClick = { onEditMember(member) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 Icons.Default.Edit,
                                 contentDescription = Localization.edit(lang),
@@ -382,7 +427,10 @@ fun MembersScreen(
                             )
                         }
 
-                        IconButton(onClick = { memberToDelete = member }) {
+                        IconButton(
+                            onClick = { memberToDelete = member },
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 Icons.Default.DeleteOutline,
                                 contentDescription = Localization.delete(lang),

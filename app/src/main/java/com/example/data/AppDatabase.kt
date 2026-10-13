@@ -16,7 +16,7 @@ import com.example.data.entity.SavingsGoal
 
 @Database(
     entities = [Expense::class, FamilyMember::class, ExpenseCategory::class, RecurringExpense::class, SavingsGoal::class, Income::class],
-    version = 5,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -90,14 +90,60 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `family_members` ADD COLUMN `sortOrder` INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE `expense_categories` ADD COLUMN `sortOrder` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `expenses` ADD COLUMN `payerMemberId` INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE `expenses` ADD COLUMN `payerMemberName` TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE `recurring_expenses` ADD COLUMN `payerMemberId` INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE `recurring_expenses` ADD COLUMN `payerMemberName` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `expenses` ADD COLUMN `payerMemberIdsCsv` TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE `expenses` ADD COLUMN `payerAmountsCsv` TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE `recurring_expenses` ADD COLUMN `payerMemberIdsCsv` TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE `recurring_expenses` ADD COLUMN `payerAmountsCsv` TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `expense_categories` ADD COLUMN `fontColorHex` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                // If legacy oikonomos_database exists, safely copy over to fintel_database
+                try {
+                    val oldDb = context.applicationContext.getDatabasePath("oikonomos_database")
+                    val newDb = context.applicationContext.getDatabasePath("fintel_database")
+                    if (oldDb.exists() && !newDb.exists()) {
+                        oldDb.copyTo(newDb, overwrite = true)
+                        val oldWal = context.applicationContext.getDatabasePath("oikonomos_database-wal")
+                        val newWal = context.applicationContext.getDatabasePath("fintel_database-wal")
+                        if (oldWal.exists()) oldWal.copyTo(newWal, overwrite = true)
+                        val oldShm = context.applicationContext.getDatabasePath("oikonomos_database-shm")
+                        val newShm = context.applicationContext.getDatabasePath("fintel_database-shm")
+                        if (oldShm.exists()) oldShm.copyTo(newShm, overwrite = true)
+                    }
+                } catch (_: Exception) {}
+
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "oikonomos_database"
+                    "fintel_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .fallbackToDestructiveMigration(false)
                     .build()
                 INSTANCE = instance

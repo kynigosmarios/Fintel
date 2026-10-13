@@ -21,12 +21,12 @@ object ExpenseReportExporter {
         val totalAmount = expenses.sumOf { it.amount }
         val count = expenses.size
 
-        sb.append("ΑΝΑΦΟΡΑ ΕΞΟΔΩΝ OIKONOMOS - $periodTitle\n")
+        sb.append("ΑΝΑΦΟΡΑ ΕΞΟΔΩΝ FINTEL - $periodTitle\n")
         sb.append("Ημερομηνία εξαγωγής:;${nowSdf.format(Date())}\n")
         sb.append("Σύνολο εξόδων:;${String.format(Locale.US, "%.2f", totalAmount)} €;Πλήθος συναλλαγών:;$count\n\n")
 
         // CSV Header
-        sb.append("Ημερομηνία;Ώρα;Τίτλος;Ποσό (€);Κατηγορία;Μέλη;Καταμερισμός;Σημειώσεις;Φωνητική Εντολή\n")
+        sb.append("Ημερομηνία;Ώρα;Τίτλος;Ποσό (€);Κατηγορία;Ποιος Πλήρωσε;Αφορά Μέλος;Καταμερισμός;Σημειώσεις;Φωνητική Εντολή\n")
 
         for (exp in expenses) {
             val d = Date(exp.timestamp)
@@ -35,12 +35,13 @@ object ExpenseReportExporter {
             val titleClean = exp.title.replace(";", ",")
             val amountStr = String.format(Locale.US, "%.2f", exp.amount)
             val catClean = exp.categoryName.replace(";", ",")
+            val payerClean = exp.payerMemberName.ifBlank { "Οικογένεια" }.replace(";", ",")
             val membersClean = exp.memberNamesDisplay.replace(";", ",")
             val splitClean = if (exp.splitType == "ALL_FAMILY") "Κοινό Οικογένειας" else "Επιλεγμένα Μέλη"
             val noteClean = exp.note.replace(";", ",").replace("\n", " ")
             val voiceClean = exp.originalVoicePrompt.replace(";", ",").replace("\n", " ")
 
-            sb.append("$dateStr;$timeStr;$titleClean;$amountStr;$catClean;$membersClean;$splitClean;$noteClean;$voiceClean\n")
+            sb.append("$dateStr;$timeStr;$titleClean;$amountStr;$catClean;$payerClean;$membersClean;$splitClean;$noteClean;$voiceClean\n")
         }
 
         return sb.toString()
@@ -50,7 +51,7 @@ object ExpenseReportExporter {
         val csvContent = generateCsv(expenses, periodTitle)
         val sendIntent = Intent().apply {
             action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_SUBJECT, "Αναφορά Εξόδων Estia - $periodTitle")
+            putExtra(Intent.EXTRA_SUBJECT, "Αναφορά Εξόδων Fintel - $periodTitle")
             putExtra(Intent.EXTRA_TEXT, csvContent)
             type = "text/plain"
         }

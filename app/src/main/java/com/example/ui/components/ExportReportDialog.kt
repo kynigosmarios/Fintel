@@ -229,7 +229,7 @@ fun ExportReportDialog(
                     onClick = {
                         val csv = ExpenseReportExporter.generateCsv(targetExpenses, periodTitle)
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Estia Report", csv)
+                        val clip = ClipData.newPlainText("Fintel Report", csv)
                         clipboard.setPrimaryClip(clip)
                         onShowMessage(Localization.csvCopiedMessage(lang))
                         onDismiss()

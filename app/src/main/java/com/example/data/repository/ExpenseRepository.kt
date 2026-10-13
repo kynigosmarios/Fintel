@@ -23,12 +23,21 @@ class ExpenseRepository(
     val allSavingsGoals: Flow<List<SavingsGoal>> = expenseDao.getAllSavingsGoals()
 
     suspend fun insertExpense(expense: Expense): Long = expenseDao.insertExpense(expense)
-    suspend fun updateExpense(expense: Expense) = expenseDao.updateExpense(expense)
+    suspend fun insertExpenses(expenses: List<Expense>) = expenseDao.insertExpenses(expenses)
+    suspend fun updateExpense(expense: Expense): Int = expenseDao.updateExpense(expense)
+    suspend fun saveOrUpdateExpense(expense: Expense): Long = expenseDao.saveOrUpdateExpense(expense)
+    suspend fun replaceAllExpenses(expenses: List<Expense>) {
+        if (expenses.isEmpty()) return
+        val existing = expenseDao.getAllExpensesList()
+        if (existing == expenses) return
+        expenseDao.replaceAllExpensesTransaction(expenses)
+    }
     suspend fun deleteExpense(expense: Expense) = expenseDao.deleteExpense(expense)
     suspend fun deleteExpenseById(id: Long) = expenseDao.deleteExpenseById(id)
     suspend fun deleteAllExpenses() = expenseDao.deleteAllExpenses()
 
     suspend fun insertIncome(income: Income): Long = expenseDao.insertIncome(income)
+    suspend fun insertIncomes(incomes: List<Income>) = expenseDao.insertIncomes(incomes)
     suspend fun updateIncome(income: Income) = expenseDao.updateIncome(income)
     suspend fun deleteIncome(income: Income) = expenseDao.deleteIncome(income)
     suspend fun deleteIncomeById(id: Long) = expenseDao.deleteIncomeById(id)
@@ -43,6 +52,7 @@ class ExpenseRepository(
         expenseDao.replaceAllMembersTransaction(members)
     }
     suspend fun updateMember(member: FamilyMember) = expenseDao.updateMember(member)
+    suspend fun updateMembers(members: List<FamilyMember>) = expenseDao.updateMembers(members)
     suspend fun deleteMember(member: FamilyMember) = expenseDao.deleteMember(member)
     suspend fun deleteAllMembers() = expenseDao.deleteAllMembers()
 
@@ -55,6 +65,7 @@ class ExpenseRepository(
         expenseDao.replaceAllCategoriesTransaction(categories)
     }
     suspend fun updateCategory(category: ExpenseCategory) = expenseDao.updateCategory(category)
+    suspend fun updateCategories(categories: List<ExpenseCategory>) = expenseDao.updateCategories(categories)
     suspend fun deleteCategory(category: ExpenseCategory) = expenseDao.deleteCategory(category)
     suspend fun deleteAllCategories() = expenseDao.deleteAllCategories()
 
@@ -117,68 +128,68 @@ class ExpenseRepository(
 
     suspend fun seedStandardCategories() {
         val existing = expenseDao.getAllCategoriesList()
+        val maxSort = existing.maxOfOrNull { it.sortOrder } ?: -1
         val standardCategories = listOf(
             ExpenseCategory(
-                id = 1L,
+                id = 0L,
                 name = "Σούπερ μάρκετ",
                 iconKey = "cart",
                 monthlyBudget = 400.0,
                 colorHex = 0xFF059669,
-                voiceKeywords = "σούπερ μάρκετ, σουπερμάρκετ, σκλαβενίτης, βασιλόπουλος, lidl, μάρκετ, τρόφιμα, ψώνια, μανάβικο, κρεοπωλείο"
+                voiceKeywords = "σούπερ μάρκετ, σουπερμάρκετ, σκλαβενίτης, βασιλόπουλος, lidl, μάρκετ, τρόφιμα, ψώνια, μανάβικο, κρεοπωλείο",
+                sortOrder = maxSort + 1
             ),
             ExpenseCategory(
-                id = 2L,
+                id = 0L,
                 name = "Φαγητό & Καφές",
                 iconKey = "food",
                 monthlyBudget = 150.0,
                 colorHex = 0xFFEF4444,
-                voiceKeywords = "φαγητό, καφές, καφέδες, ντελίβερι, σουβλάκια, πίτσα, delivery, efood, wolt, ταβέρνα, εστιατόριο"
+                voiceKeywords = "φαγητό, καφές, καφέδες, ντελίβερι, σουβλάκια, πίτσα, delivery, efood, wolt, ταβέρνα, εστιατόριο",
+                sortOrder = maxSort + 2
             ),
             ExpenseCategory(
-                id = 3L,
+                id = 0L,
                 name = "Λογαριασμοί & Σπίτι",
                 iconKey = "house",
                 monthlyBudget = 300.0,
                 colorHex = 0xFF0D9488,
-                voiceKeywords = "ενοίκιο, ρεύμα, δεη, αέριο, κοινόχρηστα, ίντερνετ, νερό, λογαριασμός"
+                voiceKeywords = "ενοίκιο, ρεύμα, δεη, αέριο, κοινόχρηστα, ίντερνετ, νερό, λογαριασμός",
+                sortOrder = maxSort + 3
             ),
             ExpenseCategory(
-                id = 4L,
+                id = 0L,
                 name = "Μετακινήσεις & Καύσιμα",
                 iconKey = "gas_station",
                 monthlyBudget = 120.0,
                 colorHex = 0xFFEA580C,
-                voiceKeywords = "βενζίνη, καύσιμα, βενζινάδικο, διόδια, πάρκινγκ, λεωφορείο, μετρό, ταξί"
+                voiceKeywords = "βενζίνη, καύσιμα, βενζινάδικο, διόδια, πάρκινγκ, λεωφορείο, μετρό, ταξί",
+                sortOrder = maxSort + 4
             ),
             ExpenseCategory(
-                id = 5L,
+                id = 0L,
                 name = "Υγεία & Φαρμακείο",
                 iconKey = "medical",
                 monthlyBudget = 80.0,
                 colorHex = 0xFFEC4899,
-                voiceKeywords = "γιατρός, φαρμακείο, φάρμακα, εξετάσεις, οδοντίατρος, υγεία"
+                voiceKeywords = "γιατρός, φαρμακείο, φάρμακα, εξετάσεις, οδοντίατρος, υγεία",
+                sortOrder = maxSort + 5
             ),
             ExpenseCategory(
-                id = 6L,
+                id = 0L,
                 name = "Διασκέδαση & Ψυχαγωγία",
                 iconKey = "entertainment",
                 monthlyBudget = 100.0,
                 colorHex = 0xFF8B5CF6,
-                voiceKeywords = "διασκέδαση, σινεμά, θέατρο, ποτό, συναυλία, έξοδος, netflix"
+                voiceKeywords = "διασκέδαση, σινεμά, θέατρο, ποτό, συναυλία, έξοδος, netflix",
+                sortOrder = maxSort + 6
             )
         )
-        if (existing.isEmpty()) {
-            expenseDao.insertCategories(standardCategories)
-        } else {
-            // Deduplicate existing categories by name and keep canonical IDs
-            val cleanMap = linkedMapOf<String, ExpenseCategory>()
-            for (cat in existing) {
-                val norm = cat.name.trim().lowercase()
-                if (!cleanMap.containsKey(norm)) {
-                    cleanMap[norm] = cat
-                }
-            }
-            replaceAllCategories(cleanMap.values.toList())
+        val toAdd = standardCategories.filter { std ->
+            existing.none { it.name.trim().equals(std.name.trim(), ignoreCase = true) }
+        }
+        if (toAdd.isNotEmpty()) {
+            expenseDao.insertCategories(toAdd)
         }
     }
 }

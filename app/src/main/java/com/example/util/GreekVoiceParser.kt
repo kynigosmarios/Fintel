@@ -15,7 +15,9 @@ data class ParsedVoiceExpense(
     val memberNamesDisplay: String,
     val splitAmountPerPerson: Double,
     val originalPrompt: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val payerMemberId: Long = 0L,
+    val payerMemberName: String = ""
 )
 
 object GreekVoiceParser {
@@ -543,11 +545,14 @@ object GreekVoiceParser {
         // 2. Requirement 7: Amount Extraction (e.g. "πέντε σαράντα" -> 5.40, "πεντακόσια σαράντα" -> 540)
         val amount = extractAmount(cleanedNorm) ?: extractAmount(norm) ?: 10.0
 
-        // 3. Member Extraction
+        // 3. Member Extraction (Beneficiaries)
         val (splitType, matchedMembers, memberDisplay) = extractMembers(cleanedNorm, allMembers)
 
+        // 3b. Payer Extraction (Who paid the expense)
+        val (payerId, payerName) = extractPayer(cleanedNorm, allMembers)
+
         // 4. Category & Title Extraction
-        val (category, title) = extractCategoryAndTitle(cleanedNorm, prompt, categories)
+        val (category, title) = extractCategoryAndTitle(cleanedNorm, prompt, categories, allMembers)
 
         val splitPerPerson = if (matchedMembers.isNotEmpty()) {
             amount / matchedMembers.size
@@ -565,8 +570,41 @@ object GreekVoiceParser {
             memberNamesDisplay = memberDisplay,
             splitAmountPerPerson = splitPerPerson,
             originalPrompt = prompt,
-            timestamp = detectedTimestamp
+            timestamp = detectedTimestamp,
+            payerMemberId = payerId,
+            payerMemberName = payerName
         )
+    }
+
+    private fun extractPayer(
+        norm: String,
+        allMembers: List<FamilyMember>
+    ): Pair<Long, String> {
+        val defaultParent = allMembers.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) }
+            ?: allMembers.firstOrNull()
+        val defaultId = defaultParent?.id ?: 0L
+        val defaultName = defaultParent?.name ?: ""
+
+        for (m in allMembers) {
+            val nameNorm = normalizeGreek(m.name)
+            val keywords = m.voiceKeywords.split(",").map { normalizeGreek(it.trim()) }.filter { it.isNotBlank() }
+            val allKw = (keywords + nameNorm).distinct()
+
+            for (kw in allKw) {
+                if (norm.contains("πληρωσε $kw") ||
+                    norm.contains("πληρωσε ο $kw") ||
+                    norm.contains("πληρωσε η $kw") ||
+                    norm.contains("$kw πληρωσε") ||
+                    norm.contains("πληρωμη απο $kw") ||
+                    norm.contains("εβαλε ο $kw") ||
+                    norm.contains("εβαλε η $kw") ||
+                    norm.contains("εβαλε $kw")
+                ) {
+                    return Pair(m.id, m.name)
+                }
+            }
+        }
+        return Pair(defaultId, defaultName)
     }
 
     private fun extractMembers(
@@ -631,10 +669,158 @@ object GreekVoiceParser {
         return Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
     }
 
+    /**
+     * Extracts spoken description keywords from the user prompt when words are spoken
+     * that do not belong to system commands, amounts, dates, or family members.
+     */
+    fun extractDescriptionKeywords(
+        originalPrompt: String,
+        allMembers: List<FamilyMember>,
+        categories: List<ExpenseCategory>
+    ): String? {
+        val rawTokens = originalPrompt.trim().split(Regex("[\\s,;!?]+")).filter { it.isNotBlank() }
+        if (rawTokens.isEmpty()) return null
+
+        val memberWords = mutableSetOf<String>()
+        for (m in allMembers) {
+            memberWords.add(normalizeGreek(m.name))
+            m.voiceKeywords.split(",").forEach {
+                val kw = normalizeGreek(it.trim())
+                if (kw.isNotBlank()) memberWords.add(kw)
+            }
+        }
+        val familyWords = setOf(
+            "οικογενεια", "ολοι", "σπιτι", "κοινο", "σπιτιου", "παντες", "κοινα",
+            "παιδια", "παιδιων", "γονεις", "γονιων", "μενα", "εμενα", "εσυ", "εσενα"
+        )
+        val payerWords = setOf(
+            "πληρωσε", "εβαλε", "πληρωμη", "χρεωση"
+        )
+        val commandWords = setOf(
+            "καταχωρησε", "βαλε", "γραψε", "σημειωσε", "περασε", "προσθεσε",
+            "εξοδο", "εξοδα", "νεο", "ευρω", "λεπτα", "λεπτο", "cent", "cents",
+            "χθες", "χτες", "σημερα", "προχθες", "προχτες", "πριν", "μερες", "ημερες"
+        )
+        val prepositionsAndArticles = setOf(
+            "για", "στο", "στον", "στην", "στα", "στους", "στις", "σε",
+            "απο", "του", "της", "των", "ο", "η", "το", "τον", "την", "τα", "τους"
+        )
+        val greekNumbers = setOf(
+            "ενα", "μια", "δυο", "τρεις", "τρια", "τεσσερις", "τεσσερα", "πεντε", "εξι",
+            "επτα", "εφτα", "οκτω", "οχτω", "εννια", "δεκα", "εντεκα", "δωδεκα",
+            "δεκατρια", "δεκατεσσερα", "δεκαπεντε", "δεκαεξι", "δεκαεπτα", "δεκαοκτω", "δεκαεννια",
+            "εικοσι", "τριαντα", "σαραντα", "πενηντα", "εξηντα", "εβδομηντα", "ογδοντα", "ενενηντα",
+            "εκατο", "εκατον", "διακοσια", "τριακοσια", "τετρακοσια", "πεντακοσια", "εξακοσια",
+            "επτακοσια", "οκτακοσια", "εννιακοσια", "χιλια", "χιλιαδες"
+        )
+        val monthWords = setOf(
+            "ιανουαριου", "ιανουαριος", "γεναρη", "γεναρης",
+            "φεβρουαριου", "φεβρουαριος", "φλεβαρη", "φλεβαρης",
+            "μαρτιου", "μαρτιος", "μαρτη", "μαρτης",
+            "απριλιου", "απριλιος", "απριλη", "απριλης",
+            "μαιου", "μαιος", "μαη", "μαης",
+            "ιουνιου", "ιουνιος", "ιουνη", "ιουνης",
+            "ιουλιου", "ιουλιος", "ιουλη", "ιουλης",
+            "αυγουστου", "αυγουστος",
+            "σεπτεμβριου", "σεπτεμβριος", "σεπτεμβρη", "σεπτεμβρης",
+            "οκτωβριου", "οκτωβριος", "οκτωβρη", "οκτωβρης",
+            "νοεμβριου", "νοεμβριος", "νοεμβρη", "νοεμβρης",
+            "δεκεμβριου", "δεκεμβριος", "δεκεμβρη", "δεκεμβρης"
+        )
+
+        val categoryWords = mutableSetOf<String>()
+        for (cat in categories) {
+            val catNorm = normalizeGreek(cat.name)
+            categoryWords.add(catNorm)
+            catNorm.split(Regex("[\\s,;!?/]+")).forEach { w ->
+                if (w.length >= 3) categoryWords.add(w)
+            }
+            cat.voiceKeywords.split(",").forEach { kwRaw ->
+                val kw = normalizeGreek(kwRaw.trim())
+                if (kw.isNotBlank()) {
+                    categoryWords.add(kw)
+                    kw.split(Regex("[\\s,;!?/]+")).forEach { w ->
+                        if (w.length >= 3) categoryWords.add(w)
+                    }
+                }
+            }
+        }
+        val knownSpecificWords = listOf(
+            "σουβλακια", "σουβλακι", "πιτσα", "πιτσες", "καφεδες", "καφες",
+            "κολυμβητηριο", "σουπερ", "μαρκετ", "σκλαβενιτης", "βασιλοπουλος", "lidl",
+            "βενζινη", "ψιλικα", "περιπτερο", "ενοικιο", "ρευμα", "δεη", "αεριο",
+            "κοινοχρηστα", "δανεια", "δανειο", "δοση", "αυτοκινητου", "γατες", "γατα",
+            "γατοτροφη", "χρωστουμενα", "διασκεδαση", "δωρα", "δωρο", "φαρμακειο",
+            "γιατρος", "αγγλικα", "φροντιστηριο", "τενις", "μπασκετ", "ποδοσφαιρο"
+        )
+        categoryWords.addAll(knownSpecificWords)
+
+        val keptTokens = mutableListOf<String>()
+        for (token in rawTokens) {
+            val cleanToken = token.trim().replace(Regex("[^\\p{L}\\p{Nd}]"), "")
+            if (cleanToken.isBlank()) continue
+            val normToken = normalizeGreek(cleanToken)
+
+            if (cleanToken.matches(Regex("\\d+([.,]\\d+)?"))) continue
+            if (greekNumbers.contains(normToken)) continue
+            if (monthWords.contains(normToken)) continue
+            if (commandWords.contains(normToken)) continue
+            if (memberWords.contains(normToken) || familyWords.contains(normToken)) continue
+            if (payerWords.contains(normToken)) continue
+            if (prepositionsAndArticles.contains(normToken)) continue
+
+            keptTokens.add(cleanToken)
+        }
+
+        if (keptTokens.isEmpty()) return null
+
+        // Check if there are tokens that do NOT belong to any category
+        val nonCategoryTokens = keptTokens.filter { token ->
+            val norm = normalizeGreek(token)
+            !categoryWords.contains(norm)
+        }
+
+        val targetTokens = if (nonCategoryTokens.isNotEmpty()) {
+            // User spoke custom description keywords (e.g. "παπούτσια Nike", "απορρυπαντικό", "service")
+            // If the phrase contains "και" between a category word and custom word (e.g. "καφέδες και τοστ"),
+            // keep the full combination. Otherwise filter out standalone category words.
+            val hasConjunction = keptTokens.any { normalizeGreek(it) == "και" }
+            if (hasConjunction && keptTokens.size <= 4) {
+                keptTokens
+            } else {
+                // Strip standalone category words so only the custom description remains
+                val filtered = keptTokens.filter { token ->
+                    val norm = normalizeGreek(token)
+                    !categoryWords.contains(norm) || norm == "και"
+                }.toMutableList()
+                if (filtered.isNotEmpty()) filtered else keptTokens
+            }
+        } else {
+            // All spoken tokens belong to category names/keywords - no separate custom description
+            return null
+        }
+
+        val resultList = targetTokens.toMutableList()
+        while (resultList.isNotEmpty() && normalizeGreek(resultList.first()) == "και") {
+            resultList.removeAt(0)
+        }
+        while (resultList.isNotEmpty() && normalizeGreek(resultList.last()) == "και") {
+            resultList.removeAt(resultList.size - 1)
+        }
+
+        if (resultList.isEmpty()) return null
+
+        val resultStr = resultList.joinToString(" ").trim()
+        if (resultStr.length < 2) return null
+
+        return resultStr.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+    }
+
     private fun extractCategoryAndTitle(
         norm: String,
         originalPrompt: String,
-        categories: List<ExpenseCategory>
+        categories: List<ExpenseCategory>,
+        allMembers: List<FamilyMember>
     ): Pair<ExpenseCategory, String> {
         val specificTitles = listOf(
             "σουβλακια" to "Σουβλάκια",
@@ -685,9 +871,13 @@ object GreekVoiceParser {
             }
         }
 
+        // Check if user spoke specific keywords not matching standard commands or members
+        val spokenCustomDescription = extractDescriptionKeywords(originalPrompt, allMembers, categories)
+
         var bestCategory: ExpenseCategory? = null
         var maxKeywordLength = 0
 
+        // 1. Search category keywords in normalized prompt
         for (cat in categories) {
             val keywords = cat.voiceKeywords.split(",").map { normalizeGreek(it.trim()) }
             val catNameNorm = normalizeGreek(cat.name)
@@ -703,6 +893,40 @@ object GreekVoiceParser {
             }
         }
 
+        // 2. If spoken custom description exists, also test matching its keywords against categories
+        if (bestCategory == null && spokenCustomDescription != null) {
+            val descNorm = normalizeGreek(spokenCustomDescription)
+            for (cat in categories) {
+                val keywords = cat.voiceKeywords.split(",").map { normalizeGreek(it.trim()) }
+                val catNameNorm = normalizeGreek(cat.name)
+                val allKw = (keywords + catNameNorm).filter { it.isNotBlank() }
+
+                for (kw in allKw) {
+                    if (containsWord(descNorm, kw)) {
+                        bestCategory = cat
+                        break
+                    }
+                }
+                if (bestCategory != null) break
+            }
+        }
+
+        // 3. Fallback domain category matching
+        if (bestCategory == null) {
+            val searchTarget = (norm + " " + (spokenCustomDescription?.let { normalizeGreek(it) } ?: "")).lowercase(Locale.ROOT)
+            if (searchTarget.contains("παπουτσ") || searchTarget.contains("ρουχ") || searchTarget.contains("μπλουζ") || searchTarget.contains("zara")) {
+                bestCategory = categories.find { it.name.contains("Ένδυση", ignoreCase = true) || it.name.contains("Αγορές", ignoreCase = true) || it.name.contains("Shopping", ignoreCase = true) }
+            } else if (searchTarget.contains("λαδι") || searchTarget.contains("συνεργει") || searchTarget.contains("λαστιχ") || searchTarget.contains("βενζιν") || searchTarget.contains("γκαραζ") || searchTarget.contains("parking")) {
+                bestCategory = categories.find { it.name.contains("Αυτοκίνητο", ignoreCase = true) || it.name.contains("Μετακίνηση", ignoreCase = true) || it.name.contains("Βενζίνη", ignoreCase = true) }
+            } else if (searchTarget.contains("κουρεμ") || searchTarget.contains("κομμωτηρι") || searchTarget.contains("φαρμακ") || searchTarget.contains("γιατρ")) {
+                bestCategory = categories.find { it.name.contains("Υγεία", ignoreCase = true) || it.name.contains("Φαρμακείο", ignoreCase = true) || it.name.contains("Προσωπικά", ignoreCase = true) }
+            } else if (searchTarget.contains("βιβλι") || searchTarget.contains("σχολει") || searchTarget.contains("μαθημ") || searchTarget.contains("φροντιστηρι")) {
+                bestCategory = categories.find { it.name.contains("Εκπαίδευση", ignoreCase = true) || it.name.contains("Παιδιά", ignoreCase = true) || it.name.contains("Σχολείο", ignoreCase = true) }
+            } else if (searchTarget.contains("φαγητ") || searchTarget.contains("εστιατορι") || searchTarget.contains("ταβερν") || searchTarget.contains("delivery") || searchTarget.contains("σουβλακ")) {
+                bestCategory = categories.find { it.name.contains("Φαγητό", ignoreCase = true) || it.name.contains("Έξω", ignoreCase = true) || it.name.contains("Εστιατόριο", ignoreCase = true) }
+            }
+        }
+
         val category = bestCategory
             ?: categories.find { it.name.contains("Σούπερ", ignoreCase = true) }
             ?: categories.firstOrNull()
@@ -715,7 +939,20 @@ object GreekVoiceParser {
                 voiceKeywords = ""
             )
 
-        val finalTitle = detectedTitle ?: category.name
+        // When user speaks words that are not command/member words, use them as description
+        val finalTitle = if (detectedTitle != null) {
+            if (spokenCustomDescription == null ||
+                spokenCustomDescription.equals(detectedTitle, ignoreCase = true) ||
+                normalizeGreek(spokenCustomDescription) == normalizeGreek(detectedTitle)
+            ) {
+                detectedTitle
+            } else {
+                spokenCustomDescription
+            }
+        } else {
+            spokenCustomDescription ?: category.name
+        }
+
         return Pair(category, finalTitle)
     }
 }

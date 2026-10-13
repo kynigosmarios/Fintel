@@ -93,7 +93,7 @@ fun EmailVerificationScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = "Estia",
+                text = "Fintel",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color(0xFF157347)

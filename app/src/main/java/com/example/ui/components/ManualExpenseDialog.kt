@@ -26,8 +26,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Euro
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -51,6 +53,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +72,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
+import com.example.data.entity.getPayerShares
+import com.example.ui.theme.Amber700
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
 import com.example.util.Localization
@@ -94,42 +99,124 @@ fun ManualExpenseDialog(
         splitType: String,
         memberIds: List<Long>,
         memberNamesDisplay: String,
-        note: String
+        note: String,
+        payerMemberId: Long,
+        payerMemberName: String,
+        payerMemberIdsCsv: String,
+        payerAmountsCsv: String
     ) -> Unit
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
 
-    var title by remember { mutableStateOf(expenseToEdit?.title ?: "") }
-    var amountText by remember {
+    // Multi-payer selection state
+    val selectedPayerIds = remember(expenseToEdit, members) {
+        val list = mutableStateListOf<Long>()
+        if (expenseToEdit != null) {
+            val parsedIds = if (expenseToEdit.payerAmountsCsv.isNotBlank()) {
+                expenseToEdit.payerAmountsCsv.split(",").mapNotNull { it.split(":").firstOrNull()?.trim()?.toLongOrNull() }
+            } else if (expenseToEdit.payerMemberIdsCsv.isNotBlank()) {
+                expenseToEdit.payerMemberIdsCsv.split(",").mapNotNull { it.trim().toLongOrNull() }
+            } else if (expenseToEdit.payerMemberId != 0L) {
+                listOf(expenseToEdit.payerMemberId)
+            } else emptyList()
+
+            val valid = parsedIds.filter { id -> members.any { it.id == id } }
+            if (valid.isNotEmpty()) {
+                list.addAll(valid)
+            } else if (expenseToEdit.payerMemberName.isNotBlank()) {
+                val cleanPayer = expenseToEdit.payerMemberName.replace(Regex("\\([^)]*\\)"), "").trim()
+                if (cleanPayer.equals("Γονείς", ignoreCase = true) || cleanPayer.equals("Parents", ignoreCase = true)) {
+                    val parents = members.filter { it.role.equals("Γονέας", ignoreCase = true) }
+                    if (parents.isNotEmpty()) list.addAll(parents.map { it.id })
+                } else {
+                    val names = cleanPayer.split(Regex("[&,/]+")).map { it.trim() }.filter { it.isNotBlank() }
+                    val matched = members.filter { m -> names.any { n -> n.equals(m.name, ignoreCase = true) || cleanPayer.contains(m.name, ignoreCase = true) } }
+                    if (matched.isNotEmpty()) {
+                        list.addAll(matched.map { it.id })
+                    } else {
+                        val def = members.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) } ?: members.firstOrNull()
+                        if (def != null) list.add(def.id)
+                    }
+                }
+            } else {
+                val def = members.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) } ?: members.firstOrNull()
+                if (def != null) list.add(def.id)
+            }
+        } else {
+            val def = members.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) } ?: members.firstOrNull()
+            if (def != null) list.add(def.id)
+        }
+        list
+    }
+
+    var isCustomPayerSplit by remember(expenseToEdit) {
+        val hasCustom = if (expenseToEdit != null && expenseToEdit.payerAmountsCsv.isNotBlank()) {
+            val parts = expenseToEdit.payerAmountsCsv.split(",")
+            val amounts = parts.mapNotNull { it.split(":").getOrNull(1)?.trim()?.toDoubleOrNull() }
+            if (amounts.size >= 2) {
+                val first = amounts[0]
+                amounts.any { Math.abs(it - first) > 0.01 }
+            } else false
+        } else false
+        mutableStateOf(hasCustom)
+    }
+
+    val customPayerAmounts = remember(expenseToEdit) {
+        val map = mutableStateMapOf<Long, String>()
+        if (expenseToEdit != null && expenseToEdit.payerAmountsCsv.isNotBlank()) {
+            expenseToEdit.payerAmountsCsv.split(",").forEach { entry ->
+                val parts = entry.split(":")
+                if (parts.size == 2) {
+                    val id = parts[0].trim().toLongOrNull()
+                    val amt = parts[1].trim().toDoubleOrNull()
+                    if (id != null && amt != null) {
+                        map[id] = String.format(Locale.US, "%.2f", amt)
+                    }
+                }
+            }
+        }
+        map
+    }
+
+    var title by remember(expenseToEdit) { mutableStateOf(expenseToEdit?.title ?: "") }
+    var amountText by remember(expenseToEdit) {
         mutableStateOf(expenseToEdit?.let { String.format(Locale.US, "%.2f", it.amount) } ?: "")
     }
-    var selectedCategoryId by remember {
-        mutableStateOf(expenseToEdit?.categoryId ?: categories.firstOrNull()?.id ?: 1L)
+    var selectedCategoryId by remember(expenseToEdit, categories) {
+        val initialId = if (expenseToEdit != null) {
+            if (expenseToEdit.categoryId == 0L || expenseToEdit.categoryName.isBlank()) 0L
+            else if (categories.any { it.id == expenseToEdit.categoryId }) expenseToEdit.categoryId
+            else 0L
+        } else {
+            categories.firstOrNull()?.id ?: 0L
+        }
+        mutableStateOf(initialId)
     }
-    var selectedTimestamp by remember {
+    var selectedTimestamp by remember(expenseToEdit) {
         mutableLongStateOf(expenseToEdit?.timestamp ?: System.currentTimeMillis())
     }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    var isAllFamily by remember {
+    var isAllFamily by remember(expenseToEdit) {
         val hasSpecific = expenseToEdit != null && (
             expenseToEdit.splitType == "SPECIFIC_MEMBERS" ||
+            expenseToEdit.memberIdsCsv.isNotBlank() ||
             (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true) && !expenseToEdit.memberNamesDisplay.equals("Family Shared", ignoreCase = true))
         )
-        mutableStateOf(if (expenseToEdit != null) !hasSpecific else true)
+        val isEmptyMember = expenseToEdit != null && expenseToEdit.memberIdsCsv.isBlank() && expenseToEdit.memberNamesDisplay.isBlank()
+        mutableStateOf(if (expenseToEdit != null) (!hasSpecific && !isEmptyMember) else true)
     }
 
-    val selectedMemberIds = remember {
+    val selectedMemberIds = remember(expenseToEdit, members) {
         val list = mutableStateListOf<Long>()
         if (expenseToEdit != null) {
             val parsedIds = expenseToEdit.memberIdsCsv.split(",").mapNotNull { it.trim().toLongOrNull() }
-            if (parsedIds.isNotEmpty()) {
-                list.addAll(parsedIds)
+            val validIds = parsedIds.filter { id -> members.any { it.id == id } }
+            if (validIds.isNotEmpty()) {
+                list.addAll(validIds)
             } else if (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true) && !expenseToEdit.memberNamesDisplay.equals("Family Shared", ignoreCase = true)) {
                 val matched = members.filter { m -> expenseToEdit.memberNamesDisplay.contains(m.name, ignoreCase = true) }
-                if (matched.isNotEmpty()) list.addAll(matched.map { it.id }) else list.addAll(members.map { it.id })
-            } else {
-                list.addAll(members.map { it.id })
+                list.addAll(matched.map { it.id })
             }
         } else {
             list.addAll(members.map { it.id })
@@ -137,8 +224,8 @@ fun ManualExpenseDialog(
         list
     }
 
-    var note by remember { mutableStateOf(expenseToEdit?.note ?: "") }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    var note by remember(expenseToEdit) { mutableStateOf(expenseToEdit?.note ?: "") }
+    var errorText by remember(expenseToEdit) { mutableStateOf<String?>(null) }
 
     val currentAmount = amountText.toDoubleOrNull() ?: 0.0
     val activeMemberCount = if (isAllFamily) members.size else selectedMemberIds.size.coerceAtLeast(1)
@@ -379,7 +466,7 @@ fun ManualExpenseDialog(
                             val catColor = Color(cat.colorHex)
                             FilterChip(
                                 selected = isSelected,
-                                onClick = { selectedCategoryId = cat.id },
+                                onClick = { selectedCategoryId = if (isSelected) 0L else cat.id },
                                 label = { Text(Localization.translateCategory(cat.name, lang), fontSize = 12.sp) },
                                 leadingIcon = {
                                     Icon(
@@ -399,12 +486,395 @@ fun ManualExpenseDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Member Split Section
+                    // 1. Payer Section (Who paid)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CreditCard,
+                            contentDescription = null,
+                            tint = Emerald700,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(modifier = Modifier.width(7.dp))
+                        Text(
+                            text = Localization.payersSectionTitle(lang),
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = Localization.memberWhoPaid(lang),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = Localization.payersSubtitle(lang),
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        members.forEach { member ->
+                            val isPayer = selectedPayerIds.contains(member.id)
+                            val avatarColor = Color(member.avatarColorHex)
+                            val translatedRole = Localization.translateRole(member.role, lang)
+
+                            FilterChip(
+                                selected = isPayer,
+                                onClick = {
+                                    if (isPayer) {
+                                        if (selectedPayerIds.size > 1) {
+                                            selectedPayerIds.remove(member.id)
+                                            customPayerAmounts.remove(member.id)
+                                        }
+                                    } else {
+                                        selectedPayerIds.add(member.id)
+                                        if (isCustomPayerSplit) {
+                                            val currentAllocated = selectedPayerIds.sumOf { customPayerAmounts[it]?.toDoubleOrNull() ?: 0.0 }
+                                            val remaining = (currentAmount - currentAllocated).coerceAtLeast(0.0)
+                                            customPayerAmounts[member.id] = if (remaining > 0) String.format(Locale.US, "%.2f", remaining) else "0.00"
+                                        }
+                                    }
+                                },
+                                label = { Text("${member.name} ($translatedRole)", fontSize = 12.sp) },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .clip(CircleShape)
+                                            .background(avatarColor)
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Emerald700.copy(alpha = 0.2f),
+                                    selectedLabelColor = Emerald700
+                                )
+                            )
+                        }
+                    }
+
+                    // Multi-payer allocation details card (when 2 or more payers selected)
+                    if (selectedPayerIds.size > 1) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Card(
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            ),
+                            border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.25f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                // Full-width Segmented Tab Control
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                                        .padding(3.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (!isCustomPayerSplit) Emerald700 else Color.Transparent)
+                                            .clickable { isCustomPayerSplit = false }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = Localization.payerSplitModeEqual(lang),
+                                            fontSize = 12.5.sp,
+                                            fontWeight = if (!isCustomPayerSplit) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (!isCustomPayerSplit) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(if (isCustomPayerSplit) Emerald700 else Color.Transparent)
+                                            .clickable {
+                                                isCustomPayerSplit = true
+                                                val share = if (currentAmount > 0) currentAmount / selectedPayerIds.size else 0.0
+                                                selectedPayerIds.forEach { id ->
+                                                    if (customPayerAmounts[id].isNullOrBlank()) {
+                                                        customPayerAmounts[id] = String.format(Locale.US, "%.2f", share)
+                                                    }
+                                                }
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = Localization.payerSplitModeCustom(lang),
+                                            fontSize = 12.5.sp,
+                                            fontWeight = if (isCustomPayerSplit) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isCustomPayerSplit) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                if (!isCustomPayerSplit) {
+                                    // Equal split display
+                                    val equalShare = if (currentAmount > 0) currentAmount / selectedPayerIds.size else 0.0
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Emerald700.copy(alpha = 0.08f))
+                                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "Share per person" else "Μερίδιο ανά άτομο",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = String.format(Locale.US, "%.2f €", equalShare),
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Emerald700
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        selectedPayerIds.forEach { pid ->
+                                            val m = members.find { it.id == pid } ?: return@forEach
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.weight(1f)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(10.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color(m.avatarColorHex))
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = m.name,
+                                                        fontSize = 12.5.sp,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = " (${Localization.translateRole(m.role, lang)})",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                                Text(
+                                                    text = String.format(Locale.US, "%.2f €", equalShare),
+                                                    fontSize = 12.5.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = Emerald700
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Custom amounts per payer inputs
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Enter amount paid per member:" else "Ορίστε το ποσό που πλήρωσε κάθε μέλος:",
+                                        fontSize = 11.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        selectedPayerIds.forEach { pid ->
+                                            val m = members.find { it.id == pid } ?: return@forEach
+                                            val currentVal = customPayerAmounts[pid] ?: ""
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(10.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color(m.avatarColorHex))
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = m.name,
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = " (${Localization.translateRole(m.role, lang)})",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+
+                                                OutlinedTextField(
+                                                    value = currentVal,
+                                                    onValueChange = { input ->
+                                                        customPayerAmounts[pid] = input.replace(',', '.')
+                                                    },
+                                                    modifier = Modifier.width(115.dp),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                                    singleLine = true,
+                                                    trailingIcon = {
+                                                        Text("€", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Emerald700)
+                                                    },
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedBorderColor = Emerald700,
+                                                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        // Balance & Auto-completion calculation
+                                        val totalAllocated = selectedPayerIds.sumOf { customPayerAmounts[it]?.toDoubleOrNull() ?: 0.0 }
+                                        val diff = currentAmount - totalAllocated
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        if (currentAmount > 0.0) {
+                                            Surface(
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = when {
+                                                    Math.abs(diff) < 0.01 -> Emerald700.copy(alpha = 0.08f)
+                                                    diff > 0.01 -> Amber700.copy(alpha = 0.08f)
+                                                    else -> MaterialTheme.colorScheme.error.copy(alpha = 0.08f)
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                if (Math.abs(diff) < 0.01) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(Icons.Default.Check, contentDescription = null, tint = Emerald700, modifier = Modifier.size(14.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text(
+                                                            text = Localization.payerFullyCovered(lang),
+                                                            fontSize = 11.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = Emerald700
+                                                        )
+                                                    }
+                                                } else if (diff > 0.01) {
+                                                    Text(
+                                                        text = Localization.payerRemaining(lang, String.format(Locale.US, "%.2f €", diff)),
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Amber700
+                                                    )
+
+                                                    // Quick button to allocate remainder to the second payer if 2 payers
+                                                    if (selectedPayerIds.size == 2) {
+                                                        val targetId = selectedPayerIds[1]
+                                                        val targetMember = members.find { it.id == targetId }
+                                                        if (targetMember != null) {
+                                                            Surface(
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                color = Amber700.copy(alpha = 0.12f),
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(6.dp))
+                                                                    .clickable {
+                                                                        val cur = customPayerAmounts[targetId]?.toDoubleOrNull() ?: 0.0
+                                                                        customPayerAmounts[targetId] = String.format(Locale.US, "%.2f", cur + diff)
+                                                                    }
+                                                            ) {
+                                                                Text(
+                                                                    text = Localization.payerQuickBalance(lang, targetMember.name, String.format(Locale.US, "%.2f €", diff)),
+                                                                    fontSize = 10.5.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = Amber700,
+                                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    Text(
+                                                        text = Localization.payerExceeded(lang, String.format(Locale.US, "%.2f €", -diff)),
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.error
+                                                    )
+                                                }
+
+                                                Text(
+                                                    text = "${String.format(Locale.US, "%.2f", totalAllocated)} / ${String.format(Locale.US, "%.2f €", currentAmount)}",
+                                                    fontSize = 11.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        }
+                                    }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 2. Beneficiary Section (Who the expense concerns)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = Color(0xFF2563EB),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "Who is this expense for?" else "Σε ποιον αφορά το έξοδο;",
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "e.g. Choose children to track expenses per child" else "π.χ. Επιλέξτε τα παιδιά για να γνωρίζετε πόσα αναλογούν σε αυτά",
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -462,9 +932,7 @@ fun ManualExpenseDialog(
                                     selected = isChecked,
                                     onClick = {
                                         if (isChecked) {
-                                            if (selectedMemberIds.size > 1) {
-                                                selectedMemberIds.remove(member.id)
-                                            }
+                                            selectedMemberIds.remove(member.id)
                                         } else {
                                             selectedMemberIds.add(member.id)
                                         }
@@ -575,9 +1043,8 @@ fun ManualExpenseDialog(
                             }
 
                             val chosenCat = categories.find { it.id == selectedCategoryId }
-                                ?: categories.firstOrNull()
-                            val catId = chosenCat?.id ?: 1L
-                            val catName = chosenCat?.name ?: if (lang == Localization.Language.ENGLISH) "General" else "Γενικά"
+                            val catId = chosenCat?.id ?: 0L
+                            val catName = chosenCat?.name ?: ""
 
                             val splitType = if (isAllFamily) "ALL_FAMILY" else "SPECIFIC_MEMBERS"
                             val finalMemberIds = if (isAllFamily) {
@@ -599,6 +1066,42 @@ fun ManualExpenseDialog(
                                 selectedTimestamp
                             }
 
+                            val finalPayerIds = selectedPayerIds.toList().ifEmpty {
+                                val def = members.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) } ?: members.firstOrNull()
+                                if (def != null) listOf(def.id) else emptyList()
+                            }
+
+                            val finalPayerMember: FamilyMember? = if (finalPayerIds.isNotEmpty()) members.find { it.id == finalPayerIds[0] } else null
+                            val finalPayerId = finalPayerMember?.id ?: 0L
+                            val finalPayerMemberIdsCsv = finalPayerIds.joinToString(",")
+
+                            val finalPayerAmountsCsv: String
+                            val finalPayerName: String
+
+                            if (finalPayerIds.size <= 1) {
+                                finalPayerAmountsCsv = if (finalPayerIds.isNotEmpty()) "${finalPayerIds[0]}:${String.format(Locale.US, "%.2f", parsedAmount)}" else ""
+                                finalPayerName = finalPayerMember?.name ?: ""
+                            } else {
+                                if (isCustomPayerSplit) {
+                                    finalPayerAmountsCsv = finalPayerIds.joinToString(",") { id ->
+                                        val amt = customPayerAmounts[id]?.toDoubleOrNull() ?: (parsedAmount / finalPayerIds.size)
+                                        String.format(Locale.US, "%d:%.2f", id, amt)
+                                    }
+                                    finalPayerName = finalPayerIds.mapNotNull { id -> members.find { it.id == id } }
+                                        .joinToString(" & ") { m ->
+                                            val amt = customPayerAmounts[m.id]?.toDoubleOrNull() ?: (parsedAmount / finalPayerIds.size)
+                                            "${m.name} (${String.format(Locale.US, "%.2f €", amt)})"
+                                        }
+                                } else {
+                                    val perPerson = parsedAmount / finalPayerIds.size
+                                    finalPayerAmountsCsv = finalPayerIds.joinToString(",") { id ->
+                                        String.format(Locale.US, "%d:%.2f", id, perPerson)
+                                    }
+                                    val names = finalPayerIds.mapNotNull { id -> members.find { it.id == id }?.name }
+                                    finalPayerName = "${names.joinToString(" & ")} (από ${String.format(Locale.US, "%.2f €", perPerson)})"
+                                }
+                            }
+
                             onSave(
                                 expenseToEdit?.id ?: 0L,
                                 title.trim(),
@@ -609,7 +1112,11 @@ fun ManualExpenseDialog(
                                 splitType,
                                 finalMemberIds,
                                 memberDisplay,
-                                note.trim()
+                                note.trim(),
+                                finalPayerId,
+                                finalPayerName,
+                                finalPayerMemberIdsCsv,
+                                finalPayerAmountsCsv
                             )
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),

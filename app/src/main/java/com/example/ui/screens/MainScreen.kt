@@ -109,6 +109,8 @@ import com.example.ui.components.ManualExpenseDialog
 import com.example.ui.components.ManualIncomeDialog
 import com.example.ui.components.MemberDialog
 import com.example.ui.components.OnboardingCarouselDialog
+import com.example.ui.components.PrivacyConsentDialog
+import com.example.ui.components.UserAvatar
 import com.example.ui.components.PremiumPaywallDialog
 import com.example.ui.components.QuickActionChooserDialog
 import com.example.ui.components.RecurringExpenseDialog
@@ -129,6 +131,7 @@ import com.example.ui.theme.Emerald700
 import com.example.ui.theme.Emerald800
 import com.example.ui.theme.Emerald900
 import com.example.ui.theme.Emerald950
+import com.example.ui.theme.ModernFontFamily
 import com.example.ui.viewmodel.OikoNomosViewModel
 import com.example.util.SpeechRecognitionHelper
 import kotlinx.coroutines.launch
@@ -143,7 +146,10 @@ enum class AppTab(val title: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: OikoNomosViewModel) {
+fun MainScreen(
+    viewModel: OikoNomosViewModel,
+    onLaunchBilling: (android.app.Activity) -> Boolean = { false }
+) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -207,6 +213,10 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
     val savingsGoals by viewModel.allSavingsGoals.collectAsStateWithLifecycle()
     val launchWithChooser by viewModel.launchWithChooser.collectAsStateWithLifecycle()
     val showOnboardingCarousel by viewModel.showOnboardingCarousel.collectAsStateWithLifecycle()
+    val dailyReminderEnabled by viewModel.dailyReminderEnabled.collectAsStateWithLifecycle()
+    val dailyReminderHour by viewModel.dailyReminderHour.collectAsStateWithLifecycle()
+    val dailyReminderMinute by viewModel.dailyReminderMinute.collectAsStateWithLifecycle()
+    val showPrivacyConsentDialog by viewModel.showPrivacyConsentDialog.collectAsStateWithLifecycle()
 
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
 
@@ -305,23 +315,40 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                     ) {
                         OikoNomosLogo(
                             isDarkTheme = isDarkTheme,
-                            size = 25.dp
+                            size = 34.dp
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Estia",
+                            text = "Fintel",
+                            fontFamily = ModernFontFamily,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 20.sp,
-                            letterSpacing = (-0.2).sp,
-                            color = if (isDarkTheme) Color(0xFF34D399) else Color(0xFF157347)
+                            fontSize = 23.sp,
+                            letterSpacing = (-0.4).sp,
+                            color = if (isDarkTheme) Color(0xFF34D399) else Color(0xFF0F5132)
                         )
                     }
                 },
                 actions = {
+                    Surface(
+                        shape = CircleShape,
+                        color = Emerald700.copy(alpha = 0.12f),
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clickable { viewModel.openUserProfileDialog() }
+                            .testTag("topbar_user_avatar")
+                    ) {
+                        UserAvatar(
+                            photoUrl = userProfile?.photoUrl?.ifBlank { null } ?: currentUser?.photoUrl?.toString(),
+                            displayName = userProfile?.displayName?.ifBlank { null } ?: currentUser?.displayName,
+                            modifier = Modifier.fillMaxSize(),
+                            fontSize = 14.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                     IconButton(
                         onClick = { viewModel.openBurgerMenu() },
                         modifier = Modifier
-                            .padding(end = 6.dp)
+                            .padding(end = 4.dp)
                             .testTag("burger_menu_button")
                     ) {
                         Icon(
@@ -498,6 +525,9 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         onExportExcel = { viewModel.openExportReportDialog() },
                         onExportPdf = { viewModel.openExportReportDialog() },
                         onShareReport = { viewModel.openExportReportDialog() },
+                        onAddMember = { viewModel.openMemberDialog() },
+                        onAddCategory = { viewModel.openCategoryDialog() },
+                        onSeedStandardCategories = { viewModel.seedStandardCategories() },
                         isInitialLoading = isInitialExpensesLoading
                     )
                     1 -> AnalyticsScreen(
@@ -509,20 +539,25 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         onExportReport = { viewModel.openExportReportDialog() },
                         onManageCategories = { currentTab = 4 }
                     )
-                    2 -> SavingsAndRecurringScreen(
-                        goals = savingsGoals,
-                        recurringExpenses = recurringExpenses,
-                        appLanguage = appLanguage,
-                        onAddGoal = { viewModel.openSavingsGoalDialog() },
-                        onEditGoal = { viewModel.openSavingsGoalDialog(it) },
-                        onDeleteGoal = { viewModel.deleteSavingsGoal(it) },
-                        onDepositToGoal = { goal, amt -> viewModel.depositToGoal(goal, amt) },
-                        onAddRecurring = { viewModel.openRecurringExpenseDialog() },
-                        onEditRecurring = { viewModel.openRecurringExpenseDialog(it) },
-                        onDeleteRecurring = { viewModel.deleteRecurringExpense(it) },
-                        onExecuteRecurringNow = { viewModel.executeRecurringExpenseNow(it) },
-                        onToggleRecurringActive = { viewModel.toggleRecurringActive(it) }
-                    )
+                    2 -> {
+                        androidx.compose.runtime.LaunchedEffect(Unit) {
+                            viewModel.checkAndProcessDueRecurringExpenses()
+                        }
+                        SavingsAndRecurringScreen(
+                            goals = savingsGoals,
+                            recurringExpenses = recurringExpenses,
+                            appLanguage = appLanguage,
+                            onAddGoal = { viewModel.openSavingsGoalDialog() },
+                            onEditGoal = { viewModel.openSavingsGoalDialog(it) },
+                            onDeleteGoal = { viewModel.deleteSavingsGoal(it) },
+                            onDepositToGoal = { goal, amt -> viewModel.depositToGoal(goal, amt) },
+                            onAddRecurring = { viewModel.openRecurringExpenseDialog() },
+                            onEditRecurring = { viewModel.openRecurringExpenseDialog(it) },
+                            onDeleteRecurring = { viewModel.deleteRecurringExpense(it) },
+                            onExecuteRecurringNow = { viewModel.executeRecurringExpenseNow(it) },
+                            onToggleRecurringActive = { viewModel.toggleRecurringActive(it) }
+                        )
+                    }
                     3 -> MembersScreen(
                         members = members,
                         currentHousehold = currentHousehold,
@@ -532,11 +567,13 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         onEditMember = { viewModel.openMemberDialog(it) },
                         onDeleteMember = { viewModel.deleteMember(it) },
                         onUpdateMemberColor = { member, color -> viewModel.updateMemberColor(member, color) },
+                        onMoveMemberUp = { viewModel.moveMemberUp(it) },
+                        onMoveMemberDown = { viewModel.moveMemberDown(it) },
                         onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
                         onShareInviteCode = { code ->
                             val sendIntent = android.content.Intent().apply {
                                 action = android.content.Intent.ACTION_SEND
-                                putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο Estia με τον κωδικό: $code")
+                                putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο Fintel με τον κωδικό: $code")
                                 type = "text/plain"
                             }
                             context.startActivity(android.content.Intent.createChooser(sendIntent, "Κοινοποίηση Κωδικού"))
@@ -548,6 +585,8 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                         onAddCategory = { viewModel.openCategoryDialog() },
                         onEditCategory = { viewModel.openCategoryDialog(it) },
                         onDeleteCategory = { viewModel.deleteCategory(it) },
+                        onMoveCategoryUp = { viewModel.moveCategoryUp(it) },
+                        onMoveCategoryDown = { viewModel.moveCategoryDown(it) },
                         onSeedStandardCategories = { viewModel.seedStandardCategories() }
                     )
                 }
@@ -578,7 +617,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
         pendingExpense = pendingParsedExpense,
         categories = categories,
         members = members,
-        onConfirm = { title, amount, categoryId, categoryName, timestamp, splitType, memberIds, memberNamesDisplay, prompt ->
+        onConfirm = { title, amount, categoryId, categoryName, timestamp, splitType, memberIds, memberNamesDisplay, prompt, payerId, payerName, payerMemberIdsCsv, payerAmountsCsv ->
             viewModel.confirmVoiceExpense(
                 title = title,
                 amount = amount,
@@ -588,7 +627,11 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                 splitType = splitType,
                 memberIds = memberIds,
                 memberNamesDisplay = memberNamesDisplay,
-                originalPrompt = prompt
+                originalPrompt = prompt,
+                payerMemberId = payerId,
+                payerMemberName = payerName,
+                payerMemberIdsCsv = payerMemberIdsCsv,
+                payerAmountsCsv = payerAmountsCsv
             )
         },
         onCancel = { viewModel.cancelPendingExpense() }
@@ -601,7 +644,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             categories = categories,
             members = members,
             onDismiss = { viewModel.dismissManualExpenseDialog() },
-            onSave = { id, title, amount, categoryId, categoryName, timestamp, splitType, memberIds, memberNamesDisplay, note ->
+            onSave = { id, title, amount, categoryId, categoryName, timestamp, splitType, memberIds, memberNamesDisplay, note, payerId, payerName, payerMemberIdsCsv, payerAmountsCsv ->
                 viewModel.saveExpense(
                     id = id,
                     title = title,
@@ -612,7 +655,11 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
                     splitType = splitType,
                     memberIds = memberIds,
                     memberNamesDisplay = memberNamesDisplay,
-                    note = note
+                    note = note,
+                    payerMemberId = payerId,
+                    payerMemberName = payerName,
+                    payerMemberIdsCsv = payerMemberIdsCsv,
+                    payerAmountsCsv = payerAmountsCsv
                 )
             }
         )
@@ -654,9 +701,10 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
     if (showCategoryDialog) {
         CategoryDialog(
             categoryToEdit = editingCategory,
+            appLanguage = appLanguage,
             onDismiss = { viewModel.dismissCategoryDialog() },
-            onSave = { id, name, iconKey, monthlyBudget, colorHex, voiceKeywords ->
-                viewModel.saveCategory(id, name, iconKey, monthlyBudget, colorHex, voiceKeywords)
+            onSave = { id, name, iconKey, monthlyBudget, colorHex, voiceKeywords, fontColorHex ->
+                viewModel.saveCategory(id, name, iconKey, monthlyBudget, colorHex, voiceKeywords, fontColorHex)
             }
         )
     }
@@ -686,6 +734,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             onSaveFullProfile = { first, last, birth, phone, occ, city ->
                 viewModel.updateUserFullProfile(first, last, birth, phone, occ, city)
             },
+            onUpdateProfilePhoto = { viewModel.updateUserProfilePhoto(it) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall("profile_upgrade") },
             onSignOut = { viewModel.signOutUser() },
             onDismiss = { viewModel.dismissUserProfileDialog() }
@@ -706,7 +755,7 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             onShareInviteCode = { code ->
                 val sendIntent = android.content.Intent().apply {
                     action = android.content.Intent.ACTION_SEND
-                    putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο Estia με τον κωδικό: $code")
+                    putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο Fintel με τον κωδικό: $code")
                     type = "text/plain"
                 }
                 context.startActivity(android.content.Intent.createChooser(sendIntent, "Κοινοποίηση Κωδικού"))
@@ -737,7 +786,13 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
         PremiumPaywallDialog(
             reason = premiumPaywallReason!!,
             appLanguage = appLanguage,
-            onUnlockPro = { viewModel.unlockPro() },
+            onUnlockPro = {
+                val act = context as? android.app.Activity
+                val launched = if (act != null) onLaunchBilling(act) else false
+                if (!launched) {
+                    viewModel.unlockPro()
+                }
+            },
             onDismiss = { viewModel.dismissPremiumPaywall() }
         )
     }
@@ -785,14 +840,16 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
         RecurringExpenseDialog(
             recurringToEdit = editingRecurringExpense,
             categories = categories,
+            members = members,
+            appLanguage = appLanguage,
             onDismiss = { viewModel.dismissRecurringExpenseDialog() },
-            onSave = { id, title, amount, categoryId, categoryName, dayOfMonth, note ->
-                viewModel.saveRecurringExpense(id, title, amount, categoryId, categoryName, dayOfMonth, note)
+            onSave = { id, title, amount, categoryId, categoryName, dayOfMonth, note, payerId, payerName ->
+                viewModel.saveRecurringExpense(id, title, amount, categoryId, categoryName, dayOfMonth, note, payerId, payerName)
             }
         )
     }
 
-    // App Settings Dialog (Profile, Desktop Tile / Widget, Theme, Family Cloud Sync)
+    // App Settings Dialog (Profile, Desktop Tile / Widget, Theme, Family Cloud Sync, Evening Reminders)
     if (showSettingsDialog) {
         AppSettingsDialog(
             currentUser = currentUser,
@@ -801,6 +858,13 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
             themeMode = themeMode,
             appLanguage = appLanguage,
             launchWithChooser = launchWithChooser,
+            userProfile = userProfile,
+            reminderEnabled = dailyReminderEnabled,
+            reminderHour = dailyReminderHour,
+            reminderMinute = dailyReminderMinute,
+            onToggleReminder = { viewModel.toggleDailyReminder(it) },
+            onSetReminderTime = { h, m -> viewModel.setDailyReminderTime(h, m) },
+            onTestReminder = { viewModel.triggerTestReminderNotification() },
             onThemeChange = { viewModel.setThemeMode(it) },
             onLanguageChange = { viewModel.setAppLanguage(it) },
             onToggleLaunchWithChooser = { viewModel.setLaunchWithChooser(it) },
@@ -816,7 +880,28 @@ fun MainScreen(viewModel: OikoNomosViewModel) {
     // Onboarding Pop-up Carousel for New Users (Next-Next-Next with Auto-advance every 5 seconds)
     if (showOnboardingCarousel) {
         OnboardingCarouselDialog(
-            onDismiss = { viewModel.dismissOnboardingCarousel() }
+            appLanguage = appLanguage,
+            onDismiss = { viewModel.dismissOnboardingCarousel() },
+            onAddMember = {
+                viewModel.dismissOnboardingCarousel()
+                viewModel.openMemberDialog()
+            },
+            onAddCategory = {
+                viewModel.dismissOnboardingCarousel()
+                viewModel.openCategoryDialog()
+            },
+            onSeedCategories = {
+                viewModel.dismissOnboardingCarousel()
+                viewModel.seedStandardCategories()
+            }
+        )
+    }
+
+    // GDPR / Privacy Consent Modal on App Start
+    if (showPrivacyConsentDialog) {
+        PrivacyConsentDialog(
+            appLanguage = appLanguage,
+            onAccept = { viewModel.acceptPrivacyConsent() }
         )
     }
 }

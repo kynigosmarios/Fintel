@@ -317,7 +317,7 @@ fun FamilyCloudSyncCard(
                                     OutlinedButton(
                                         onClick = {
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = ClipData.newPlainText("Estia Invite Code", household.inviteCode)
+                                            val clip = ClipData.newPlainText("Fintel Invite Code", household.inviteCode)
                                             clipboard.setPrimaryClip(clip)
                                             onMessage(if (lang == Localization.Language.ENGLISH) "Code ${household.inviteCode} copied!" else "Ο κωδικός ${household.inviteCode} αντιγράφηκε!")
                                         },
@@ -335,9 +335,9 @@ fun FamilyCloudSyncCard(
                                                 putExtra(
                                                     Intent.EXTRA_TEXT,
                                                     if (lang == Localization.Language.ENGLISH)
-                                                        "Join me in tracking our family expenses on Estia! Use invite code: ${household.inviteCode}"
+                                                        "Join me in tracking our expenses on Fintel! Use invite code: ${household.inviteCode}"
                                                     else
-                                                        "Έλα να μοιραστούμε τα οικογενειακά μας έξοδα στο Estia! Βάλε τον κωδικό: ${household.inviteCode}"
+                                                        "Έλα να μοιραστούμε τα έξοδά μας στο Fintel! Βάλε τον κωδικό: ${household.inviteCode}"
                                                 )
                                                 type = "text/plain"
                                             }

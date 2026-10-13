@@ -1,118 +1,132 @@
 package com.example.data.model
 
 import com.google.firebase.Timestamp
+import com.google.firebase.firestore.DocumentId
 
 data class Household(
-    val id: String = "",
-    val name: String = "Το Εξοδολόγιό μου",
-    val ownerId: String = "",
-    val inviteCode: String = "",
-    val memberUids: List<String> = emptyList(),
-    val isPremium: Boolean = false,
-    val createdAt: Timestamp? = null
+    @DocumentId var id: String = "",
+    var name: String = "Το Εξοδολόγιό μου",
+    var ownerId: String = "",
+    var inviteCode: String = "",
+    var memberUids: List<String> = emptyList(),
+    var isPremium: Boolean = false,
+    var createdAt: Timestamp? = null
 )
 
 data class FirebaseExpense(
-    val id: String = "",
-    val householdId: String = "",
-    val title: String = "",
-    val amount: Double = 0.0,
-    val categoryId: Long = 1L,
-    val categoryName: String = "",
-    val timestamp: Long = 0L,
-    val splitType: String = "ALL",
-    val memberIdsCsv: String = "",
-    val memberNamesDisplay: String = "",
-    val note: String = "",
-    val createdByUid: String = "",
-    val createdByName: String = "",
-    val createdAt: Timestamp? = null
+    @DocumentId var id: String = "",
+    var householdId: String = "",
+    var title: String = "",
+    var amount: Double = 0.0,
+    var categoryId: Long = 1L,
+    var categoryName: String = "",
+    var timestamp: Long = 0L,
+    var splitType: String = "ALL",
+    var memberIdsCsv: String = "",
+    var memberNamesDisplay: String = "",
+    var note: String = "",
+    var payerMemberId: Long = 0L,
+    var payerMemberName: String = "",
+    var payerMemberIdsCsv: String = "",
+    var payerAmountsCsv: String = "",
+    var createdByUid: String = "",
+    var createdByName: String = "",
+    var createdAt: Timestamp? = null
 )
 
 data class UserProfile(
-    val uid: String = "",
-    val email: String = "",
-    val displayName: String = "",
-    val firstName: String = "",
-    val lastName: String = "",
-    val birthDate: String = "",
-    val phoneNumber: String = "",
-    val occupation: String = "",
-    val city: String = "",
-    val householdId: String = "",
-    val householdIds: List<String> = emptyList(),
-    val isPremium: Boolean = false,
-    val createdAt: Timestamp? = null
+    @DocumentId var uid: String = "",
+    var email: String = "",
+    var displayName: String = "",
+    var firstName: String = "",
+    var lastName: String = "",
+    var birthDate: String = "",
+    var phoneNumber: String = "",
+    var occupation: String = "",
+    var city: String = "",
+    var householdId: String = "",
+    var householdIds: List<String> = emptyList(),
+    var isPremium: Boolean = false,
+    var photoUrl: String = "",
+    var authProvider: String = "password", // "password" or "google"
+    var createdAt: Timestamp? = null
 )
 
 data class FirebaseIncome(
-    val id: String = "",
-    val householdId: String = "",
-    val title: String = "",
-    val amount: Double = 0.0,
-    val memberId: Long = 0L,
-    val memberName: String = "",
-    val category: String = "Μισθός",
-    val timestamp: Long = 0L,
-    val note: String = "",
-    val createdByUid: String = "",
-    val createdByName: String = "",
-    val createdAt: Timestamp? = null
+    @DocumentId var id: String = "",
+    var householdId: String = "",
+    var title: String = "",
+    var amount: Double = 0.0,
+    var memberId: Long = 0L,
+    var memberName: String = "",
+    var category: String = "Μισθός",
+    var timestamp: Long = 0L,
+    var note: String = "",
+    var createdByUid: String = "",
+    var createdByName: String = "",
+    var createdAt: Timestamp? = null
 )
 
 data class FirebaseMember(
-    val id: String = "",
-    val householdId: String = "",
-    val userId: String = "",
-    val name: String = "",
-    val role: String = "Γονέας",
-    val avatarColorHex: Long = 0xFF059669,
-    val voiceKeywords: String = "",
-    val isDefault: Boolean = false,
-    val createdAt: Timestamp? = null
+    @DocumentId var id: String = "",
+    var householdId: String = "",
+    var userId: String = "",
+    var name: String = "",
+    var role: String = "Γονέας",
+    var avatarColorHex: Long = 0xFF059669,
+    var voiceKeywords: String = "",
+    var isDefault: Boolean = false,
+    var sortOrder: Int = 0,
+    var createdAt: Timestamp? = null
 )
 
 data class FirebaseCategory(
-    val id: String = "",
-    val householdId: String = "",
-    val userId: String = "",
-    val name: String = "",
-    val iconKey: String = "cart",
-    val monthlyBudget: Double = 0.0,
-    val colorHex: Long = 0xFF059669,
-    val voiceKeywords: String = "",
-    val createdAt: Timestamp? = null
+    @DocumentId var id: String = "",
+    var householdId: String = "",
+    var userId: String = "",
+    var name: String = "",
+    var iconKey: String = "cart",
+    var monthlyBudget: Double = 0.0,
+    var colorHex: Long = 0xFF059669,
+    var voiceKeywords: String = "",
+    var sortOrder: Int = 0,
+    var fontColorHex: Long = 0L,
+    var createdAt: Timestamp? = null
 )
 
 data class FirebaseSavingsGoal(
-    val id: String = "",
-    val householdId: String = "",
-    val userId: String = "",
-    val title: String = "",
-    val targetAmount: Double = 0.0,
-    val currentAmount: Double = 0.0,
-    val deadlineDate: String = "",
-    val iconKey: String = "vacation",
-    val colorHex: Long = 0xFF059669,
-    val note: String = "",
-    val createdAt: Timestamp? = null
+    @DocumentId var id: String = "",
+    var householdId: String = "",
+    var userId: String = "",
+    var title: String = "",
+    var targetAmount: Double = 0.0,
+    var currentAmount: Double = 0.0,
+    var deadlineDate: String = "",
+    var iconKey: String = "vacation",
+    var colorHex: Long = 0xFF059669,
+    var note: String = "",
+    var createdAt: Timestamp? = null
 )
 
 data class FirebaseRecurringExpense(
-    val id: String = "",
-    val householdId: String = "",
-    val userId: String = "",
-    val title: String = "",
-    val amount: Double = 0.0,
-    val categoryId: Long = 0L,
-    val categoryName: String = "",
-    val frequency: String = "MONTHLY",
-    val dayOfMonth: Int = 1,
-    val splitType: String = "ALL_FAMILY",
-    val memberIdsCsv: String = "",
-    val memberNamesDisplay: String = "Κοινό Οικογένειας",
-    val note: String = "",
-    val isActive: Boolean = true,
-    val lastGeneratedMonth: String = "",
-    val createdAt: Timestamp? = null
+    @DocumentId var id: String = "",
+    var householdId: String = "",
+    var userId: String = "",
+    var title: String = "",
+    var amount: Double = 0.0,
+    var categoryId: Long = 0L,
+    var categoryName: String = "",
+    var frequency: String = "MONTHLY",
+    var dayOfMonth: Int = 1,
+    var splitType: String = "ALL_FAMILY",
+    var memberIdsCsv: String = "",
+    var memberNamesDisplay: String = "Κοινό Οικογένειας",
+    var note: String = "",
+    var isActive: Boolean = true,
+    var lastGeneratedMonth: String = "",
+    var payerMemberId: Long = 0L,
+    var payerMemberName: String = "",
+    var payerMemberIdsCsv: String = "",
+    var payerAmountsCsv: String = "",
+    var createdAt: Timestamp? = null
 )

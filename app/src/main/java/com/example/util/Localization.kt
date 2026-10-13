@@ -6,7 +6,7 @@ import java.util.Locale
 
 /**
  * Localization helper providing instant, dynamic translations in Greek (EL) and English (EN)
- * across the entire OikoNomos application.
+ * across the entire Fintel application.
  */
 object Localization {
 
@@ -22,7 +22,7 @@ object Localization {
     }
 
     // App Branding & Navigation
-    fun appName(lang: Language) = "Estia"
+    fun appName(lang: Language) = "Fintel"
     fun appTagline(lang: Language) = if (lang == Language.ENGLISH) "Smart Expense Tracker" else "Έξυπνο Εξοδολόγιο"
 
     // Bottom Nav Tabs
@@ -127,13 +127,13 @@ object Localization {
 
     // Members Screen
     fun inviteMembersTitle(lang: Language) = if (lang == Language.ENGLISH) "Invite Users to Household" else "Πρόσκληση Χρηστών στο Εξοδολόγιο"
-    fun proPaidFeature(lang: Language) = if (lang == Language.ENGLISH) "🔒 Paid feature (Estia Pro)" else "🔒 Λειτουργία επί πληρωμή (Estia Pro)"
+    fun proPaidFeature(lang: Language) = if (lang == Language.ENGLISH) "🔒 Paid feature (Fintel Pro)" else "🔒 Λειτουργία επί πληρωμή (Fintel Pro)"
     fun proActiveLiveSync(lang: Language) = if (lang == Language.ENGLISH) "Pro Active: Real-time expense sharing" else "Pro Ενεργό: Μοιραστείτε τα έξοδα ζωντανά"
     fun inviteCardDesc(lang: Language) = if (lang == Language.ENGLISH)
         "Connect family, partner or roommates to the same household to view and log expenses in real-time."
     else
         "Συνδέστε την οικογένεια, τον/την σύντροφο ή συνεργάτες στο ίδιο εξοδολόγιο ώστε να βλέπουν και να καταχωρούν έξοδα σε πραγματικό χρόνο."
-    fun upgradeToProToInvite(lang: Language) = if (lang == Language.ENGLISH) "★ Upgrade to Pro to Invite" else "★ Αναβάθμιση σε Pro για Πρόσκληση"
+    fun upgradeToProToInvite(lang: Language) = if (lang == Language.ENGLISH) "Upgrade to Pro to Invite" else "Αναβάθμιση σε Pro για Πρόσκληση"
     fun inviteMemberToHousehold(lang: Language) = if (lang == Language.ENGLISH) "Invite Member to Household" else "Πρόσκληση Μέλους στο Εξοδολόγιο"
     fun familyMembersHeader(lang: Language) = if (lang == Language.ENGLISH) "Family Members" else "Μέλη Οικογένειας"
     fun activeMembersCount(lang: Language, count: Int) = if (lang == Language.ENGLISH) "$count active members" else "$count ενεργά μέλη"
@@ -217,7 +217,18 @@ object Localization {
     fun expenseDescLabel(lang: Language) = if (lang == Language.ENGLISH) "Description" else "Περιγραφή εξόδου"
     fun expenseDescPlaceholder(lang: Language) = if (lang == Language.ENGLISH) "e.g. Sklavenitis, Pharmacy, Coffee" else "π.χ. Σκλαβενίτης, Φαρμακείο, Καφές"
     fun expenseAmountLabel(lang: Language) = if (lang == Language.ENGLISH) "Amount (€)" else "Ποσό (€)"
-    fun memberWhoPaid(lang: Language) = if (lang == Language.ENGLISH) "Member who paid" else "Μέλος που πλήρωσε"
+    fun memberWhoPaid(lang: Language) = if (lang == Language.ENGLISH) "Payer" else "Πληρωτής"
+    fun payersSectionTitle(lang: Language) = if (lang == Language.ENGLISH) "Who paid?" else "Ποιος πλήρωσε;"
+    fun payersSubtitle(lang: Language) = if (lang == Language.ENGLISH) "Select one or more members who contributed" else "Επιλέξτε ένα ή περισσότερα μέλη που συνεισέφεραν"
+    fun payerSplitModeEqual(lang: Language) = if (lang == Language.ENGLISH) "Equal split" else "Ισόποσα"
+    fun payerSplitModeCustom(lang: Language) = if (lang == Language.ENGLISH) "Custom amounts" else "Προσαρμοσμένα ποσά"
+    fun payerAllocationTitle(lang: Language, count: Int) = if (lang == Language.ENGLISH) "Payment split" else "Επιμερισμός πληρωμής"
+    fun payerFullyCovered(lang: Language) = if (lang == Language.ENGLISH) "Fully covered ✓" else "Πλήρης κάλυψη ✓"
+    fun payerRemaining(lang: Language, amount: String) = if (lang == Language.ENGLISH) "Remaining: $amount" else "Απομένουν: $amount"
+    fun payerExceeded(lang: Language, amount: String) = if (lang == Language.ENGLISH) "Exceeded: +$amount" else "Υπέρβαση: +$amount"
+    fun payerQuickBalance(lang: Language, name: String, amount: String) = if (lang == Language.ENGLISH) "Fill remainder to $name (+$amount)" else "Συμπλήρωση σε $name (+$amount)"
+    fun paidSingle(lang: Language) = if (lang == Language.ENGLISH) "Paid:" else "Πλήρωσε:"
+    fun paidMultiple(lang: Language) = if (lang == Language.ENGLISH) "Paid by:" else "Πλήρωσαν:"
     fun noMembersExpenseHint(lang: Language) = if (lang == Language.ENGLISH) "No members registered. The expense will be logged as Common." else "Δεν έχουν καταχωρηθεί μέλη. Το έξοδο θα καταχωρηθεί ως Κοινό."
     fun categoryLabel(lang: Language) = if (lang == Language.ENGLISH) "Category" else "Κατηγορία"
     fun date(lang: Language) = if (lang == Language.ENGLISH) "Date" else "Ημερομηνία"
@@ -282,12 +293,11 @@ object Localization {
 
     // User Profile Dialog
     fun myProfile(lang: Language) = if (lang == Language.ENGLISH) "My Profile" else "Το Προφίλ μου"
-    fun oikonomosUser(lang: Language) = if (lang == Language.ENGLISH) "Estia User" else "Χρήστης Estia"
-    fun estiaUser(lang: Language) = if (lang == Language.ENGLISH) "Estia User" else "Χρήστης Estia"
+    fun fintelUser(lang: Language) = if (lang == Language.ENGLISH) "Fintel User" else "Χρήστης Fintel"
     fun freePlan(lang: Language) = if (lang == Language.ENGLISH) "Free Plan" else "Δωρεάν Πλάνο"
     fun proSubscriber(lang: Language) = if (lang == Language.ENGLISH) "Pro Subscriber" else "Συνδρομητής Pro"
     fun activeHouseholdCount(lang: Language, count: Int) = if (lang == Language.ENGLISH) "$count active household" else "$count ενεργό εξοδολόγιο"
-    fun upgradeToPro(lang: Language) = if (lang == Language.ENGLISH) "★ Upgrade to Pro" else "★ Αναβάθμιση σε Pro"
+    fun upgradeToPro(lang: Language) = if (lang == Language.ENGLISH) "Upgrade to Pro" else "Αναβάθμιση σε Pro"
     fun transactionsLabel(lang: Language) = if (lang == Language.ENGLISH) "Transactions" else "Συναλλαγές"
     fun totalExpensesLabel(lang: Language) = if (lang == Language.ENGLISH) "Total Expenses" else "Σύνολο Εξόδων"
     fun signOutAccount(lang: Language) = if (lang == Language.ENGLISH) "Sign Out Account" else "Αποσύνδεση Λογαριασμού"
@@ -337,10 +347,38 @@ object Localization {
             "γονέας", "γονεας" -> "Parent"
             "παιδί", "παιδι" -> "Child"
             "σύντροφος", "συντροφος" -> "Partner"
+            "συγκάτοικος", "συγκατοικος" -> "Roommate"
+            "συνεργάτης", "συνεργατης" -> "Associate"
+            "φίλος / φίλη", "φιλος / φιλη", "φίλος", "φιλος", "φίλη", "φιλη" -> "Friend"
             "άλλο", "αλλο" -> "Other"
             "διαχειριστής", "διαχειριστης", "admin" -> "Admin"
             "μέλος", "μελος", "member" -> "Member"
             else -> role
+        }
+    }
+
+    fun pluralRoleName(role: String, lang: Language): String {
+        val r = role.trim().lowercase()
+        return if (lang == Language.ENGLISH) {
+            when {
+                r.contains("γον") || r.contains("parent") -> "Parents"
+                r.contains("παιδ") || r.contains("child") || r.contains("kid") -> "Children"
+                r.contains("συγκάτοικ") || r.contains("συγκατοικ") || r.contains("roommate") -> "Roommates"
+                r.contains("συνεργάτ") || r.contains("συνεργατ") || r.contains("partner") || r.contains("associate") -> "Partners"
+                r.contains("σύντροφ") || r.contains("συντροφ") -> "Partners"
+                r.contains("φίλ") || r.contains("φιλ") || r.contains("friend") -> "Friends"
+                else -> role
+            }
+        } else {
+            when {
+                r.contains("γον") || r.contains("parent") -> "Γονείς"
+                r.contains("παιδ") || r.contains("child") || r.contains("kid") -> "Παιδιά"
+                r.contains("συγκάτοικ") || r.contains("συγκατοικ") || r.contains("roommate") -> "Συγκάτοικοι"
+                r.contains("συνεργάτ") || r.contains("συνεργατ") || r.contains("partner") || r.contains("associate") -> "Συνεργάτες"
+                r.contains("σύντροφ") || r.contains("συντροφ") -> "Σύντροφοι"
+                r.contains("φίλ") || r.contains("φιλ") || r.contains("friend") -> "Φίλοι"
+                else -> role
+            }
         }
     }
 
@@ -416,7 +454,12 @@ object Localization {
     fun categoriesCount(count: Int, lang: Language) = if (lang == Language.ENGLISH) "$count categories" else "$count κατηγορίες"
     fun exceededBudget(lang: Language) = if (lang == Language.ENGLISH) "Exceeded" else "Υπέρβαση"
     fun warningBudget(lang: Language) = if (lang == Language.ENGLISH) "Warning" else "Προσοχή"
+    fun atBudget(lang: Language) = if (lang == Language.ENGLISH) "At budget limit (100%)" else "Στο όριο (100%)"
     fun withinLimit(lang: Language) = if (lang == Language.ENGLISH) "Within limit" else "Εντός ορίου"
+    fun memberIncomeDeficitTitle(lang: Language) = if (lang == Language.ENGLISH) "Expenses Exceeded Declared Income" else "Υπέρβαση Εσόδων Μέλους"
+    fun memberIncomeDeficitDesc(lang: Language) = if (lang == Language.ENGLISH) "Member has paid more in expenses than their declared income for this period." else "Το μέλος έχει πληρώσει περισσότερα έξοδα από όσα έχει δηλώσει ως έσοδα για το επιλεγμένο διάστημα."
+    fun deficitLabel(lang: Language) = if (lang == Language.ENGLISH) "Deficit" else "Έλλειμμα"
+    fun expensesExceedIncomeTag(lang: Language) = if (lang == Language.ENGLISH) "Expenses > Income" else "Έξοδα > Έσοδα"
     fun barChartView(lang: Language) = if (lang == Language.ENGLISH) "Bar Chart View" else "Προβολή Μπάρας"
     fun pieChartView(lang: Language) = if (lang == Language.ENGLISH) "Pie Chart View" else "Προβολή Πίτας"
     fun noExpensesRegistered(lang: Language) = if (lang == Language.ENGLISH) "No expenses registered" else "Δεν υπάρχουν καταχωρημένα έξοδα"

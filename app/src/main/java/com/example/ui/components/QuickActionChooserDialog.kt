@@ -73,7 +73,7 @@ fun QuickActionChooserDialog(
                 ) {
                     Column {
                         Text(
-                            text = "Estia",
+                            text = "Fintel",
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface

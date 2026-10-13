@@ -174,7 +174,7 @@ fun AuthScreen(
             Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = "Estia",
+                text = "Fintel",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color(0xFF157347)
@@ -328,7 +328,31 @@ fun AuthScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(18.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            if (resetMethod == ResetMethod.EMAIL) {
+                                OutlinedButton(
+                                    onClick = {
+                                        resetSuccessMessage = null
+                                        errorMessage = null
+                                        resetMethod = ResetMethod.PHONE_SMS
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(44.dp)
+                                ) {
+                                    Icon(Icons.Default.Phone, contentDescription = null, tint = Emerald700, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Try Mobile (SMS) 6-digit Code" else "Δοκιμή με 6ψήφιο Κωδικό SMS",
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Emerald700
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
 
                             Button(
                                 onClick = {
@@ -413,9 +437,9 @@ fun AuthScreen(
                                         email = email,
                                         onSuccess = {
                                             resetSuccessMessage = if (lang == Localization.Language.ENGLISH)
-                                                "A password reset link has been sent to $email. Please check your inbox and spam folder."
+                                                "A password reset link has been dispatched to $email.\n\n⚠️ IMPORTANT:\n• Check both your Inbox and Spam / Junk folders.\n• Check the Promotions tab if using Gmail.\n• If not received, you can also use the Mobile (SMS) recovery option."
                                             else
-                                                "Στάλθηκε σύνδεσμος επαναφοράς στο $email. Ελέγξτε τα εισερχόμενά σας και τα spam."
+                                                "Στάλθηκε σύνδεσμος επαναφοράς στο $email.\n\n⚠️ ΣΗΜΑΝΤΙΚΟ:\n• Ελέγξτε οπωσδήποτε τον φάκελο Ανεπιθύμητα (Spam / Junk).\n• Ελέγξτε την καρτέλα «Προσφορές» (Promotions) στο Gmail.\n• Αν δεν το βρίσκετε, μπορείτε να χρησιμοποιήσετε την επαναφορά μέσω Κινητού (SMS) παραπάνω!"
                                         },
                                         onError = { errorMessage = it }
                                     )
@@ -1232,9 +1256,16 @@ fun AuthScreen(
     if (showDatePickerDialog) {
         val calendar = Calendar.getInstance()
         val currentYear = calendar.get(Calendar.YEAR)
-        var selectedDay by remember { mutableStateOf(1) }
-        var selectedMonth by remember { mutableStateOf(1) } // 1-12
-        var selectedYear by remember { mutableStateOf(1995) }
+        val birthParts = birthDate.split("/").map { it.trim() }
+        var dayText by remember(showDatePickerDialog) {
+            mutableStateOf(if (birthParts.isNotEmpty() && birthParts[0].isNotBlank()) birthParts[0] else "")
+        }
+        var monthText by remember(showDatePickerDialog) {
+            mutableStateOf(if (birthParts.size > 1 && birthParts[1].isNotBlank()) birthParts[1] else "")
+        }
+        var yearText by remember(showDatePickerDialog) {
+            mutableStateOf(if (birthParts.size > 2 && birthParts[2].isNotBlank()) birthParts[2] else "")
+        }
 
         Dialog(
             onDismissRequest = { showDatePickerDialog = false },
@@ -1282,13 +1313,12 @@ fun AuthScreen(
                     ) {
                         // Day Input
                         OutlinedTextField(
-                            value = if (selectedDay > 0) selectedDay.toString() else "",
-                            onValueChange = {
-                                val d = it.filter { ch -> ch.isDigit() }.take(2).toIntOrNull() ?: 1
-                                selectedDay = d.coerceIn(1, 31)
+                            value = dayText,
+                            onValueChange = { input ->
+                                dayText = input.filter { ch -> ch.isDigit() }.take(2)
                             },
                             label = { Text("Ημέρα") },
-                            placeholder = { Text("1-31") },
+                            placeholder = { Text("ΗΗ") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             shape = RoundedCornerShape(12.dp),
@@ -1297,13 +1327,12 @@ fun AuthScreen(
 
                         // Month Input
                         OutlinedTextField(
-                            value = if (selectedMonth > 0) selectedMonth.toString() else "",
-                            onValueChange = {
-                                val m = it.filter { ch -> ch.isDigit() }.take(2).toIntOrNull() ?: 1
-                                selectedMonth = m.coerceIn(1, 12)
+                            value = monthText,
+                            onValueChange = { input ->
+                                monthText = input.filter { ch -> ch.isDigit() }.take(2)
                             },
                             label = { Text("Μήνας") },
-                            placeholder = { Text("1-12") },
+                            placeholder = { Text("ΜΜ") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             shape = RoundedCornerShape(12.dp),
@@ -1312,13 +1341,12 @@ fun AuthScreen(
 
                         // Year Input
                         OutlinedTextField(
-                            value = if (selectedYear > 0) selectedYear.toString() else "",
-                            onValueChange = {
-                                val y = it.filter { ch -> ch.isDigit() }.take(4).toIntOrNull() ?: 1995
-                                selectedYear = y.coerceIn(1920, currentYear)
+                            value = yearText,
+                            onValueChange = { input ->
+                                yearText = input.filter { ch -> ch.isDigit() }.take(4)
                             },
                             label = { Text("Έτος") },
-                            placeholder = { Text("1995") },
+                            placeholder = { Text("ΕΕΕΕ") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             shape = RoundedCornerShape(12.dp),
@@ -1338,9 +1366,12 @@ fun AuthScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
-                                val dayStr = selectedDay.toString().padStart(2, '0')
-                                val monthStr = selectedMonth.toString().padStart(2, '0')
-                                birthDate = "$dayStr/$monthStr/$selectedYear"
+                                val d = dayText.toIntOrNull()?.coerceIn(1, 31) ?: 1
+                                val m = monthText.toIntOrNull()?.coerceIn(1, 12) ?: 1
+                                val y = yearText.toIntOrNull()?.coerceIn(1920, currentYear) ?: 1995
+                                val dayStr = d.toString().padStart(2, '0')
+                                val monthStr = m.toString().padStart(2, '0')
+                                birthDate = "$dayStr/$monthStr/$y"
                                 showDatePickerDialog = false
                             },
                             shape = RoundedCornerShape(12.dp),

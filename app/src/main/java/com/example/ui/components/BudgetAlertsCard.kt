@@ -49,8 +49,9 @@ data class CategoryBudgetStatus(
     val spent: Double,
     val budget: Double,
     val percentage: Float,
-    val isExceeded: Boolean,
-    val isWarning: Boolean
+    val isExact: Boolean = false,
+    val isExceeded: Boolean = false,
+    val isWarning: Boolean = false
 )
 
 @Composable
@@ -78,13 +79,17 @@ fun BudgetAlertsCard(
             val spent = currentMonthExpenses.filter { it.categoryId == cat.id }.sumOf { it.amount }
             val budget = cat.monthlyBudget
             val percentage = (spent / budget).toFloat()
+            val isExact = Math.abs(spent - budget) < 0.05 || (percentage >= 0.999f && percentage <= 1.001f)
+            val isExceeded = spent > budget + 0.05
+            val isWarning = !isExact && !isExceeded && percentage >= 0.80f
             CategoryBudgetStatus(
                 category = cat,
                 spent = spent,
                 budget = budget,
                 percentage = percentage,
-                isExceeded = percentage >= 1.0f,
-                isWarning = percentage in 0.80f..0.999f
+                isExact = isExact,
+                isExceeded = isExceeded,
+                isWarning = isWarning
             )
         }.sortedByDescending { it.percentage }
     }
@@ -188,6 +193,7 @@ fun BudgetAlertsCard(
             budgetStatuses.take(4).forEach { status ->
                 val progressClamped = status.percentage.coerceIn(0f, 1f)
                 val barColor = when {
+                    status.isExact -> Color(0xFF2563EB)
                     status.isExceeded -> Color(0xFFEF4444)
                     status.isWarning -> Color(0xFFF59E0B)
                     else -> Emerald700

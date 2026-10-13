@@ -5,46 +5,30 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- House Roof -->
+    <!-- House Outline: Scaled to 66dp safe zone (scale = 0.66, offset = 21dp) -->
     <path
-        android:pathData="M20.59,51.84 L54.00,21.74 L87.41,51.84"
-        android:strokeWidth="4.2"
+        android:pathData="M 54.0,25.95 L 23.97,51.69 L 28.92,51.69 L 28.92,74.46 Q 28.92,81.72 36.18,81.72 L 71.82,81.72 Q 79.08,81.72 79.08,74.46 L 79.08,51.69 L 84.03,51.69 Z"
+        android:strokeWidth="3.43"
         android:strokeColor="#157347"
-        android:strokeLineCap="square"
-        android:strokeLineJoin="miter"
-        android:fillColor="#00000000" />
-
-    <!-- Left Wall -->
-    <path
-        android:pathData="M26.28,46.51 L26.28,85.54"
-        android:strokeWidth="4.2"
-        android:strokeColor="#157347"
-        android:strokeLineCap="square"
-        android:fillColor="#00000000" />
-
-    <!-- Right Wall -->
-    <path
-        android:pathData="M81.72,46.51 L81.72,85.54"
-        android:strokeWidth="4.2"
-        android:strokeColor="#157347"
-        android:strokeLineCap="square"
-        android:fillColor="#00000000" />
-
-    <!-- Special Interlocking Infinity Symbol - Left Loop and Lower Diagonal -->
-    <path
-        android:pathData="M51.84,57.24 C49.68,54.72 46.44,53.42 42.84,53.42 C36.58,53.42 31.54,58.54 31.54,64.80 C31.54,71.06 36.58,76.18 42.84,76.18 C46.08,76.18 48.96,74.88 51.12,72.86 L60.84,64.80"
-        android:strokeWidth="4.2"
-        android:strokeColor="#157347"
-        android:strokeLineCap="square"
+        android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000" />
 
-    <!-- Special Interlocking Infinity Symbol - Right Loop and Upper Diagonal (180-deg rotated) -->
+    <!-- Infinity Symbol: Left piece -->
     <path
-        android:pathData="M47.16,64.80 L56.88,56.74 C59.04,54.72 61.92,53.42 65.16,53.42 C71.42,53.42 76.46,58.54 76.46,64.80 C76.46,71.06 71.42,76.18 65.16,76.18 C61.56,76.18 58.32,74.88 56.16,72.36"
-        android:strokeWidth="4.2"
+        android:pathData="M 52.02,55.98 C 48.06,53.14 43.44,53.14 39.48,54.13 C 33.67,55.98 33.67,62.91 33.67,62.91 C 33.67,69.18 38.16,72.68 43.44,72.68 C 47.73,72.68 51.69,70.17 54.0,66.87 L 59.28,61.92"
+        android:strokeWidth="3.43"
         android:strokeColor="#157347"
-        android:strokeLineCap="square"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+
+    <!-- Infinity Symbol: Right piece (180-deg symmetric) -->
+    <path
+        android:pathData="M 55.98,69.84 C 59.94,72.68 64.56,72.68 68.52,71.69 C 74.33,69.84 74.33,62.91 74.33,62.91 C 74.33,56.64 69.84,53.14 64.56,53.14 C 60.27,53.14 56.31,55.65 54.0,58.95 L 48.72,63.9"
+        android:strokeWidth="3.43"
+        android:strokeColor="#157347"
+        android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="#00000000" />
 

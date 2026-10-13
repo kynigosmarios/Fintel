@@ -46,6 +46,7 @@ import com.example.ui.viewmodel.OikoNomosViewModel
 class MainActivity : ComponentActivity() {
 
     private val viewModel: OikoNomosViewModel by viewModels()
+    private lateinit var billingManager: com.example.billing.BillingManager
 
     companion object {
         const val EXTRA_QUICK_ACTION = "EXTRA_QUICK_ACTION"
@@ -56,6 +57,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        billingManager = com.example.billing.BillingManager(applicationContext) { isPro ->
+            if (isPro) {
+                viewModel.activateProFromBilling()
+            }
+        }
+        billingManager.startConnection()
         handleIntent(intent)
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -67,6 +74,31 @@ class MainActivity : ComponentActivity() {
                 "DARK" -> true
                 "LIGHT" -> false
                 else -> isSystemInDarkTheme()
+            }
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                val notifLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    if (isGranted) {
+                        com.example.reminder.DailyReminderManager.createNotificationChannel(applicationContext)
+                        if (com.example.reminder.DailyReminderManager.isReminderEnabled(applicationContext)) {
+                            val h = com.example.reminder.DailyReminderManager.getReminderHour(applicationContext)
+                            val m = com.example.reminder.DailyReminderManager.getReminderMinute(applicationContext)
+                            com.example.reminder.DailyReminderManager.scheduleDailyReminder(applicationContext, h, m)
+                        }
+                    }
+                }
+
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    if (androidx.core.content.ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            android.Manifest.permission.POST_NOTIFICATIONS
+                        ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notifLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
             }
 
             val view = LocalView.current
@@ -86,11 +118,21 @@ class MainActivity : ComponentActivity() {
                     } else if (!isUserVerified) {
                         EmailVerificationScreen(user = currentUser!!, viewModel = viewModel)
                     } else {
-                        MainScreen(viewModel = viewModel)
+                        MainScreen(
+                            viewModel = viewModel,
+                            onLaunchBilling = { activity ->
+                                billingManager.launchPurchaseFlow(activity, com.example.billing.BillingManager.SUB_MONTHLY)
+                            }
+                        )
                     }
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        billingManager.endConnection()
     }
 
     override fun onResume() {
@@ -129,12 +171,12 @@ private fun SplashScreen() {
         ) {
             Image(
                 painter = painterResource(id = R.drawable.ic_oikonomos_logo_white),
-                contentDescription = "Estia",
+                contentDescription = "Fintel",
                 modifier = Modifier.size(72.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Estia",
+                text = "Fintel",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
