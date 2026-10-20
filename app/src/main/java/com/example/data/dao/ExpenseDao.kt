@@ -54,9 +54,10 @@ interface ExpenseDao {
 
     @Transaction
     suspend fun replaceAllExpensesTransaction(expenses: List<Expense>) {
-        if (expenses.isEmpty()) return
         deleteAllExpenses()
-        insertExpenses(expenses)
+        if (expenses.isNotEmpty()) {
+            insertExpenses(expenses)
+        }
     }
 
     @Delete
@@ -98,9 +99,10 @@ interface ExpenseDao {
 
     @Transaction
     suspend fun replaceAllMembersTransaction(members: List<FamilyMember>) {
-        if (members.isEmpty()) return
         deleteAllMembers()
-        insertMembers(members)
+        if (members.isNotEmpty()) {
+            insertMembers(members)
+        }
     }
 
     // Categories
@@ -130,9 +132,10 @@ interface ExpenseDao {
 
     @Transaction
     suspend fun replaceAllCategoriesTransaction(categories: List<ExpenseCategory>) {
-        if (categories.isEmpty()) return
         deleteAllCategories()
-        insertCategories(categories)
+        if (categories.isNotEmpty()) {
+            insertCategories(categories)
+        }
     }
 
     // Recurring Expenses
@@ -153,6 +156,14 @@ interface ExpenseDao {
 
     @Query("DELETE FROM recurring_expenses")
     suspend fun deleteAllRecurringExpenses()
+
+    @Transaction
+    suspend fun replaceAllRecurringExpensesTransaction(recurringList: List<RecurringExpense>) {
+        deleteAllRecurringExpenses()
+        if (recurringList.isNotEmpty()) {
+            insertRecurringExpenses(recurringList)
+        }
+    }
 
     @Query("SELECT COUNT(*) FROM recurring_expenses")
     suspend fun getRecurringCount(): Int
@@ -175,6 +186,14 @@ interface ExpenseDao {
 
     @Query("DELETE FROM savings_goals")
     suspend fun deleteAllSavingsGoals()
+
+    @Transaction
+    suspend fun replaceAllSavingsGoalsTransaction(goals: List<SavingsGoal>) {
+        deleteAllSavingsGoals()
+        if (goals.isNotEmpty()) {
+            insertSavingsGoals(goals)
+        }
+    }
 
     @Query("SELECT COUNT(*) FROM savings_goals")
     suspend fun getSavingsGoalCount(): Int
@@ -200,6 +219,14 @@ interface ExpenseDao {
 
     @Query("DELETE FROM incomes")
     suspend fun deleteAllIncomes()
+
+    @Transaction
+    suspend fun replaceAllIncomesTransaction(incomes: List<Income>) {
+        deleteAllIncomes()
+        if (incomes.isNotEmpty()) {
+            insertIncomes(incomes)
+        }
+    }
 
     // Safety & Bi-directional Sync One-shot Getters
     @Query("SELECT * FROM expense_categories ORDER BY sortOrder ASC, id ASC")

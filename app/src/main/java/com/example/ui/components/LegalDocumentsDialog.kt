@@ -207,72 +207,7 @@ fun LegalDocumentsDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Cloud Link Banner for Google Play Console
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Emerald700.copy(alpha = 0.08f),
-                    border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.25f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH) "Cloud Web Link (Google Play Console):" else "Cloud Σελίδα (Google Play Console):",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Emerald700
-                            )
-                            Text(
-                                text = currentCloudUrl,
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Emerald700,
-                            modifier = Modifier
-                                .clickable {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("Legal URL", currentCloudUrl)
-                                    clipboard.setPrimaryClip(clip)
-                                    Toast.makeText(
-                                        context,
-                                        if (lang == Localization.Language.ENGLISH) "Link copied to clipboard!" else "Το link αντιγράφηκε!",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                                .padding(start = 8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = "Copy Link",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (lang == Localization.Language.ENGLISH) "Copy" else "Αντιγραφή",
-                                    fontSize = 10.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Spacer(modifier = Modifier.height(10.dp))
 

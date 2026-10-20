@@ -2,17 +2,23 @@ package com.example.data.model
 
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.IgnoreExtraProperties
+import com.google.firebase.firestore.PropertyName
 
+@IgnoreExtraProperties
 data class Household(
     @DocumentId var id: String = "",
     var name: String = "Το Εξοδολόγιό μου",
     var ownerId: String = "",
     var inviteCode: String = "",
     var memberUids: List<String> = emptyList(),
-    var isPremium: Boolean = false,
-    var createdAt: Timestamp? = null
+    var invitedEmails: List<String> = emptyList(),
+    @set:PropertyName("isPremium") @get:PropertyName("isPremium") var isPremium: Boolean = false,
+    var createdAt: Timestamp? = null,
+    var updatedAt: Timestamp? = null
 )
 
+@IgnoreExtraProperties
 data class FirebaseExpense(
     @DocumentId var id: String = "",
     var householdId: String = "",
@@ -34,6 +40,7 @@ data class FirebaseExpense(
     var createdAt: Timestamp? = null
 )
 
+@IgnoreExtraProperties
 data class UserProfile(
     @DocumentId var uid: String = "",
     var email: String = "",
@@ -46,12 +53,14 @@ data class UserProfile(
     var city: String = "",
     var householdId: String = "",
     var householdIds: List<String> = emptyList(),
-    var isPremium: Boolean = false,
+    @set:PropertyName("isPremium") @get:PropertyName("isPremium") var isPremium: Boolean = false,
     var photoUrl: String = "",
     var authProvider: String = "password", // "password" or "google"
-    var createdAt: Timestamp? = null
+    var createdAt: Timestamp? = null,
+    var updatedAt: Timestamp? = null
 )
 
+@IgnoreExtraProperties
 data class FirebaseIncome(
     @DocumentId var id: String = "",
     var householdId: String = "",
@@ -67,6 +76,7 @@ data class FirebaseIncome(
     var createdAt: Timestamp? = null
 )
 
+@IgnoreExtraProperties
 data class FirebaseMember(
     @DocumentId var id: String = "",
     var householdId: String = "",
@@ -75,11 +85,18 @@ data class FirebaseMember(
     var role: String = "Γονέας",
     var avatarColorHex: Long = 0xFF059669,
     var voiceKeywords: String = "",
-    var isDefault: Boolean = false,
+    @set:PropertyName("isDefault") @get:PropertyName("isDefault") var isDefault: Boolean = false,
     var sortOrder: Int = 0,
     var createdAt: Timestamp? = null
-)
+) {
+    @PropertyName("default")
+    fun getLegacyDefault(): Boolean = isDefault
 
+    @PropertyName("default")
+    fun setLegacyDefault(value: Boolean) { isDefault = value }
+}
+
+@IgnoreExtraProperties
 data class FirebaseCategory(
     @DocumentId var id: String = "",
     var householdId: String = "",
@@ -94,6 +111,7 @@ data class FirebaseCategory(
     var createdAt: Timestamp? = null
 )
 
+@IgnoreExtraProperties
 data class FirebaseSavingsGoal(
     @DocumentId var id: String = "",
     var householdId: String = "",
@@ -108,6 +126,7 @@ data class FirebaseSavingsGoal(
     var createdAt: Timestamp? = null
 )
 
+@IgnoreExtraProperties
 data class FirebaseRecurringExpense(
     @DocumentId var id: String = "",
     var householdId: String = "",
@@ -122,11 +141,17 @@ data class FirebaseRecurringExpense(
     var memberIdsCsv: String = "",
     var memberNamesDisplay: String = "Κοινό Οικογένειας",
     var note: String = "",
-    var isActive: Boolean = true,
+    @set:PropertyName("isActive") @get:PropertyName("isActive") var isActive: Boolean = true,
     var lastGeneratedMonth: String = "",
     var payerMemberId: Long = 0L,
     var payerMemberName: String = "",
     var payerMemberIdsCsv: String = "",
     var payerAmountsCsv: String = "",
     var createdAt: Timestamp? = null
-)
+) {
+    @PropertyName("active")
+    fun getLegacyActive(): Boolean = isActive
+
+    @PropertyName("active")
+    fun setLegacyActive(value: Boolean) { isActive = value }
+}

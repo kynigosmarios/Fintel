@@ -83,181 +83,97 @@ fun OnboardingCarouselDialog(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(pageCount = { 6 })
+    val pagerState = rememberPagerState(pageCount = { 3 })
     val isEnglish = appLanguage.equals("EN", ignoreCase = true)
 
     val steps = if (isEnglish) {
         listOf(
             OnboardingStep(
                 stepNumber = 1,
-                title = "Your Household is Ready",
-                subtitle = "Your smart household was created automatically and synced with the cloud. All data is securely stored and available across devices.",
-                icon = Icons.Default.Home,
+                title = "Voice Logging",
+                subtitle = "Tap the mic and say: \"Coffee 3.50\". Amount & category are recognized instantly.",
+                icon = Icons.Default.Mic,
                 gradientColors = listOf(Color(0xFF059669), Color(0xFF10B981)),
                 highlights = listOf(
-                    "Automatic secure cloud backup",
-                    "Fresh start with clean data",
-                    "Seamless multi-device access"
+                    "Voice recognition in English & Greek",
+                    "Instant category & amount detection",
+                    "Fast entry without typing"
                 ),
-                badgeLabel = "Step 1: Household",
-                statusPill = "✓ Cloud Storage Active"
+                badgeLabel = "1/3: Voice",
+                statusPill = "✓ Fast Voice Logging"
             ),
             OnboardingStep(
                 stepNumber = 2,
-                title = "Set Up Your Expense Categories",
-                subtitle = "Create your own expense categories (e.g. Supermarket, Dining, Bills) with monthly budgets, custom colors and icons.",
-                icon = Icons.Default.Category,
-                gradientColors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8)),
-                highlights = listOf(
-                    "Monthly budget target per category",
-                    "Custom color & icon selection",
-                    "Voice keywords for fast logging"
-                ),
-                badgeLabel = "Step 2: Categories",
-                statusPill = "✓ Categories Setup"
-            ),
-            OnboardingStep(
-                stepNumber = 3,
-                title = "Add Household Members",
-                subtitle = "Add family or roommates to track who paid each expense and easily split amounts equally or by custom shares.",
+                title = "Household Profile",
+                subtitle = "Designed for singles, couples, flatmates, or families.",
                 icon = Icons.Default.Group,
                 gradientColors = listOf(Color(0xFF7C3AED), Color(0xFFA78BFA)),
                 highlights = listOf(
-                    "Add members with names & roles",
-                    "Color-coded avatars for quick ID",
-                    "Split: All family or custom members"
+                    "Single role for solo tracking",
+                    "Fair split for couples & roommates",
+                    "Parent & children tracking for families"
                 ),
-                badgeLabel = "Step 3: Members",
-                statusPill = "✓ Members Management"
+                badgeLabel = "2/3: Profile",
+                statusPill = "✓ Built for Everyone"
             ),
             OnboardingStep(
-                stepNumber = 4,
-                title = "Log Expenses with Voice or Text",
-                subtitle = "Record expenses in seconds! Use the '+' button or tap the microphone to dictate expenses naturally.",
-                icon = Icons.Default.Mic,
-                gradientColors = listOf(Color(0xFFD97706), Color(0xFFFBBF24)),
-                highlights = listOf(
-                    "Instant voice & text recognition",
-                    "Automatic category & member tagging",
-                    "Fast manual and receipt entry"
-                ),
-                badgeLabel = "Step 4: Transactions",
-                statusPill = "✓ Voice & Text Ready"
-            ),
-            OnboardingStep(
-                stepNumber = 5,
-                title = "Track Visual Analytics & Budgets",
-                subtitle = "Gain total financial control with category breakdown charts, member distributions, and monthly budget alerts.",
+                stepNumber = 3,
+                title = "Smart Stats & Cloud",
+                subtitle = "Real-time sync across devices and a reminder at 22:00.",
                 icon = Icons.Default.PieChart,
-                gradientColors = listOf(Color(0xFF2563EB), Color(0xFF60A5FA)),
+                gradientColors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8)),
                 highlights = listOf(
-                    "Interactive expense charts & shares",
-                    "Monthly budget overrun alerts",
-                    "Income vs expense balance checks"
+                    "Real-time cloud sync on all devices",
+                    "Monthly balance & daily average",
+                    "Gentle reminder at 22:00"
                 ),
-                badgeLabel = "Step 5: Analytics",
-                statusPill = "✓ Visual Analytics Active"
-            ),
-            OnboardingStep(
-                stepNumber = 6,
-                title = "Upgrade to Pro for Full Sharing",
-                subtitle = "Unlock Pro to collaborate in real time with your family across devices, manage multiple households, and export Excel.",
-                icon = Icons.Default.Star,
-                gradientColors = listOf(Color(0xFFB45309), Color(0xFFF59E0B)),
-                highlights = listOf(
-                    "Real-time multi-device sync via code",
-                    "Manage multiple separate households",
-                    "Detailed Excel / CSV export reports"
-                ),
-                badgeLabel = "Step 6: Pro Features",
-                statusPill = "★ Fintel Pro Collaboration"
+                badgeLabel = "3/3: Stats & Sync",
+                statusPill = "✓ Live Cloud Sync"
             )
         )
     } else {
         listOf(
             OnboardingStep(
                 stepNumber = 1,
-                title = "Δημιουργήθηκε το εξοδολόγιό σας",
-                subtitle = "Το οικιακό σας εξοδολόγιο δημιουργήθηκε αυτόματα και είναι συνδεδεμένο με το cloud. Όλα τα δεδομένα σας παραμένουν ασφαλή.",
-                icon = Icons.Default.Home,
+                title = "Φωνητική Καταγραφή",
+                subtitle = "Πατήστε το μικρόφωνο και πείτε: «Σούπερ μάρκετ 45€». Αναγνωρίζεται αυτόματα.",
+                icon = Icons.Default.Mic,
                 gradientColors = listOf(Color(0xFF059669), Color(0xFF10B981)),
                 highlights = listOf(
-                    "Αυτόματη ασφαλής αποθήκευση στο Cloud",
-                    "Καθαρή έναρξη χωρίς παλιά δεδομένα",
-                    "Άμεση πρόσβαση από κάθε συσκευή"
+                    "Φωνητική καταγραφή στα ελληνικά",
+                    "Αυτόματη κατηγορία & ποσό",
+                    "Άμεση καταχώρηση χωρίς πληκτρολόγηση"
                 ),
-                badgeLabel = "Βήμα 1: Εξοδολόγιο",
-                statusPill = "✓ Ασφαλής Σύνδεση Cloud"
+                badgeLabel = "1/3: Φωνή",
+                statusPill = "✓ Φωνητική Καταγραφή"
             ),
             OnboardingStep(
                 stepNumber = 2,
-                title = "Καταχωρήστε τις κατηγορίες των εξόδων σας",
-                subtitle = "Ορίστε τις δικές σας κατηγορίες (π.χ. Σούπερ Μάρκετ, Φαγητό, Λογαριασμοί) με μηνιαίο προϋπολογισμό, χρώματα και εικονίδια.",
-                icon = Icons.Default.Category,
-                gradientColors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8)),
-                highlights = listOf(
-                    "Μηνιαίος στόχος budget ανά κατηγορία",
-                    "Επιλογή χρώματος & εικονιδίου",
-                    "Λέξεις-κλειδιά για φωνητική καταγραφή"
-                ),
-                badgeLabel = "Βήμα 2: Κατηγορίες",
-                statusPill = "✓ Κατηγορίες Εξόδων"
-            ),
-            OnboardingStep(
-                stepNumber = 3,
-                title = "Καταχωρήστε τα μέλη του εξοδολογίου",
-                subtitle = "Προσθέστε τα μέλη της οικογένειας ή του σπιτιού σας ώστε να γνωρίζετε ποιος πλήρωσε και να μοιράζετε τα έξοδα.",
+                title = "Επιλογή Προφίλ",
+                subtitle = "Ιδανικό για μονοπρόσωπο σπίτι, ζευγάρια, συγκατοίκους ή οικογένειες.",
                 icon = Icons.Default.Group,
                 gradientColors = listOf(Color(0xFF7C3AED), Color(0xFFA78BFA)),
                 highlights = listOf(
-                    "Προσθήκη μελών με ονόματα & ρόλους",
-                    "Χρωματιστά avatars για γρήγορη αναγνώριση",
-                    "Διαχωρισμός: Κοινό ή συγκεκριμένα μέλη"
+                    "«Μονοπρόσωπο» για ατομική χρήση",
+                    "Διαμοιρασμός για ζευγάρια & συγκατοίκους",
+                    "Έξοδα γονέων & παιδιών για οικογένειες"
                 ),
-                badgeLabel = "Βήμα 3: Μέλη",
-                statusPill = "✓ Μέλη Οικογένειας"
+                badgeLabel = "2/3: Προφίλ",
+                statusPill = "✓ Προσαρμογή για Όλους"
             ),
             OnboardingStep(
-                stepNumber = 4,
-                title = "Καταχωρήστε έσοδα & έξοδα με φωνή ή γραπτώς",
-                subtitle = "Καταχωρήστε συναλλαγές σε δευτερόλεπτα! Χρησιμοποιήστε το κουμπί «+» ή πατήστε το μικρόφωνο για φωνητική εντολή.",
-                icon = Icons.Default.Mic,
-                gradientColors = listOf(Color(0xFFD97706), Color(0xFFFBBF24)),
-                highlights = listOf(
-                    "Έξυπνη ελληνική φωνητική αναγνώριση",
-                    "Αυτόματη ταξινόμηση σε κατηγορία & μέλος",
-                    "Γρήγορη χειροκίνητη πληκτρολόγηση"
-                ),
-                badgeLabel = "Βήμα 4: Συναλλαγές",
-                statusPill = "✓ Φωνητική & Χειροκίνητη Καταγραφή"
-            ),
-            OnboardingStep(
-                stepNumber = 5,
-                title = "Παρακολουθήστε αναλυτικά στατιστικά",
-                subtitle = "Αποκτήστε πλήρη έλεγχο με διαγράμματα εξόδων ανά κατηγορία, κατανομή ανά μέλος, και ειδοποιήσεις υπέρβασης budget.",
+                stepNumber = 3,
+                title = "Στατιστικά & Cloud Sync",
+                subtitle = "Αυτόματος συγχρονισμός σε όλες τις συσκευές και υπενθύμιση στις 22:00.",
                 icon = Icons.Default.PieChart,
-                gradientColors = listOf(Color(0xFF2563EB), Color(0xFF60A5FA)),
+                gradientColors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8)),
                 highlights = listOf(
-                    "Γραφήματα δαπανών και ποσοστά ανά κατηγορία",
-                    "Έλεγχος υπέρβασης μηνιαίου budget",
-                    "Σύγκριση εσόδων - εξόδων & υπόλοιπο"
+                    "Real-time συγχρονισμός στο Cloud",
+                    "Μηνιαίος ισολογισμός & μέσο έξοδο",
+                    "Βραδινή υπενθύμιση στις 22:00"
                 ),
-                badgeLabel = "Βήμα 5: Στατιστικά",
-                statusPill = "✓ Οπτική Ανάλυση Ενεργή"
-            ),
-            OnboardingStep(
-                stepNumber = 6,
-                title = "Αναβαθμίστε σε Pro για κοινή χρήση",
-                subtitle = "Ξεκλειδώστε τη λειτουργία Pro για να συνεργάζεστε σε πραγματικό χρόνο με την οικογένειά σας, πολλαπλά εξοδολόγια και Excel.",
-                icon = Icons.Default.Star,
-                gradientColors = listOf(Color(0xFFB45309), Color(0xFFF59E0B)),
-                highlights = listOf(
-                    "Ζωντανός συγχρονισμός πολλών συσκευών",
-                    "Διαχείριση πολλαπλών εξοδολογίων",
-                    "Εξαγωγή αναλυτικών αναφορών σε Excel"
-                ),
-                badgeLabel = "Βήμα 6: Pro Δυνατότητες",
-                statusPill = "★ Fintel Pro Συνεργασία"
+                badgeLabel = "3/3: Στατιστικά",
+                statusPill = "✓ Ζωντανός Συγχρονισμός"
             )
         )
     }
@@ -515,7 +431,7 @@ fun OnboardingCarouselDialog(
                                         }
                                     }
                                 }
-                            } else if (step.stepNumber == 3 && onAddMember != null) {
+                            } else if (step.stepNumber == 2 && onAddMember != null) {
                                 Button(
                                     onClick = onAddMember,
                                     shape = RoundedCornerShape(12.dp),
@@ -526,7 +442,7 @@ fun OnboardingCarouselDialog(
                                         .testTag("onboarding_add_member_btn")
                                 ) {
                                     Text(
-                                        text = if (isEnglish) "Add First Member" else "Προσθήκη Πρώτου Μέλους",
+                                        text = if (isEnglish) "Set Up Members & Roles" else "Ορισμός Μελών & Ρόλων",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold
                                     )

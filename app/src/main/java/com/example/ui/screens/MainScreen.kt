@@ -74,6 +74,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -104,6 +105,7 @@ import com.example.ui.components.BurgerMenuDrawer
 import com.example.ui.components.CategoryDialog
 import com.example.ui.components.ExodologioDetailsDialog
 import com.example.ui.components.ExodologioManagerDialog
+import com.example.ui.components.HouseholdActiveBar
 import com.example.ui.components.ExportReportDialog
 import com.example.ui.components.ManualExpenseDialog
 import com.example.ui.components.ManualIncomeDialog
@@ -117,6 +119,7 @@ import com.example.ui.components.RecurringExpenseDialog
 import com.example.ui.components.SavingsGoalDialog
 import com.example.ui.components.TileSettingsDialog
 import com.example.ui.components.UserProfileDialog
+import com.example.ui.components.InviteMemberDialog
 import com.example.ui.components.VoiceConfirmationDialog
 import com.example.ui.components.VoiceInputDialog
 import com.example.ui.components.VoiceListeningOverlay
@@ -138,8 +141,8 @@ import kotlinx.coroutines.launch
 
 enum class AppTab(val title: String) {
     EXPENSES("Έξοδα"),
-    ANALYTICS("Στατιστικά"),
-    GOALS("Στόχοι"),
+    ANALYTICS("Αναλυτικά"),
+    SAVINGS("Αποταμίευση"),
     MEMBERS("Μέλη"),
     CATEGORIES("Κατηγορίες")
 }
@@ -217,6 +220,7 @@ fun MainScreen(
     val dailyReminderHour by viewModel.dailyReminderHour.collectAsStateWithLifecycle()
     val dailyReminderMinute by viewModel.dailyReminderMinute.collectAsStateWithLifecycle()
     val showPrivacyConsentDialog by viewModel.showPrivacyConsentDialog.collectAsStateWithLifecycle()
+    var showInviteDialog by remember { mutableStateOf(false) }
 
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
 
@@ -315,15 +319,15 @@ fun MainScreen(
                     ) {
                         OikoNomosLogo(
                             isDarkTheme = isDarkTheme,
-                            size = 34.dp
+                            size = 36.dp
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "Fintel",
                             fontFamily = ModernFontFamily,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 23.sp,
-                            letterSpacing = (-0.4).sp,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 25.sp,
+                            letterSpacing = (-0.5).sp,
                             color = if (isDarkTheme) Color(0xFF34D399) else Color(0xFF0F5132)
                         )
                     }
@@ -386,11 +390,11 @@ fun MainScreen(
 
                 // Navigation Bar
                 NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 6.dp,
+                    containerColor = if (isDarkTheme) Color(0xFF0F172A) else Color(0xFFF1F5F2),
+                    tonalElevation = 4.dp,
                     modifier = Modifier.border(
                         width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
                     )
                 ) {
                     NavigationBarItem(
@@ -402,11 +406,13 @@ fun MainScreen(
                                 contentDescription = com.example.util.Localization.tabExpenses(lang)
                             )
                         },
-                        label = { Text(com.example.util.Localization.tabExpenses(lang), fontSize = 10.sp, fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabExpenses(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Emerald700,
-                            selectedTextColor = Emerald700,
-                            indicatorColor = Emerald100
+                            selectedIconColor = Color(0xFF064E3B),
+                            selectedTextColor = Color(0xFF064E3B),
+                            indicatorColor = Color(0xFFD1FAE5),
+                            unselectedIconColor = Color(0xFF475569),
+                            unselectedTextColor = Color(0xFF64748B)
                         ),
                         modifier = Modifier.testTag("tab_expenses")
                     )
@@ -420,11 +426,13 @@ fun MainScreen(
                                 contentDescription = com.example.util.Localization.tabAnalytics(lang)
                             )
                         },
-                        label = { Text(com.example.util.Localization.tabAnalytics(lang), fontSize = 10.sp, fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabAnalytics(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Emerald700,
-                            selectedTextColor = Emerald700,
-                            indicatorColor = Emerald100
+                            selectedIconColor = Color(0xFF064E3B),
+                            selectedTextColor = Color(0xFF064E3B),
+                            indicatorColor = Color(0xFFD1FAE5),
+                            unselectedIconColor = Color(0xFF475569),
+                            unselectedTextColor = Color(0xFF64748B)
                         ),
                         modifier = Modifier.testTag("tab_analytics")
                     )
@@ -438,11 +446,13 @@ fun MainScreen(
                                 contentDescription = com.example.util.Localization.tabSavings(lang)
                             )
                         },
-                        label = { Text(com.example.util.Localization.tabSavings(lang), fontSize = 10.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabSavings(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Emerald700,
-                            selectedTextColor = Emerald700,
-                            indicatorColor = Emerald100
+                            selectedIconColor = Color(0xFF064E3B),
+                            selectedTextColor = Color(0xFF064E3B),
+                            indicatorColor = Color(0xFFD1FAE5),
+                            unselectedIconColor = Color(0xFF475569),
+                            unselectedTextColor = Color(0xFF64748B)
                         ),
                         modifier = Modifier.testTag("tab_goals")
                     )
@@ -456,11 +466,13 @@ fun MainScreen(
                                 contentDescription = com.example.util.Localization.tabMembers(lang)
                             )
                         },
-                        label = { Text(com.example.util.Localization.tabMembers(lang), fontSize = 10.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabMembers(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Emerald700,
-                            selectedTextColor = Emerald700,
-                            indicatorColor = Emerald100
+                            selectedIconColor = Color(0xFF064E3B),
+                            selectedTextColor = Color(0xFF064E3B),
+                            indicatorColor = Color(0xFFD1FAE5),
+                            unselectedIconColor = Color(0xFF475569),
+                            unselectedTextColor = Color(0xFF64748B)
                         ),
                         modifier = Modifier.testTag("tab_members")
                     )
@@ -474,11 +486,13 @@ fun MainScreen(
                                 contentDescription = com.example.util.Localization.tabCategories(lang)
                             )
                         },
-                        label = { Text(com.example.util.Localization.tabCategories(lang), fontSize = 10.sp, fontWeight = if (currentTab == 4) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(com.example.util.Localization.tabCategories(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 4) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Emerald700,
-                            selectedTextColor = Emerald700,
-                            indicatorColor = Emerald100
+                            selectedIconColor = Color(0xFF064E3B),
+                            selectedTextColor = Color(0xFF064E3B),
+                            indicatorColor = Color(0xFFD1FAE5),
+                            unselectedIconColor = Color(0xFF475569),
+                            unselectedTextColor = Color(0xFF64748B)
                         ),
                         modifier = Modifier.testTag("tab_categories")
                     )
@@ -492,12 +506,31 @@ fun MainScreen(
             )
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            Crossfade(
+            // Active Household Bar on other tabs (Tab 0 has full-bleed hero card per design)
+            if (currentTab != 0) {
+                HouseholdActiveBar(
+                    currentHousehold = currentHousehold,
+                    households = userHouseholds,
+                    appLanguage = appLanguage,
+                    isDarkTheme = isDarkTheme,
+                    onSelectHousehold = { viewModel.switchExodologio(it) },
+                    onManageHouseholdsClick = { viewModel.openExodologioDetailsDialog() },
+                    onCreateNewHouseholdClick = { viewModel.openExodologioManager() },
+                    onSwitchClick = { viewModel.openExodologioManager() }
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                Crossfade(
                 targetState = currentTab,
                 animationSpec = tween(durationMillis = 150),
                 label = "tab_navigation_crossfade"
@@ -570,14 +603,7 @@ fun MainScreen(
                         onMoveMemberUp = { viewModel.moveMemberUp(it) },
                         onMoveMemberDown = { viewModel.moveMemberDown(it) },
                         onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
-                        onShareInviteCode = { code ->
-                            val sendIntent = android.content.Intent().apply {
-                                action = android.content.Intent.ACTION_SEND
-                                putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο Fintel με τον κωδικό: $code")
-                                type = "text/plain"
-                            }
-                            context.startActivity(android.content.Intent.createChooser(sendIntent, "Κοινοποίηση Κωδικού"))
-                        }
+                        onShareInviteCode = { showInviteDialog = true }
                     )
                     4 -> CategoriesScreen(
                         categories = categories,
@@ -611,6 +637,7 @@ fun MainScreen(
             )
         }
     }
+}
 
     // Voice Confirmation Dialog with editable Amount, Category, Members, Date (Requirement 2)
     VoiceConfirmationDialog(
@@ -737,7 +764,26 @@ fun MainScreen(
             onUpdateProfilePhoto = { viewModel.updateUserProfilePhoto(it) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall("profile_upgrade") },
             onSignOut = { viewModel.signOutUser() },
+            onDeleteAccount = { viewModel.deleteCurrentUserAccount() },
             onDismiss = { viewModel.dismissUserProfileDialog() }
+        )
+    }
+
+    // Invite Member Dialog (Email & Share Link)
+    val activeHouseholdForInvite = currentHousehold ?: userHouseholds.firstOrNull() ?: com.example.data.model.Household(
+        id = "primary_household",
+        name = if (appLanguage == "EN") "My Household" else "Το Εξοδολόγιό μου",
+        inviteCode = "OIKO-${System.currentTimeMillis().toString().takeLast(4)}"
+    )
+    if (showInviteDialog) {
+        InviteMemberDialog(
+            household = activeHouseholdForInvite,
+            isPro = userProfile?.isPremium == true || activeHouseholdForInvite.isPremium,
+            appLanguage = appLanguage,
+            onInviteEmail = { email -> viewModel.inviteMemberByEmail(email) },
+            onMessage = { msg -> viewModel.showSnackbar(msg) },
+            onShowPremiumPaywall = { viewModel.showPremiumPaywall("invite_member") },
+            onDismiss = { showInviteDialog = false }
         )
     }
 
@@ -752,14 +798,7 @@ fun MainScreen(
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
             onManageMembers = { currentTab = 3 },
-            onShareInviteCode = { code ->
-                val sendIntent = android.content.Intent().apply {
-                    action = android.content.Intent.ACTION_SEND
-                    putExtra(android.content.Intent.EXTRA_TEXT, "Συνδεθείτε στο εξοδολόγιό μου στο Fintel με τον κωδικό: $code")
-                    type = "text/plain"
-                }
-                context.startActivity(android.content.Intent.createChooser(sendIntent, "Κοινοποίηση Κωδικού"))
-            },
+            onShareInviteCode = { showInviteDialog = true },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
             onClearExpenses = { viewModel.clearCurrentExodologioExpenses() },
             onDismiss = { viewModel.dismissExodologioDetailsDialog() }
@@ -776,7 +815,10 @@ fun MainScreen(
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
-            onInviteMember = { currentTab = 3 },
+            onInviteMember = {
+                viewModel.dismissExodologioManager()
+                showInviteDialog = true
+            },
             onDismiss = { viewModel.dismissExodologioManager() }
         )
     }

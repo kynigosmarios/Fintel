@@ -62,6 +62,89 @@ class FirestoreSyncRepository(
         }
     }
 
+    suspend fun discoverUserHouseholds(uid: String, email: String): List<String> {
+        val foundIds = mutableSetOf<String>()
+        val cleanEmail = email.trim()
+        val lowerEmail = cleanEmail.lowercase()
+
+        // 1. Households owned by this user
+        if (uid.isNotBlank()) {
+            try {
+                val qOwner = db.collection("households").whereEqualTo("ownerId", uid).get().await()
+                for (doc in qOwner.documents) {
+                    foundIds.add(doc.id)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "discoverUserHouseholds owner error: ${e.message}")
+            }
+
+            // 2. Households where memberUids contains uid
+            try {
+                val qMembers = db.collection("households").whereArrayContains("memberUids", uid).get().await()
+                for (doc in qMembers.documents) {
+                    foundIds.add(doc.id)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "discoverUserHouseholds memberUids error: ${e.message}")
+            }
+        }
+
+        // 3. Households where invitedEmails contains user's email
+        if (cleanEmail.isNotBlank()) {
+            val emailVariations = listOf(cleanEmail, lowerEmail).distinct()
+            for (ev in emailVariations) {
+                try {
+                    val qInvited = db.collection("households").whereArrayContains("invitedEmails", ev).get().await()
+                    for (doc in qInvited.documents) {
+                        foundIds.add(doc.id)
+                        // Auto-add user's uid to memberUids in Firestore if missing
+                        if (uid.isNotBlank()) {
+                            try {
+                                doc.reference.update("memberUids", FieldValue.arrayUnion(uid)).await()
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Auto-add memberUid to household ${doc.id}: ${e.message}")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "discoverUserHouseholds invited error: ${e.message}")
+                }
+            }
+
+            // 4. Cross-account resolution: check other user profile documents with this email
+            try {
+                for (ev in emailVariations) {
+                    val qUsers = db.collection("users").whereEqualTo("email", ev).get().await()
+                    for (uDoc in qUsers.documents) {
+                        val hid = uDoc.getString("householdId")
+                        if (!hid.isNullOrBlank()) foundIds.add(hid)
+                        val hids = uDoc.get("householdIds") as? List<*>
+                        hids?.mapNotNull { it as? String }?.filter { it.isNotBlank() }?.let {
+                            foundIds.addAll(it)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "discoverUserHouseholds cross-user error: ${e.message}")
+            }
+        }
+
+        return foundIds.toList()
+    }
+
+    suspend fun findHouseholdWithExpenses(householdIds: List<String>): String? {
+        for (hid in householdIds.filter { it.isNotBlank() }.distinct()) {
+            try {
+                val snap = db.collection("households").document(hid)
+                    .collection("expenses").limit(1).get().await()
+                if (!snap.isEmpty) {
+                    return hid
+                }
+            } catch (_: Exception) {}
+        }
+        return null
+    }
+
     suspend fun getOrCreateUserProfile(
         uid: String,
         email: String,
@@ -76,6 +159,9 @@ class FirestoreSyncRepository(
     ): UserProfile {
         val userRef = db.collection("users").document(uid)
         val snapshot = userRef.get().await()
+
+        // Discover all households in cloud associated with this user or email
+        val discoveredHids = discoverUserHouseholds(uid, email)
 
         return if (snapshot.exists()) {
             val existing = snapshot.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
@@ -106,6 +192,36 @@ class FirestoreSyncRepository(
                 existing.authProvider
             } else "password"
 
+            val allHids = (existing.householdIds + listOf(existing.householdId) + discoveredHids)
+                .filter { it.isNotBlank() }
+                .distinct()
+
+            // Resolve best active household:
+            // If existing.householdId has no expenses, but another discovered household DOES have expenses, prioritize the one with actual data!
+            val bestActiveHid = if (existing.householdId.isNotBlank()) {
+                val currentHasExp = try {
+                    !db.collection("households").document(existing.householdId).collection("expenses").limit(1).get().await().isEmpty
+                } catch (_: Exception) { false }
+                if (currentHasExp) {
+                    existing.householdId
+                } else {
+                    findHouseholdWithExpenses(allHids) ?: existing.householdId
+                }
+            } else {
+                findHouseholdWithExpenses(allHids) ?: allHids.firstOrNull() ?: ""
+            }
+
+            val finalHouseholdId = if (bestActiveHid.isNotBlank()) {
+                bestActiveHid
+            } else if (allHids.isNotEmpty()) {
+                allHids.first()
+            } else {
+                val newHousehold = createHousehold(uid, "Το Εξοδολόγιό μου")
+                newHousehold.id
+            }
+
+            val finalHouseholdIds = (allHids + finalHouseholdId).filter { it.isNotBlank() }.distinct()
+
             val merged = existing.copy(
                 displayName = profileDisplayName,
                 firstName = derivedFirst,
@@ -114,34 +230,23 @@ class FirestoreSyncRepository(
                 phoneNumber = if (existing.phoneNumber.isNotBlank()) existing.phoneNumber else phoneNumber,
                 occupation = if (existing.occupation.isNotBlank()) existing.occupation else occupation,
                 city = if (existing.city.isNotBlank()) existing.city else city,
+                householdId = finalHouseholdId,
+                householdIds = finalHouseholdIds,
                 authProvider = effectiveAuthProvider
             )
 
-            if (merged.householdId.isBlank() || merged.householdIds.isEmpty()) {
-                val newHousehold = createHousehold(uid, "Το Εξοδολόγιό μου")
-                val updated = merged.copy(
-                    householdId = newHousehold.id,
-                    householdIds = listOf(newHousehold.id)
-                )
-                userRef.set(updated, SetOptions.merge()).await()
-                updated
-            } else {
-                // Merge safely without overwriting other collections or existing fields
-                userRef.set(merged, SetOptions.merge()).await()
-                merged
-            }
+            // Save merged profile to Firestore with SetOptions.merge()
+            userRef.set(merged, SetOptions.merge()).await()
+            merged
         } else {
-            val householdId = UUID.randomUUID().toString().take(12)
-            val inviteCode = "FINTEL-" + Random.nextInt(1000, 9999).toString()
-            val household = Household(
-                id = householdId,
-                name = "Το Εξοδολόγιό μου",
-                ownerId = uid,
-                inviteCode = inviteCode,
-                memberUids = listOf(uid),
-                createdAt = Timestamp.now()
-            )
-            db.collection("households").document(householdId).set(household).await()
+            val allDiscovered = discoveredHids.filter { it.isNotBlank() }.distinct()
+            val (initialHouseholdId, initialHouseholdIds) = if (allDiscovered.isNotEmpty()) {
+                val withExp = findHouseholdWithExpenses(allDiscovered) ?: allDiscovered.first()
+                Pair(withExp, allDiscovered)
+            } else {
+                val newHousehold = createHousehold(uid, "Το Εξοδολόγιό μου")
+                Pair(newHousehold.id, listOf(newHousehold.id))
+            }
 
             val profileDisplayName = displayName.ifBlank {
                 if (firstName.isNotBlank() || lastName.isNotBlank()) "$firstName $lastName".trim() else "Χρήστης Fintel"
@@ -162,13 +267,13 @@ class FirestoreSyncRepository(
                 phoneNumber = phoneNumber,
                 occupation = occupation,
                 city = city,
-                householdId = householdId,
-                householdIds = listOf(householdId),
+                householdId = initialHouseholdId,
+                householdIds = initialHouseholdIds,
                 isPremium = false,
                 authProvider = authProvider.ifBlank { "password" },
                 createdAt = Timestamp.now()
             )
-            userRef.set(newProfile).await()
+            userRef.set(newProfile, SetOptions.merge()).await()
             newProfile
         }
     }
@@ -210,8 +315,13 @@ class FirestoreSyncRepository(
             try {
                 val doc = db.collection("households").document(id).get().await()
                 if (doc.exists()) {
-                    doc.toObject(Household::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)?.let {
-                        list.add(it)
+                    doc.toObject(Household::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)?.let { h ->
+                        if (h.id.isBlank()) h.id = doc.id
+                        val rawName = doc.getString("name")
+                        if (!rawName.isNullOrBlank()) {
+                            h.name = rawName
+                        }
+                        list.add(h)
                     }
                 }
             } catch (e: Exception) {
@@ -227,8 +337,13 @@ class FirestoreSyncRepository(
 
     suspend fun renameHousehold(householdId: String, newName: String) {
         if (householdId.isBlank() || newName.isBlank()) return
+        val cleanName = newName.trim()
         db.collection("households").document(householdId).set(
-            mapOf("name" to newName.trim(), "updatedAt" to Timestamp.now()),
+            mapOf(
+                "id" to householdId,
+                "name" to cleanName,
+                "updatedAt" to Timestamp.now()
+            ),
             com.google.firebase.firestore.SetOptions.merge()
         ).await()
     }
@@ -413,7 +528,15 @@ class FirestoreSyncRepository(
             .snapshots()
             .map { snapshot ->
                 if (snapshot.exists()) {
-                    snapshot.toObject(Household::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    val h = snapshot.toObject(Household::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (h != null) {
+                        if (h.id.isBlank()) h.id = snapshot.id
+                        val rawName = snapshot.getString("name")
+                        if (!rawName.isNullOrBlank()) {
+                            h.name = rawName
+                        }
+                    }
+                    h
                 } else null
             }
     }
@@ -1283,12 +1406,78 @@ class FirestoreSyncRepository(
         return result.distinctBy { it.id.ifBlank { it.title } }
     }
 
+    suspend fun fetchAllHouseholdExpenses(householdIds: List<String>): List<FirebaseExpense> {
+        val result = mutableListOf<FirebaseExpense>()
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+            val exps = getExpensesOnce(hId)
+            result.addAll(exps)
+        }
+        return result.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
+    }
+
+    suspend fun fetchAllHouseholdIncomes(householdIds: List<String>): List<FirebaseIncome> {
+        val result = mutableListOf<FirebaseIncome>()
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+            val incs = getIncomesOnce(hId)
+            result.addAll(incs)
+        }
+        return result.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
+    }
+
     suspend fun fetchAllHouseholdRecurringExpenses(householdIds: List<String>): List<FirebaseRecurringExpense> {
         val result = mutableListOf<FirebaseRecurringExpense>()
-        for (hId in householdIds) {
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
             val recurring = getRecurringExpensesOnce(hId)
             result.addAll(recurring)
         }
         return result.distinctBy { it.id.ifBlank { it.title } }
     }
+
+    suspend fun inviteMemberToHousehold(householdId: String, email: String) {
+        if (householdId.isBlank() || email.isBlank()) return
+        val doc = db.collection("households").document(householdId).get().await()
+        val currentInvited = doc.get("invitedEmails") as? List<String> ?: emptyList()
+        if (!currentInvited.contains(email)) {
+            db.collection("households").document(householdId)
+                .update("invitedEmails", currentInvited + email)
+                .await()
+        }
+    }
+
+    suspend fun getAllExpensesAcrossAllScopes(householdIds: List<String>, userId: String): List<FirebaseExpense> {
+        val result = mutableListOf<FirebaseExpense>()
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+            val exps = getExpensesOnce(hId)
+            result.addAll(exps)
+        }
+        if (userId.isNotBlank()) {
+            val userExps = getUserExpensesOnce(userId)
+            result.addAll(userExps)
+        }
+        return result.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
+            .sortedWith(
+                compareByDescending<FirebaseExpense> { it.timestamp }
+                    .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                    .thenByDescending { it.id }
+            )
+    }
+
+    suspend fun getAllIncomesAcrossAllScopes(householdIds: List<String>, userId: String): List<FirebaseIncome> {
+        val result = mutableListOf<FirebaseIncome>()
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+            val incs = getIncomesOnce(hId)
+            result.addAll(incs)
+        }
+        if (userId.isNotBlank()) {
+            val userIncs = getUserIncomesOnce(userId)
+            result.addAll(userIncs)
+        }
+        return result.distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
+            .sortedWith(
+                compareByDescending<FirebaseIncome> { it.timestamp }
+                    .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
+                    .thenByDescending { it.id }
+            )
+    }
 }
+

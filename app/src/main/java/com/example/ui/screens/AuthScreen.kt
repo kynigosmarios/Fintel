@@ -88,6 +88,7 @@ import com.example.R
 import com.example.ui.components.OikoNomosLogo
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
+import com.example.ui.theme.ModernFontFamily
 import com.example.ui.viewmodel.OikoNomosViewModel
 import com.example.util.Localization
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
@@ -175,13 +176,15 @@ fun AuthScreen(
 
             Text(
                 text = "Fintel",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontFamily = ModernFontFamily,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = (-0.5).sp,
                 color = Color(0xFF157347)
             )
 
             Text(
-                text = if (lang == Localization.Language.ENGLISH) "Family Expense Tracker" else "Οικογενειακό Εξοδολόγιο",
+                text = if (lang == Localization.Language.ENGLISH) "Smart Expense & Budget Tracker" else "Έξοδα, Έσοδα & Προϋπολογισμός",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -831,9 +834,10 @@ fun AuthScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.ic_google_logo),
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
                                         contentDescription = "Google",
+                                        tint = Emerald700,
                                         modifier = Modifier.size(22.dp)
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))

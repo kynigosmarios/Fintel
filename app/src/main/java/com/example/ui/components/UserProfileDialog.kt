@@ -31,15 +31,18 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -94,11 +97,13 @@ fun UserProfileDialog(
     onUpdateProfilePhoto: (String) -> Unit = {},
     onShowPremiumPaywall: () -> Unit,
     onSignOut: () -> Unit,
+    onDeleteAccount: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val lang = Localization.Language.fromCode(appLanguage)
     var isEditingProfile by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -1052,7 +1057,7 @@ fun UserProfileDialog(
                             onSignOut()
                         },
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(46.dp)
@@ -1062,18 +1067,96 @@ fun UserProfileDialog(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Logout,
                                 contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = Localization.signOutAccount(lang), fontWeight = FontWeight.Bold, fontSize = 13.5.sp)
+                            Text(
+                                text = Localization.signOutAccount(lang),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
-                    // Generous bottom spacer so Sign Out and everything above it is 100% visible and accessible
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // 7. Delete Account & Cloud Data (Google Play Policy Compliance)
+                    OutlinedButton(
+                        onClick = { showDeleteConfirmDialog = true },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("profile_delete_account_btn")
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteForever,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = Localization.deleteAccountButton(lang),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+
+                    // Generous bottom spacer so everything is 100% visible and accessible
                     Spacer(modifier = Modifier.height(48.dp))
                 }
             }
         }
+    }
+
+    // Delete Account Confirmation Dialog
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = {
+                Text(
+                    text = Localization.deleteAccountConfirmTitle(lang),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            },
+            text = {
+                Text(
+                    text = Localization.deleteAccountConfirmMsg(lang),
+                    fontSize = 13.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirmDialog = false
+                        onDismiss()
+                        onDeleteAccount()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(
+                        text = Localization.deleteAccountTitle(lang),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text(text = Localization.cancel(lang))
+                }
+            }
+        )
     }
 
     // Date Picker Dialog for Profile Edit (with full backspace/delete support and zero stickiness)

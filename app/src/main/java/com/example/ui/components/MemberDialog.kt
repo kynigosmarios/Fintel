@@ -174,7 +174,7 @@ fun MemberDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        listOf("Γονέας", "Παιδί", "Σύντροφος", "Συγκάτοικος", "Συνεργάτης", "Φίλος / Φίλη", "Άλλο").forEach { r ->
+                        listOf("Γονέας", "Παιδί", "Σύντροφος", "Συγκάτοικος", "Συνεργάτης", "Φίλος", "Μονοπρόσωπο", "Άλλο").forEach { r ->
                             val translatedRole = Localization.translateRole(r, lang)
                             FilterChip(
                                 selected = role == r,

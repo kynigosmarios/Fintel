@@ -984,7 +984,19 @@ fun VoiceConfirmationDialog(
                                 if (lang == Localization.Language.ENGLISH) "Family Shared" else "Κοινό Οικογένειας"
                             } else {
                                 val active = members.filter { finalMemberIds.contains(it.id) }
-                                active.joinToString(" & ") { it.name }
+                                if (active.size >= 2) {
+                                    val firstRolePlural = Localization.pluralRoleName(active.first().role, lang)
+                                    val allSameRole = active.all {
+                                        Localization.pluralRoleName(it.role, lang).equals(firstRolePlural, ignoreCase = true)
+                                    }
+                                    if (allSameRole) {
+                                        firstRolePlural
+                                    } else {
+                                        active.joinToString(" & ") { it.name }
+                                    }
+                                } else {
+                                    active.joinToString(" & ") { it.name }
+                                }
                             }
 
                             val finalPayerIds = selectedPayerIds.toList().ifEmpty {
@@ -1018,8 +1030,17 @@ fun VoiceConfirmationDialog(
                                     finalPayerAmountsCsv = finalPayerIds.joinToString(",") { id ->
                                         String.format(Locale.US, "%d:%.2f", id, perPerson)
                                     }
-                                    val names = finalPayerIds.mapNotNull { id -> members.find { it.id == id }?.name }
-                                    finalPayerName = "${names.joinToString(" & ")} (από ${String.format(Locale.US, "%.2f €", perPerson)})"
+                                    val payerMembers = finalPayerIds.mapNotNull { id -> members.find { it.id == id } }
+                                    val payerLabel = if (payerMembers.size >= 2) {
+                                        val firstRolePlural = Localization.pluralRoleName(payerMembers.first().role, lang)
+                                        val allSameRole = payerMembers.all {
+                                            Localization.pluralRoleName(it.role, lang).equals(firstRolePlural, ignoreCase = true)
+                                        }
+                                        if (allSameRole) firstRolePlural else payerMembers.joinToString(" & ") { it.name }
+                                    } else {
+                                        payerMembers.joinToString(" & ") { it.name }
+                                    }
+                                    finalPayerName = payerLabel
                                 }
                             }
 

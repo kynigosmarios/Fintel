@@ -253,62 +253,39 @@ fun ExodologioManagerDialog(
                             .testTag("add_new_exodologio_button")
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isPremium) Emerald700.copy(alpha = 0.15f) else Amber700.copy(alpha = 0.15f),
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = if (isPremium) Icons.Default.Add else Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = if (isPremium) Emerald700 else Amber700,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
+                            Text(
+                                text = Localization.createNewExodologio(lang),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
 
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = Localization.createNewExodologio(lang),
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (lang == Localization.Language.ENGLISH)
-                                        "Unlimited households for home, business, etc."
-                                    else
-                                        "Απεριόριστα εξοδολόγια για σπίτι, δουλειά κ.α.",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Spacer(modifier = Modifier.width(10.dp))
 
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = Amber700.copy(alpha = 0.15f),
-                                border = BorderStroke(1.dp, Amber700.copy(alpha = 0.3f))
+                                color = Amber700.copy(alpha = 0.18f),
+                                border = BorderStroke(1.dp, Amber700.copy(alpha = 0.45f))
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Star,
                                         contentDescription = null,
                                         tint = Amber700,
-                                        modifier = Modifier.size(12.dp)
+                                        modifier = Modifier.size(13.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "PRO",
-                                        fontSize = 10.5.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Amber700
                                     )
@@ -507,21 +484,22 @@ fun PremiumPaywallDialog(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                val paywallSubtitle = when (reason) {
+                    "multi_exodologio" -> null
+                    "invite_member" -> if (lang == Localization.Language.ENGLISH) "Adding members is a Pro feature" else "Η προσθήκη μελών είναι δυνατότητα Pro"
+                    else -> if (lang == Localization.Language.ENGLISH) "Unlock all Fintel Pro features" else "Ξεκλειδώστε όλες τις δυνατότητες του Fintel"
+                }
 
-                Text(
-                    text = if (reason == "multi_exodologio") {
-                        if (lang == Localization.Language.ENGLISH) "Pro required for more than 1 household" else "Απαιτείται Pro για περισσότερα από 1 εξοδολόγια"
-                    } else if (reason == "invite_member") {
-                        if (lang == Localization.Language.ENGLISH) "Adding members is a Pro feature" else "Η προσθήκη μελών είναι δυνατότητα Pro"
-                    } else {
-                        if (lang == Localization.Language.ENGLISH) "Unlock all Fintel Pro features" else "Ξεκλειδώστε όλες τις δυνατότητες του Fintel"
-                    },
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Amber700,
-                    textAlign = TextAlign.Center
-                )
+                if (paywallSubtitle != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = paywallSubtitle,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Amber700,
+                        textAlign = TextAlign.Center
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 

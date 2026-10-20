@@ -152,7 +152,8 @@ object DataSafetyGuard {
                         monthlyBudget = cat.monthlyBudget,
                         colorHex = cat.colorHex,
                         voiceKeywords = cat.voiceKeywords,
-                        sortOrder = cat.sortOrder
+                        sortOrder = cat.sortOrder,
+                        fontColorHex = cat.fontColorHex
                     )
                     if (activeHouseholdId.isNotBlank()) {
                         firestoreSyncRepo.syncCategory(activeHouseholdId, fbCat)
@@ -234,6 +235,31 @@ object DataSafetyGuard {
                     firestoreSyncRepo.syncUserExpense(userId, fbExp)
                 }
                 Log.d(TAG, "Secured ${localExpenses.size} expenses to cloud.")
+            }
+
+            // 6. Audit & Secure Incomes (ensure all local incomes are mirrored in cloud)
+            val localIncomes = repository.getAllIncomesList()
+            if (localIncomes.isNotEmpty()) {
+                localIncomes.forEach { inc ->
+                    val fbInc = com.example.data.model.FirebaseIncome(
+                        id = inc.cloudId.ifBlank { "inc_${inc.id}" },
+                        householdId = activeHouseholdId,
+                        title = inc.title,
+                        amount = inc.amount,
+                        memberId = inc.memberId,
+                        memberName = inc.memberName,
+                        category = inc.category,
+                        timestamp = inc.timestamp,
+                        note = inc.note,
+                        createdByUid = userId,
+                        createdByName = user.displayName ?: "Χρήστης"
+                    )
+                    if (activeHouseholdId.isNotBlank()) {
+                        firestoreSyncRepo.syncIncome(fbInc)
+                    }
+                    firestoreSyncRepo.syncUserIncome(userId, fbInc)
+                }
+                Log.d(TAG, "Secured ${localIncomes.size} incomes to cloud.")
             }
 
             Log.i(TAG, "Audit complete. All user data is 100% mirrored in Firebase Cloud.")

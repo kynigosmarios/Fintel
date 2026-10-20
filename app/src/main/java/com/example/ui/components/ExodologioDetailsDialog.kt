@@ -326,8 +326,8 @@ fun ExodologioDetailsDialog(
                         }
                     }
 
-                    // List of All Households (if more than 1 exist)
-                    if (allHouseholds.size > 1) {
+                    // List of All Households
+                    if (allHouseholds.isNotEmpty()) {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -358,6 +358,7 @@ fun ExodologioDetailsDialog(
                                                 .clickable {
                                                     if (!isSelected) {
                                                         onSelectHousehold(household)
+                                                        onDismiss()
                                                     }
                                                 }
                                         ) {
@@ -424,42 +425,19 @@ fun ExodologioDetailsDialog(
                             .testTag("add_new_exodologio_button")
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Amber700.copy(alpha = 0.2f),
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = Amber700,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            }
+                            Text(
+                                text = Localization.createNewExodologio(lang),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
 
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = Localization.createNewExodologio(lang),
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (lang == Localization.Language.ENGLISH)
-                                        "Add multiple households for home, business, etc."
-                                    else
-                                        "Προσθήκη επιπλέον εξοδολογίων (Σπίτι, Εργασία, Εξοχικό)",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Spacer(modifier = Modifier.width(10.dp))
 
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
@@ -467,19 +445,19 @@ fun ExodologioDetailsDialog(
                                 border = BorderStroke(1.dp, Amber700.copy(alpha = 0.45f))
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Star,
                                         contentDescription = null,
                                         tint = Amber700,
-                                        modifier = Modifier.size(12.dp)
+                                        modifier = Modifier.size(13.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "PRO",
-                                        fontSize = 11.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Amber700
                                     )

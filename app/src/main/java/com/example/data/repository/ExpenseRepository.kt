@@ -27,7 +27,6 @@ class ExpenseRepository(
     suspend fun updateExpense(expense: Expense): Int = expenseDao.updateExpense(expense)
     suspend fun saveOrUpdateExpense(expense: Expense): Long = expenseDao.saveOrUpdateExpense(expense)
     suspend fun replaceAllExpenses(expenses: List<Expense>) {
-        if (expenses.isEmpty()) return
         val existing = expenseDao.getAllExpensesList()
         if (existing == expenses) return
         expenseDao.replaceAllExpensesTransaction(expenses)
@@ -42,11 +41,13 @@ class ExpenseRepository(
     suspend fun deleteIncome(income: Income) = expenseDao.deleteIncome(income)
     suspend fun deleteIncomeById(id: Long) = expenseDao.deleteIncomeById(id)
     suspend fun deleteAllIncomes() = expenseDao.deleteAllIncomes()
+    suspend fun replaceAllIncomes(incomes: List<Income>) {
+        expenseDao.replaceAllIncomesTransaction(incomes)
+    }
 
     suspend fun insertMember(member: FamilyMember): Long = expenseDao.insertMember(member)
     suspend fun insertMembers(members: List<FamilyMember>) = expenseDao.insertMembers(members)
     suspend fun replaceAllMembers(members: List<FamilyMember>) {
-        if (members.isEmpty()) return
         val existing = expenseDao.getAllMembersList()
         if (existing == members) return
         expenseDao.replaceAllMembersTransaction(members)
@@ -59,7 +60,6 @@ class ExpenseRepository(
     suspend fun insertCategory(category: ExpenseCategory): Long = expenseDao.insertCategory(category)
     suspend fun insertCategories(categories: List<ExpenseCategory>) = expenseDao.insertCategories(categories)
     suspend fun replaceAllCategories(categories: List<ExpenseCategory>) {
-        if (categories.isEmpty()) return
         val existing = expenseDao.getAllCategoriesList()
         if (existing == categories) return
         expenseDao.replaceAllCategoriesTransaction(categories)
@@ -122,8 +122,30 @@ class ExpenseRepository(
     }
 
     suspend fun seedInitialDataIfEmpty() {
-        // Clean start for new users: All fields (expenses, incomes, categories, members) start completely clean (0 items).
-        // Standard categories can be loaded on-demand by the user via seedStandardCategories().
+        val existingCategories = expenseDao.getCategoryCount()
+        if (existingCategories == 0) {
+            seedStandardCategories()
+        }
+    }
+
+    suspend fun seedMariosDataIfEmpty() {
+        val existingExpenses = expenseDao.getExpenseCount()
+        val existingMembers = expenseDao.getMemberCount()
+        val existingCategories = expenseDao.getCategoryCount()
+        val existingIncomes = expenseDao.getAllIncomesList().size
+
+        if (existingMembers == 0) {
+            expenseDao.insertMembers(com.example.data.seed.FirestoreDataSeed.members)
+        }
+        if (existingCategories == 0) {
+            expenseDao.insertCategories(com.example.data.seed.FirestoreDataSeed.categories)
+        }
+        if (existingIncomes == 0) {
+            expenseDao.insertIncomes(com.example.data.seed.FirestoreDataSeed.incomes)
+        }
+        if (existingExpenses == 0) {
+            expenseDao.insertExpenses(com.example.data.seed.FirestoreDataSeed.expenses)
+        }
     }
 
     suspend fun seedStandardCategories() {

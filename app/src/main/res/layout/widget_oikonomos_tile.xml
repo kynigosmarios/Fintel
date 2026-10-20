@@ -3,28 +3,15 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:background="@drawable/ic_launcher_background"
     android:gravity="center"
-    android:padding="4dp">
+    android:orientation="vertical"
+    android:padding="8dp">
 
     <ImageView
         android:id="@+id/widget_icon"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:src="@drawable/ic_oikonomos_logo"
-        android:contentDescription="@string/app_name" />
-
-    <TextView
-        android:id="@+id/widget_label"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:text="@string/app_name"
-        android:textSize="11sp"
-        android:textColor="#FFFFFF"
-        android:singleLine="true"
-        android:shadowColor="#000000"
-        android:shadowDx="1"
-        android:shadowDy="1"
-        android:shadowRadius="2" />
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:contentDescription="@string/app_name"
+        android:src="@drawable/ic_oikonomos_logo" />
 </LinearLayout>

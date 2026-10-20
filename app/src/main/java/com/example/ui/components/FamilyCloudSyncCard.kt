@@ -337,7 +337,7 @@ fun FamilyCloudSyncCard(
                                                     if (lang == Localization.Language.ENGLISH)
                                                         "Join me in tracking our expenses on Fintel! Use invite code: ${household.inviteCode}"
                                                     else
-                                                        "Έλα να μοιραστούμε τα έξοδά μας στο Fintel! Βάλε τον κωδικό: ${household.inviteCode}"
+                                                        "Ελάτε να μοιραστούμε τα έξοδά μας στο Fintel! Εισάγετε τον κωδικό: ${household.inviteCode}"
                                                 )
                                                 type = "text/plain"
                                             }

@@ -101,7 +101,7 @@ fun ExodologioExportCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Excel / CSV", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(text = "Excel", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 // PDF Button

@@ -81,34 +81,33 @@ fun VoiceMicButton(
         contentAlignment = Alignment.Center,
         modifier = modifier.testTag("voice_mic_container")
     ) {
-        // Ambient soft halo ring around the mic
+        // Ambient soft mint halo ring around the mic (matches screenshot)
         Box(
             modifier = Modifier
-                .size(76.dp)
+                .size(70.dp)
                 .scale(if (isListening) pulseScale else restingGlowScale)
                 .clip(CircleShape)
                 .background(
                     if (isListening) Color(0xFFEF4444).copy(alpha = 0.35f)
-                    else Emerald400.copy(alpha = 0.22f)
+                    else Color(0xFFA7F3D0).copy(alpha = 0.65f)
                 )
         )
 
-        // Inner FAB button with luxury gradient and crisp micro-border
+        // Inner FAB button with crisp emerald tone
         Box(
             modifier = Modifier
-                .size(62.dp)
+                .size(56.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.linearGradient(
                         colors = if (isListening) {
                             listOf(Color(0xFFEF4444), Color(0xFFB91C1C))
                         } else {
-                            listOf(Color(0xFF10B981), Color(0xFF047857), Color(0xFF064E3B))
+                            listOf(Color(0xFF059669), Color(0xFF047857))
                         }
                     )
                 )
                 .clickable { onMicClick() }
-                .border(2.dp, Color.White.copy(alpha = 0.85f), CircleShape)
                 .testTag("voice_mic_button"),
             contentAlignment = Alignment.Center
         ) {
@@ -116,7 +115,7 @@ fun VoiceMicButton(
                 imageVector = if (isListening) Icons.Default.GraphicEq else Icons.Default.Mic,
                 contentDescription = if (isListening) "Διακοπή ακρόασης" else "Φωνητική καταχώρηση",
                 tint = Color.White,
-                modifier = Modifier.size(30.dp)
+                modifier = Modifier.size(28.dp)
             )
         }
     }

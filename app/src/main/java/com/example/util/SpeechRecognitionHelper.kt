@@ -18,10 +18,65 @@ class SpeechRecognitionHelper(
     private val onRmsChanged: (Float) -> Unit = {}
 ) {
     companion object {
-        private const val TAG = "SpeechRecognitionHelper"
+        private const val TAG = "SpeechRecognizer"
+
+        fun parseVoiceCommand(
+            text: String,
+            categories: List<com.example.data.entity.ExpenseCategory>,
+            members: List<com.example.data.entity.FamilyMember>
+        ): ParsedVoiceExpense? {
+            if (text.isBlank()) return null
+
+            // Extract amount
+            val amountRegex = Regex("(\\d+([.,]\\d+)?)")
+            val amountMatch = amountRegex.find(text) ?: return null
+            val rawAmount = amountMatch.value.replace(',', '.')
+            val amount = rawAmount.toDoubleOrNull() ?: return null
+
+            // Find matching category
+            val lower = text.lowercase()
+            val matchedCategory = categories.firstOrNull { cat ->
+                val keywords = cat.voiceKeywords.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
+                lower.contains(cat.name.lowercase()) || keywords.any { lower.contains(it) }
+            } ?: categories.firstOrNull() ?: com.example.data.entity.ExpenseCategory(id = 1, name = "Διάφορα")
+
+            // Find matching payer
+            val matchedPayer = members.firstOrNull { m ->
+                val keywords = m.voiceKeywords.split(",").map { it.trim().lowercase() }.filter { it.isNotBlank() }
+                lower.contains(m.name.lowercase()) || keywords.any { lower.contains(it) }
+            } ?: members.firstOrNull()
+
+            val payerId = matchedPayer?.id ?: 1L
+            val payerName = matchedPayer?.name ?: "Μάριος"
+
+            // Construct title
+            val cleanTitle = text.replace(amountMatch.value, "")
+                .replace("ευρώ", "", ignoreCase = true)
+                .replace("ευρω", "", ignoreCase = true)
+                .replace("€", "")
+                .trim()
+                .ifBlank { matchedCategory.name }
+
+            return ParsedVoiceExpense(
+                title = if (cleanTitle.isNotEmpty()) cleanTitle.replaceFirstChar { it.uppercase() } else matchedCategory.name,
+                amount = amount,
+                categoryId = matchedCategory.id,
+                categoryName = matchedCategory.name,
+                splitType = "Κοινό Οικογένειας",
+                memberIdsCsv = members.joinToString(",") { it.id.toString() },
+                memberNamesDisplay = "Κοινό Οικογένειας",
+                splitAmountPerPerson = if (members.isNotEmpty()) amount / members.size else amount,
+                originalPrompt = text,
+                payerMemberId = payerId,
+                payerMemberName = payerName,
+                payerMemberIdsCsv = payerId.toString(),
+                payerAmountsCsv = "$payerId:$amount",
+                note = "Φωνητική καταχώρηση"
+            )
+        }
     }
 
-    private val appContext = context.applicationContext
+    private val appContext: Context = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
 
@@ -36,7 +91,6 @@ class SpeechRecognitionHelper(
 
     fun startListening() {
         stopListening()
-
         if (!isRecognitionAvailable()) {
             mainHandler.post {
                 onListeningStateChanged(false)
@@ -48,7 +102,6 @@ class SpeechRecognitionHelper(
         try {
             val recognizer = SpeechRecognizer.createSpeechRecognizer(appContext)
             speechRecognizer = recognizer
-
             recognizer.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     mainHandler.post { onListeningStateChanged(true) }
@@ -67,36 +120,29 @@ class SpeechRecognitionHelper(
                 }
 
                 override fun onError(error: Int) {
+                    val message = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH -> "Δεν αναγνωρίστηκε ομιλία. Δοκιμάστε ξανά."
+                        SpeechRecognizer.ERROR_NETWORK -> "Σφάλμα σύνδεσης δικτύου κατά τη φωνητική αναγνώριση."
+                        SpeechRecognizer.ERROR_AUDIO -> "Σφάλμα μικροφώνου."
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Δεν ακούστηκε ομιλία."
+                        else -> "Σφάλμα φωνητικής αναγνώρισης ($error)"
+                    }
                     mainHandler.post {
                         onListeningStateChanged(false)
-                        val message = when (error) {
-                            SpeechRecognizer.ERROR_AUDIO -> "Σφάλμα εγγραφής ήχου"
-                            SpeechRecognizer.ERROR_CLIENT -> "Η φωνητική αναγνώριση δεν υποστηρίζεται ή απασχολείται"
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Απαιτείται άδεια μικροφώνου"
-                            SpeechRecognizer.ERROR_NETWORK -> "Σφάλμα δικτύου"
-                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Λήξη χρόνου δικτύου"
-                            SpeechRecognizer.ERROR_NO_MATCH -> "Δεν αναγνωρίστηκε ομιλία. Δοκιμάστε ξανά."
-                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Ο αναγνωριστής είναι απασχολημένος"
-                            SpeechRecognizer.ERROR_SERVER -> "Σφάλμα διακομιστή φωνής"
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Δεν ακούστηκε ομιλία"
-                            else -> "Σφάλμα αναγνώρισης ($error)"
-                        }
-                        cancelListening()
                         onError(message)
                     }
                 }
 
                 override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    val text = matches?.firstOrNull()?.trim().orEmpty()
                     mainHandler.post {
                         onListeningStateChanged(false)
-                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        if (!matches.isNullOrEmpty()) {
-                            val recognizedText = matches[0]
-                            onResult(recognizedText)
+                        if (text.isNotBlank()) {
+                            onResult(text)
                         } else {
-                            onError("Δεν αναγνωρίστηκε κείμενο.")
+                            onError("Δεν αναγνωρίστηκε ομιλία. Δοκιμάστε ξανά.")
                         }
-                        cancelListening()
                     }
                 }
 
@@ -114,7 +160,6 @@ class SpeechRecognitionHelper(
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
                 putExtra(RecognizerIntent.EXTRA_PROMPT, "Πείτε το έξοδο στα ελληνικά (π.χ. «πέντε σαράντα σούπερ μάρκετ»)")
             }
-
             recognizer.startListening(intent)
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to start speech recognition", t)
@@ -138,13 +183,9 @@ class SpeechRecognitionHelper(
     fun cancelListening() {
         try {
             speechRecognizer?.cancel()
-        } catch (t: Throwable) {
-            Log.w(TAG, "Error cancelling speech recognition", t)
-        }
-        try {
             speechRecognizer?.destroy()
         } catch (t: Throwable) {
-            Log.w(TAG, "Error destroying speech recognizer", t)
+            Log.w(TAG, "Error cancelling speech recognition", t)
         } finally {
             speechRecognizer = null
             mainHandler.post { onListeningStateChanged(false) }

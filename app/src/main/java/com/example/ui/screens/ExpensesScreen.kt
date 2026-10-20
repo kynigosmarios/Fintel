@@ -1,15 +1,15 @@
 package com.example.ui.screens
 
-import com.example.util.Localization
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,46 +21,33 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -68,723 +55,687 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.painterResource
-import com.example.R
 import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
 import com.example.data.entity.Income
-import com.example.data.entity.getPayerDisplay
-import com.example.data.entity.getPayerCategoryOrNamesDisplay
 import com.example.data.entity.getBeneficiaryCategoryOrNamesDisplay
-import com.example.data.entity.hasMultiplePayers
+import com.example.data.entity.getPayerCategoryOrNamesDisplay
 import com.example.ui.components.CategoryIconHelper
-import com.example.util.GreekVoiceParser
-import com.example.ui.theme.Emerald100
-import com.example.ui.theme.Emerald200
-import com.example.ui.theme.Emerald300
-import com.example.ui.theme.Emerald400
-import com.example.ui.theme.Emerald500
 import com.example.ui.theme.Emerald700
-import com.example.ui.theme.Emerald800
-import com.example.ui.theme.Emerald900
-import com.example.ui.theme.Emerald950
-import com.example.ui.theme.HeroEmeraldGradient
-import com.example.ui.theme.GlassBorderBrush
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
+import com.example.util.Localization
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-import com.example.ui.components.ExodologioExportCard
+sealed class ActivityItem(val timestamp: Long, val key: String) {
+    data class ExpenseItem(val expense: Expense) : ActivityItem(expense.timestamp, "exp_${expense.id}_${expense.cloudId}")
+    data class IncomeItem(val income: Income) : ActivityItem(income.timestamp, "inc_${income.id}")
+}
 
-data class MonthSectionData(
-    val key: String,
-    val title: String,
-    val total: Double,
-    val count: Int,
-    val days: Map<String, List<Expense>>
-)
-
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ExpensesScreen(
     expenses: List<Expense>,
-    incomes: List<Income> = emptyList(),
+    incomes: List<Income>,
     categories: List<ExpenseCategory>,
     members: List<FamilyMember>,
     selectedMemberFilter: Long?,
     selectedCategoryFilter: Long?,
     searchQuery: String,
-    appLanguage: String = "EN",
+    appLanguage: String,
     onMemberFilterChange: (Long?) -> Unit,
     onCategoryFilterChange: (Long?) -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onAddManualExpense: () -> Unit,
-    onAddManualIncome: () -> Unit = {},
-    onVoiceExpense: () -> Unit = {},
+    onAddManualIncome: () -> Unit,
+    onVoiceExpense: () -> Unit,
     onEditExpense: (Expense) -> Unit,
     onDeleteExpense: (Expense) -> Unit,
-    onEditIncome: (Income) -> Unit = {},
-    onDeleteIncome: (Income) -> Unit = {},
-    onExportExcel: () -> Unit = {},
-    onExportPdf: () -> Unit = {},
-    onShareReport: () -> Unit = {},
-    onAddMember: () -> Unit = {},
-    onAddCategory: () -> Unit = {},
-    onSeedStandardCategories: () -> Unit = {},
-    isInitialLoading: Boolean = false,
+    onEditIncome: (Income) -> Unit,
+    onDeleteIncome: (Income) -> Unit,
+    onExportExcel: () -> Unit,
+    onExportPdf: () -> Unit,
+    onShareReport: () -> Unit,
+    onAddMember: () -> Unit,
+    onAddCategory: () -> Unit,
+    onSeedStandardCategories: () -> Unit,
+    isInitialLoading: Boolean,
     modifier: Modifier = Modifier
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
+    val locale = Localization.getDateLocale(lang)
+
+    val monthYearFormat = remember(locale) { SimpleDateFormat("LLLL yyyy", locale) }
+    val monthYearKeyFormat = remember { SimpleDateFormat("yyyy-MM", Locale.US) }
+
     var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
     var incomeToDelete by remember { mutableStateOf<Income?>(null) }
-    var activeViewMode by remember { mutableStateOf(0) } // 0 = Expenses, 1 = Incomes
 
-    // Period filter state ("CURRENT_MONTH", "ALL", or "yyyy-MM")
-    var selectedPeriodKey by remember { mutableStateOf<String?>("CURRENT_MONTH") }
-    var showPeriodDropdown by remember { mutableStateOf(false) }
+    // Segmented tab inside hero card: "EXPENSE" or "INCOME"
+    var selectedTypeFilter by remember { mutableStateOf("EXPENSE") }
 
-    // Dropdown filters state
+    // Dropdown toggles
+    var showMonthDropdown by remember { mutableStateOf(false) }
     var showMemberDropdown by remember { mutableStateOf(false) }
     var showCategoryDropdown by remember { mutableStateOf(false) }
+    var isMonthlyListExpanded by remember { mutableStateOf(true) }
 
-    val currentMonthKey = remember { SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date()) }
-    val currentMonthLabel = remember(lang) {
-        val cal = java.util.Calendar.getInstance()
-        SimpleDateFormat("LLLL yyyy", Localization.getDateLocale(lang)).format(cal.time).replaceFirstChar { it.uppercase() }
-    }
+    // Extract available months from dataset
+    val availableMonths = remember(expenses, incomes, locale) {
+        val allTimestamps = (expenses.map { it.timestamp } + incomes.map { it.timestamp })
+            .filter { it > 0 }
+            .distinct()
 
-    // Extract available year-month strings from expenses
-    val availableMonths = remember(expenses) {
-        val set = linkedSetOf<String>()
-        set.add(currentMonthKey)
-        val fmt = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-        expenses.forEach { exp ->
-            set.add(fmt.format(Date(exp.timestamp)))
+        val list = allTimestamps.map { ts ->
+            val key = monthYearKeyFormat.format(Date(ts))
+            val rawName = monthYearFormat.format(Date(ts))
+            val display = rawName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+            Triple(key, display, ts)
         }
-        set.toList().sortedDescending()
+            .distinctBy { it.first }
+            .sortedByDescending { it.third }
+
+        if (list.isEmpty()) {
+            val now = System.currentTimeMillis()
+            val rawNow = monthYearFormat.format(Date(now))
+            listOf(Triple(monthYearKeyFormat.format(Date(now)), rawNow.replaceFirstChar { it.titlecase(locale) }, now))
+        } else list
     }
 
-    fun getMonthLabel(key: String): String {
-        return try {
-            val date = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(key) ?: Date()
-            SimpleDateFormat("LLLL yyyy", Localization.getDateLocale(lang)).format(date).replaceFirstChar { it.uppercase() }
-        } catch (e: Exception) {
-            key
-        }
+    // Default to the first (most recent) month e.g. "Οκτώβριος 2026"
+    var selectedMonthKey by remember(availableMonths) {
+        mutableStateOf(availableMonths.firstOrNull()?.first ?: "")
     }
 
-    val activePeriodDisplay = when (selectedPeriodKey) {
-        "ALL" -> Localization.allMonthsCombined(lang)
-        "CURRENT_MONTH", null -> currentMonthLabel
-        else -> getMonthLabel(selectedPeriodKey!!)
-    }
-
-    // Filter expenses by selected period (Month & Year)
-    val periodFilteredExpenses = remember(expenses, selectedPeriodKey) {
-        when (selectedPeriodKey) {
-            "ALL" -> expenses
-            "CURRENT_MONTH", null -> expenses.filter {
-                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == currentMonthKey
-            }
-            else -> expenses.filter {
-                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == selectedPeriodKey
-            }
+    val currentMonthDisplay = remember(selectedMonthKey, availableMonths, lang) {
+        if (selectedMonthKey == "ALL") {
+            if (lang == Localization.Language.ENGLISH) "All Months" else "Όλοι οι μήνες"
+        } else {
+            availableMonths.find { it.first == selectedMonthKey }?.second ?: "Οκτώβριος 2026"
         }
     }
 
-    // Filter incomes by selected period
-    val periodFilteredIncomes = remember(incomes, selectedPeriodKey) {
-        when (selectedPeriodKey) {
-            "ALL" -> incomes
-            "CURRENT_MONTH", null -> incomes.filter {
-                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == currentMonthKey
-            }
-            else -> incomes.filter {
-                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == selectedPeriodKey
-            }
+    // Month-filtered datasets for the Hero Card metrics
+    val monthExpenses = remember(expenses, selectedMonthKey) {
+        if (selectedMonthKey.isBlank() || selectedMonthKey == "ALL") expenses
+        else expenses.filter { monthYearKeyFormat.format(Date(it.timestamp)) == selectedMonthKey }
+    }
+    val monthIncomes = remember(incomes, selectedMonthKey) {
+        if (selectedMonthKey.isBlank() || selectedMonthKey == "ALL") incomes
+        else incomes.filter { monthYearKeyFormat.format(Date(it.timestamp)) == selectedMonthKey }
+    }
+
+    val totalExpensesAmount = remember(monthExpenses) { monthExpenses.sumOf { it.amount } }
+    val totalIncomesAmount = remember(monthIncomes) { monthIncomes.sumOf { it.amount } }
+    val netBalance = totalIncomesAmount - totalExpensesAmount
+
+    // Dynamic budget calculation: sum of monthly budgets of categories
+    val totalBudget = remember(categories) {
+        val sum = categories.sumOf { it.monthlyBudget }
+        if (sum > 0.0) sum else 2962.00
+    }
+    val remainingBudget = remember(totalBudget, totalExpensesAmount) {
+        maxOf(0.0, totalBudget - totalExpensesAmount)
+    }
+    val budgetPercent = remember(totalBudget, totalExpensesAmount) {
+        if (totalBudget > 0.0) ((totalExpensesAmount / totalBudget) * 100).toInt() else 0
+    }
+    val isWithinBudget = totalExpensesAmount <= totalBudget
+
+    // Shared family ("Κοινά Σπιτιού") vs Individual ("Ατομικά")
+    val sharedExpenses = remember(monthExpenses) {
+        monthExpenses.filter { it.splitType == "ALL" || it.splitType == "ALL_FAMILY" }.sumOf { it.amount }
+    }
+    val individualExpenses = remember(monthExpenses) {
+        monthExpenses.filter { it.splitType != "ALL" && it.splitType != "ALL_FAMILY" }.sumOf { it.amount }
+    }
+
+    // Filtered transaction items to display in the list below
+    val displayItems = remember(monthExpenses, monthIncomes, selectedTypeFilter) {
+        when (selectedTypeFilter) {
+            "EXPENSE" -> monthExpenses.map { ActivityItem.ExpenseItem(it) }
+            "INCOME" -> monthIncomes.map { ActivityItem.IncomeItem(it) }
+            else -> (monthExpenses.map { ActivityItem.ExpenseItem(it) } + monthIncomes.map { ActivityItem.IncomeItem(it) })
+                .sortedByDescending { it.timestamp }
         }
     }
 
-    // Calculations based on periodFilteredExpenses & periodFilteredIncomes
-    val totalSpend = periodFilteredExpenses.sumOf { it.amount }
-    val totalIncome = periodFilteredIncomes.sumOf { it.amount }
-    val netBalance = totalIncome - totalSpend
-    val commonSpend = periodFilteredExpenses.filter { it.splitType == "ALL_FAMILY" }.sumOf { it.amount }
-    val individualSpend = totalSpend - commonSpend
-    val totalBudget = if (categories.isNotEmpty()) {
-        categories.sumOf { it.monthlyBudget }.coerceAtLeast(1.0)
-    } else {
-        1150.0 // Standard fallback monthly budget so UI never flickers to 0.00€
-    }
-    val budgetProgress = (totalSpend / totalBudget).toFloat().coerceIn(0f, 1f)
-    val remainingBudget = (totalBudget - totalSpend).coerceAtLeast(0.0)
+    // Date grouping: Group items into "Σήμερα", "Χθες", or genuine calendar date (e.g. "Τετάρτη, 14 Οκτωβρίου 2026")
+    val groupedItems = remember(displayItems, locale, lang) {
+        val dayFormat = SimpleDateFormat("EEEE, d MMMM yyyy", locale)
+        val dayKeyFormat = SimpleDateFormat("yyyyMMdd", Locale.US)
 
-    // Collapsed months state map
-    val collapsedMonths = remember { mutableStateMapOf<String, Boolean>() }
+        val calToday = Calendar.getInstance()
+        val calYesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
 
-    // Group periodFilteredExpenses into Months & Days
-    val expensesByMonth = remember(periodFilteredExpenses, lang) {
-        val monthKeyFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-        val monthDisplayFormat = SimpleDateFormat("LLLL yyyy", Localization.getDateLocale(lang))
-        val dayDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val todayStr = dayDateFormat.format(Date())
-        val yesterdayStr = dayDateFormat.format(Date(System.currentTimeMillis() - 24L * 3600 * 1000))
-        val dayDisplayFormat = SimpleDateFormat("EEEE, d MMMM", Localization.getDateLocale(lang))
+        displayItems.groupBy { item ->
+            val itemCal = Calendar.getInstance().apply { timeInMillis = item.timestamp }
 
-        // Sort all expenses by entry timestamp descending first
-        val sortedExpenses = periodFilteredExpenses.sortedWith(
-            compareByDescending<Expense> { it.timestamp }.thenByDescending { it.id }
-        )
+            val isToday = itemCal.get(Calendar.YEAR) == calToday.get(Calendar.YEAR) &&
+                    itemCal.get(Calendar.DAY_OF_YEAR) == calToday.get(Calendar.DAY_OF_YEAR)
 
-        sortedExpenses
-            .groupBy { exp -> monthKeyFormat.format(Date(exp.timestamp)) }
-            .map { (monthKey, monthExpenses) ->
-                val sampleDate = Date(monthExpenses.firstOrNull()?.timestamp ?: System.currentTimeMillis())
-                val monthTitle = monthDisplayFormat.format(sampleDate).replaceFirstChar { it.uppercase() }
-                val monthTotal = monthExpenses.sumOf { it.amount }
+            val isYesterday = itemCal.get(Calendar.YEAR) == calYesterday.get(Calendar.YEAR) &&
+                    itemCal.get(Calendar.DAY_OF_YEAR) == calYesterday.get(Calendar.DAY_OF_YEAR)
 
-                // Group by dayKey (YYYY-MM-DD) so days sort strictly chronologically descending
-                val groupedByDayKey = monthExpenses.groupBy { exp ->
-                    dayDateFormat.format(Date(exp.timestamp))
+            val label = when {
+                isToday -> if (lang == Localization.Language.ENGLISH) "Today" else "Σήμερα"
+                isYesterday -> if (lang == Localization.Language.ENGLISH) "Yesterday" else "Χθες"
+                else -> {
+                    val raw = dayFormat.format(Date(item.timestamp))
+                    raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
                 }
-
-                // Build days map maintaining chronological order and proper headers
-                val groupedDays = linkedMapOf<String, List<Expense>>()
-                groupedByDayKey.keys.sortedDescending().forEach { dayKey ->
-                    val dayExpenses = groupedByDayKey[dayKey] ?: emptyList()
-                    val headerTitle = when (dayKey) {
-                        todayStr -> Localization.today(lang)
-                        yesterdayStr -> Localization.yesterday(lang)
-                        else -> {
-                            val firstExp = dayExpenses.firstOrNull()
-                            if (firstExp != null) {
-                                dayDisplayFormat.format(Date(firstExp.timestamp)).replaceFirstChar { it.uppercase() }
-                            } else {
-                                dayKey
-                            }
-                        }
-                    }
-                    groupedDays[headerTitle] = dayExpenses
-                }
-
-                MonthSectionData(
-                    key = monthKey,
-                    title = monthTitle,
-                    total = monthTotal,
-                    count = monthExpenses.size,
-                    days = groupedDays
-                )
             }
-            .sortedByDescending { it.key }
+            val key = dayKeyFormat.format(Date(item.timestamp))
+            Pair(key, label)
+        }.entries.sortedByDescending { it.key.first }
     }
 
-    LazyColumn(
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .testTag("expenses_screen_list"),
-        contentPadding = PaddingValues(bottom = 120.dp)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        // Modern Neo-Fintech Hero Monthly Card
-        item {
-            val expenseTabColor by animateColorAsState(
-                targetValue = if (activeViewMode == 0) Emerald500 else Color.Transparent,
-                animationSpec = tween(220),
-                label = "expense_tab_color"
-            )
-            val incomeTabColor by animateColorAsState(
-                targetValue = if (activeViewMode == 1) Emerald500 else Color.Transparent,
-                animationSpec = tween(220),
-                label = "income_tab_color"
-            )
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .testTag("monthly_summary_card"),
-                shape = RoundedCornerShape(28.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                border = BorderStroke(1.2.dp, GlassBorderBrush)
-            ) {
-                Box(
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // 1. HERO FOREST GREEN CARD (Exact match to Screenshot 1)
+            item(key = "hero_dashboard_card") {
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(HeroEmeraldGradient)
-                        .padding(22.dp)
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .testTag("hero_balance_card"),
+                    shape = RoundedCornerShape(26.dp),
+                    color = Color(0xFF044837),
+                    border = BorderStroke(1.dp, Color(0xFF065F46).copy(alpha = 0.6f)),
+                    tonalElevation = 6.dp
                 ) {
-                    // Ambient radial glow in top corner
                     Box(
                         modifier = Modifier
-                            .size(150.dp)
-                            .align(Alignment.TopEnd)
+                            .fillMaxWidth()
                             .background(
-                                Brush.radialGradient(
-                                    colors = listOf(Emerald400.copy(alpha = 0.25f), Color.Transparent)
-                                ),
-                                shape = CircleShape
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF044837),
+                                        Color(0xFF023628)
+                                    )
+                                )
                             )
-                    )
-
-                    Column {
-                        // Top row: Clickable Month Badge with Dropdown + Manual Add Button
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Month/year selector badge
-                            Box {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.White.copy(alpha = 0.12f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
-                                    modifier = Modifier
-                                        .clickable { showPeriodDropdown = true }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        val isExactTotalBudget = totalBudget > 0 && Math.abs(totalSpend - totalBudget) < 0.05
-                                        val isExceededTotalBudget = totalBudget > 0 && totalSpend > totalBudget + 0.05
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .clip(CircleShape)
-                                                .background(when {
-                                                    isExactTotalBudget -> Color(0xFF60A5FA)
-                                                    isExceededTotalBudget -> Color(0xFFF87171)
-                                                    else -> Emerald300
-                                                })
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = activePeriodDisplay,
-                                            color = Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowDropDown,
-                                            contentDescription = Localization.selectMonthYear(lang),
-                                            tint = Emerald200,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-
-                                DropdownMenu(
-                                    expanded = showPeriodDropdown,
-                                    onDismissRequest = { showPeriodDropdown = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        leadingIcon = {
-                                            Icon(Icons.Default.Receipt, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
-                                        },
-                                        text = {
-                                            Text(
-                                                text = Localization.allMonthsCombined(lang),
-                                                fontWeight = if (selectedPeriodKey == "ALL") FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        onClick = {
-                                            selectedPeriodKey = "ALL"
-                                            showPeriodDropdown = false
-                                        }
-                                    )
-                                    HorizontalDivider()
-                                    DropdownMenuItem(
-                                        leadingIcon = {
-                                            Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
-                                        },
-                                        text = {
-                                            Text(
-                                                text = "${Localization.currentMonth(lang)} ($currentMonthLabel)",
-                                                fontWeight = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == currentMonthKey) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        onClick = {
-                                            selectedPeriodKey = "CURRENT_MONTH"
-                                            showPeriodDropdown = false
-                                        }
-                                    )
-                                    availableMonths.filter { it != currentMonthKey }.forEach { monthKey ->
-                                        DropdownMenuItem(
-                                            leadingIcon = {
-                                                Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
-                                            },
-                                            text = {
-                                                Text(
-                                                    text = getMonthLabel(monthKey),
-                                                    fontWeight = if (selectedPeriodKey == monthKey) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            },
-                                            onClick = {
-                                                selectedPeriodKey = monthKey
-                                                showPeriodDropdown = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Modern glass manual add button
-                            Surface(
-                                shape = RoundedCornerShape(13.dp),
-                                color = Emerald500.copy(alpha = 0.28f),
-                                border = BorderStroke(1.dp, Emerald300.copy(alpha = 0.5f)),
-                                modifier = Modifier.clickable {
-                                    if (activeViewMode == 0) onAddManualExpense() else onAddManualIncome()
-                                }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (activeViewMode == 0) Localization.singleExpense(lang) else Localization.singleIncome(lang),
-                                        color = Color.White,
-                                        fontSize = 14.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        // Center: Prominent Net Balance (Copilot / Revolut style)
+                            .padding(18.dp)
+                    ) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
+                            // Top Row: Month Dropdown Chip + '+ Έξοδο' Pill Button
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Month Selector Chip
+                                Box {
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = Color(0xFF0A5541).copy(alpha = 0.85f),
+                                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                                        modifier = Modifier
+                                            .clickable { showMonthDropdown = true }
+                                            .testTag("month_selector_pill")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(7.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFF34D399))
+                                            )
+                                            Text(
+                                                text = currentMonthDisplay,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDropDown,
+                                                contentDescription = "Select Month",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = showMonthDropdown,
+                                        onDismissRequest = { showMonthDropdown = false }
+                                    ) {
+                                        if (availableMonths.size > 1) {
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = if (lang == Localization.Language.ENGLISH) "All Months" else "Όλοι οι μήνες",
+                                                        fontWeight = if (selectedMonthKey == "ALL") FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (selectedMonthKey == "ALL") Emerald700 else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                },
+                                                onClick = {
+                                                    selectedMonthKey = "ALL"
+                                                    showMonthDropdown = false
+                                                }
+                                            )
+                                        }
+                                        availableMonths.forEach { month ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = month.second,
+                                                        fontWeight = if (month.first == selectedMonthKey) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (month.first == selectedMonthKey) Emerald700 else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                },
+                                                onClick = {
+                                                    selectedMonthKey = month.first
+                                                    showMonthDropdown = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // '+ Έξοδο' Pill Button
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = Color(0xFF065F46),
+                                    border = BorderStroke(1.dp, Color(0xFF34D399).copy(alpha = 0.5f)),
+                                    modifier = Modifier
+                                        .clickable { onAddManualExpense() }
+                                        .testTag("hero_add_expense_btn")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "+ Expense" else "+ Έξοδο",
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            // Net Balance Header
                             Text(
-                                text = Localization.netBalanceLabel(lang),
-                                fontSize = 11.sp,
+                                text = if (lang == Localization.Language.ENGLISH) "NET BALANCE" else "ΚΑΘΑΡΟ ΥΠΟΛΟΙΠΟ",
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
-                                color = Emerald200.copy(alpha = 0.9f)
+                                color = Color(0xFFA7F3D0),
+                                letterSpacing = 0.8.sp
                             )
+
                             Spacer(modifier = Modifier.height(4.dp))
+
+                            // Big Amount
                             Text(
                                 text = String.format(Locale.US, "%s%.2f €", if (netBalance >= 0) "+" else "", netBalance),
-                                fontSize = 32.sp,
+                                fontSize = 35.sp,
                                 fontWeight = FontWeight.Black,
-                                color = Color.White,
-                                letterSpacing = (-0.5).sp,
-                                maxLines = 1,
-                                softWrap = false
+                                color = Color.White
                             )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // 'Εντός προϋπολογισμού' Status Badge
                             Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = (if (netBalance >= 0) Color(0xFF10B981) else Color(0xFFEF4444)).copy(alpha = 0.22f),
-                                border = BorderStroke(1.dp, (if (netBalance >= 0) Color(0xFF34D399) else Color(0xFFFCA5A5)).copy(alpha = 0.35f)),
-                                modifier = Modifier.padding(top = 6.dp)
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color(0xFF065F46).copy(alpha = 0.75f),
+                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f))
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Icon(
-                                        imageVector = if (netBalance >= 0) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                        imageVector = Icons.AutoMirrored.Filled.TrendingUp,
                                         contentDescription = null,
-                                        tint = if (netBalance >= 0) Color(0xFF6EE7B7) else Color(0xFFFCA5A5),
-                                        modifier = Modifier.size(13.dp)
+                                        tint = Color(0xFF6EE7B7),
+                                        modifier = Modifier.size(15.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(5.dp))
                                     Text(
-                                        text = if (netBalance >= 0) Localization.withinBudget(lang) else Localization.overBudget(lang),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (netBalance >= 0) Color(0xFF6EE7B7) else Color(0xFFFCA5A5)
+                                        text = if (isWithinBudget)
+                                            (if (lang == Localization.Language.ENGLISH) "Within budget" else "Εντός προϋπολογισμού")
+                                        else
+                                            (if (lang == Localization.Language.ENGLISH) "Over budget" else "Εκτός προϋπολογισμού"),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color(0xFF6EE7B7)
                                     )
                                 }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(18.dp))
+                            Spacer(modifier = Modifier.height(18.dp))
 
-                        // Dual Breakdown Capsules: Incomes vs Expenses
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            // Incomes Pill
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color(0xFF10B981).copy(alpha = 0.18f),
-                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f)),
-                                modifier = Modifier.weight(1f)
+                            // Middle Row: Incomes & Expenses Cards side by side
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                // Left Card: Έσοδα
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onAddManualIncome() },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFF065F46).copy(alpha = 0.35f),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.25f))
                                 ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = Color(0xFF10B981).copy(alpha = 0.30f),
-                                        modifier = Modifier.size(30.dp)
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.TrendingUp,
-                                                contentDescription = null,
-                                                tint = Color(0xFF6EE7B7),
-                                                modifier = Modifier.size(16.dp)
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Color(0xFF059669),
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Filled.TrendingUp,
+                                                    contentDescription = null,
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Column {
+                                            Text(
+                                                text = Localization.income(lang),
+                                                fontSize = 12.sp,
+                                                color = Color(0xFFA7F3D0)
+                                            )
+                                            Text(
+                                                text = String.format(Locale.US, "%.2f €", totalIncomesAmount),
+                                                fontSize = 17.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
                                             )
                                         }
                                     }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            text = Localization.income(lang),
-                                            fontSize = 11.5.sp,
-                                            color = Emerald200,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = String.format(Locale.US, "%.2f €", totalIncome),
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color.White,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
                                 }
-                            }
 
-                            // Expenses Pill
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color(0xFFEF4444).copy(alpha = 0.18f),
-                                border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f)),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                // Right Card: Έξοδα
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onAddManualExpense() },
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFF451A1A).copy(alpha = 0.35f),
+                                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.25f))
                                 ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = Color(0xFFEF4444).copy(alpha = 0.30f),
-                                        modifier = Modifier.size(30.dp)
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.TrendingDown,
-                                                contentDescription = null,
-                                                tint = Color(0xFFFCA5A5),
-                                                modifier = Modifier.size(16.dp)
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Color(0xFF7F1D1D),
+                                            modifier = Modifier.size(34.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ArrowDownward,
+                                                    contentDescription = null,
+                                                    tint = Color(0xFFFCA5A5),
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Column {
+                                            Text(
+                                                text = Localization.expenses(lang),
+                                                fontSize = 12.sp,
+                                                color = Color(0xFFFCA5A5)
+                                            )
+                                            Text(
+                                                text = String.format(Locale.US, "%.2f €", totalExpensesAmount),
+                                                fontSize = 17.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
                                             )
                                         }
                                     }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            text = Localization.expenses(lang),
-                                            fontSize = 11.5.sp,
-                                            color = Color(0xFFFCA5A5),
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = String.format(Locale.US, "%.2f €", totalSpend),
-                                            fontSize = 16.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color.White,
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Segmented Switcher Tab: 💸 Έξοδα (71) | 💰 Έσοδα (1)
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color(0xFF023225),
+                                border = BorderStroke(1.dp, Color(0xFF065F46).copy(alpha = 0.7f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(4.dp)
+                                ) {
+                                    // Tab 1: Έξοδα
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { selectedTypeFilter = "EXPENSE" },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (selectedTypeFilter == "EXPENSE") Color(0xFF10B981) else Color.Transparent
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 9.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "💸 ", fontSize = 14.sp)
+                                            Text(
+                                                text = "${Localization.expenses(lang)} (${monthExpenses.size})",
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (selectedTypeFilter == "EXPENSE") Color.White else Color(0xFFA7F3D0)
+                                            )
+                                        }
+                                    }
+
+                                    // Tab 2: Έσοδα
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { selectedTypeFilter = "INCOME" },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (selectedTypeFilter == "INCOME") Color(0xFF10B981) else Color.Transparent
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(vertical = 9.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "💰 ", fontSize = 14.sp)
+                                            Text(
+                                                text = "${Localization.income(lang)} (${monthIncomes.size})",
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (selectedTypeFilter == "INCOME") Color.White else Color(0xFFA7F3D0)
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                        // Switcher Segment: Έξοδα / Έσοδα (with smooth animated pill)
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = Color.White.copy(alpha = 0.12f),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(modifier = Modifier.padding(4.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(11.dp),
-                                    color = expenseTabColor,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { activeViewMode = 0 }
-                                ) {
-                                    Text(
-                                        text = Localization.expensesCount(lang, periodFilteredExpenses.size),
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (activeViewMode == 0) FontWeight.ExtraBold else FontWeight.Medium,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 8.dp)
-                                    )
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(11.dp),
-                                    color = incomeTabColor,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { activeViewMode = 1 }
-                                ) {
-                                    Text(
-                                        text = Localization.incomesCount(lang, periodFilteredIncomes.size),
-                                        color = Color.White,
-                                        fontSize = 13.sp,
-                                        fontWeight = if (activeViewMode == 1) FontWeight.ExtraBold else FontWeight.Medium,
-                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                        modifier = Modifier.padding(vertical = 8.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        if (activeViewMode == 0) {
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Budget Progress & Remaining Track
+                            // Budget Progress Section
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "${Localization.remainingBudgetPrefix(lang)} ${String.format(Locale.US, "%.2f €", remainingBudget)}",
-                                    color = Emerald100,
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Medium
+                                    text = if (lang == Localization.Language.ENGLISH)
+                                        String.format(Locale.US, "Remaining Budget: %.2f €", remainingBudget)
+                                    else
+                                        String.format(Locale.US, "Υπόλοιπο Budget: %.2f €", remainingBudget),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White
                                 )
+
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = Color.White.copy(alpha = 0.12f)
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFF065F46).copy(alpha = 0.8f)
                                 ) {
                                     Text(
-                                        text = "${(budgetProgress * 100).toInt()}% ${Localization.ofBudget(lang)}",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
+                                        text = if (lang == Localization.Language.ENGLISH)
+                                            "$budgetPercent% of budget"
+                                        else
+                                            "$budgetPercent% του budget",
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        color = Color(0xFFA7F3D0),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                            val isExactTotalBudget = totalBudget > 0 && Math.abs(totalSpend - totalBudget) < 0.05
-                            val isExceededTotalBudget = totalBudget > 0 && totalSpend > totalBudget + 0.05
+                            // Budget Progress Bar
+                            val animatedProgress by animateFloatAsState(
+                                targetValue = (budgetPercent.coerceIn(0, 100) / 100f),
+                                label = "budget_progress"
+                            )
                             LinearProgressIndicator(
-                                progress = { budgetProgress },
+                                progress = { animatedProgress },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(7.dp)
-                                    .clip(CircleShape),
-                                color = when {
-                                    isExactTotalBudget -> Color(0xFF60A5FA)
-                                    isExceededTotalBudget -> Color(0xFFF87171)
-                                    else -> Emerald400
-                                },
-                                trackColor = Color.White.copy(alpha = 0.2f)
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = Color(0xFF34D399),
+                                trackColor = Color(0xFF065F46).copy(alpha = 0.7f),
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
 
-                            // Dual Breakdown Capsules (Common vs Individual)
+                            // Bottom Row: Κοινά Σπιτιού & Ατομικά Cards
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
+                                // Left Card: Κοινά Σπιτιού
                                 Surface(
                                     modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.White.copy(alpha = 0.08f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFF065F46).copy(alpha = 0.35f),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.2f))
                                 ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
                                             Icon(
                                                 imageVector = Icons.Default.Group,
                                                 contentDescription = null,
-                                                tint = Emerald300,
-                                                modifier = Modifier.size(13.dp)
+                                                tint = Color(0xFFA7F3D0),
+                                                modifier = Modifier.size(16.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(5.dp))
                                             Text(
-                                                text = Localization.commonHousehold(lang),
-                                                color = Emerald100,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Medium
+                                                text = if (lang == Localization.Language.ENGLISH) "Shared" else "Κοινά Σπιτιού",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFFA7F3D0)
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = String.format(Locale.US, "%.2f €", commonSpend),
-                                            color = Color.White,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold
+                                            text = String.format(Locale.US, "%.2f €", sharedExpenses),
+                                            fontSize = 17.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
                                         )
                                     }
                                 }
 
+                                // Right Card: Ατομικά
                                 Surface(
                                     modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.White.copy(alpha = 0.08f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color(0xFF065F46).copy(alpha = 0.35f),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.2f))
                                 ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
                                             Icon(
-                                                imageVector = Icons.Default.TrendingDown,
+                                                imageVector = Icons.AutoMirrored.Filled.TrendingUp,
                                                 contentDescription = null,
-                                                tint = Emerald300,
-                                                modifier = Modifier.size(13.dp)
+                                                tint = Color(0xFFA7F3D0),
+                                                modifier = Modifier.size(16.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(5.dp))
                                             Text(
-                                                text = Localization.individualPersonal(lang),
-                                                color = Emerald100,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Medium
+                                                text = if (lang == Localization.Language.ENGLISH) "Personal" else "Ατομικά",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color(0xFFA7F3D0)
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            text = String.format(Locale.US, "%.2f €", individualSpend),
-                                            color = Color.White,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold
+                                            text = String.format(Locale.US, "%.2f €", individualExpenses),
+                                            fontSize = 17.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -793,341 +744,155 @@ fun ExpensesScreen(
                     }
                 }
             }
-        }
 
-        // New User Onboarding Setup Guide Card (Step-by-step guidance for categories & members)
-        if (members.isEmpty() || categories.isEmpty()) {
-            item(key = "setup_guide_card") {
-                val completedSteps = (if (members.isNotEmpty()) 1 else 0) + (if (categories.isNotEmpty()) 1 else 0)
-                Card(
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-                    border = BorderStroke(1.5.dp, Emerald700.copy(alpha = 0.35f)),
+            // 2. SEARCH BAR (Matches Screenshot 1 & 2)
+            item(key = "search_bar_item") {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .testTag("household_setup_guide_card")
+                        .padding(horizontal = 16.dp, vertical = 2.dp)
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(CircleShape)
-                                        .background(Emerald100),
-                                    contentAlignment = Alignment.Center
-                                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        placeholder = {
+                            Text(
+                                text = Localization.searchExpensesPlaceholder(lang),
+                                fontSize = 13.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = Color(0xFF059669),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotBlank()) {
+                                IconButton(onClick = { onSearchQueryChange("") }) {
                                     Icon(
-                                        imageVector = Icons.Default.Tune,
-                                        contentDescription = null,
-                                        tint = Emerald700,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Quick Setup Guide" else "Οδηγός Πρώτων Βημάτων",
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Set up your budget in 2 steps" else "Διαμορφώστε το εξοδολόγιό σας σε 2 βήματα",
-                                        fontSize = 11.5.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Clear",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
-
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Emerald700.copy(alpha = 0.12f)
-                            ) {
-                                Text(
-                                    text = "$completedSteps / 2",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Emerald700,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Step 1: Members
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (members.isEmpty()) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f) else Emerald100.copy(alpha = 0.3f),
-                            border = BorderStroke(1.dp, if (members.isEmpty()) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f) else Emerald700.copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(if (members.isNotEmpty()) Emerald700 else MaterialTheme.colorScheme.outlineVariant),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (members.isNotEmpty()) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                        } else {
-                                            Text("1", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = if (lang == Localization.Language.ENGLISH) "1. Add Household Members" else "1. Προσθήκη Μελών Εξοδολογίου",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.5.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = if (members.isEmpty()) {
-                                                if (lang == Localization.Language.ENGLISH) "Add yourself or family members to track who paid each expense."
-                                                else "Προσθέστε το πρώτο μέλος (εσάς ή την οικογένεια) για να παρακολουθείτε ποιος πληρώνει."
-                                            } else {
-                                                "✓ ${members.joinToString(", ") { it.name }}"
-                                            },
-                                            fontSize = 11.5.sp,
-                                            color = if (members.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else Emerald700
-                                        )
-                                    }
-                                }
-
-                                if (members.isEmpty()) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Button(
-                                        onClick = onAddMember,
-                                        shape = RoundedCornerShape(10.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
-                                        modifier = Modifier.fillMaxWidth().height(36.dp).testTag("setup_add_member_button")
-                                    ) {
-                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(if (lang == Localization.Language.ENGLISH) "Add Member" else "Προσθήκη Πρώτου Μέλους", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Step 2: Categories
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (categories.isEmpty()) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f) else Emerald100.copy(alpha = 0.3f),
-                            border = BorderStroke(1.dp, if (categories.isEmpty()) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f) else Emerald700.copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(if (categories.isNotEmpty()) Emerald700 else MaterialTheme.colorScheme.outlineVariant),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (categories.isNotEmpty()) {
-                                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                        } else {
-                                            Text("2", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = if (lang == Localization.Language.ENGLISH) "2. Create Expense Categories" else "2. Δημιουργία Κατηγοριών Εξόδων",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.5.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = if (categories.isEmpty()) {
-                                                if (lang == Localization.Language.ENGLISH) "Create your own categories or load a starter set."
-                                                else "Δημιουργήστε τις δικές σας κατηγορίες ή φορτώστε ένα βασικό σετ."
-                                            } else {
-                                                if (lang == Localization.Language.ENGLISH) "✓ ${categories.size} categories configured"
-                                                else "✓ Έχουν ρυθμιστεί ${categories.size} κατηγορίες"
-                                            },
-                                            fontSize = 11.5.sp,
-                                            color = if (categories.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else Emerald700
-                                        )
-                                    }
-                                }
-
-                                if (categories.isEmpty()) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Button(
-                                            onClick = onAddCategory,
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
-                                            modifier = Modifier.weight(1f).height(36.dp).testTag("setup_add_category_button")
-                                        ) {
-                                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(if (lang == Localization.Language.ENGLISH) "New Category" else "Νέα Κατηγορία", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        OutlinedButton(
-                                            onClick = onSeedStandardCategories,
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier.weight(1f).height(36.dp).testTag("setup_load_categories_button")
-                                        ) {
-                                            Text(if (lang == Localization.Language.ENGLISH) "Load Starter" else "Φόρτωση Βασικών", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(20.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedBorderColor = Emerald700,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("expenses_search_input")
+                    )
                 }
             }
-        }
 
-        // Search Bar & Side-by-Side Dropdown Filters (Requirement 2)
-        item {
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                // Search Input
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = onSearchQueryChange,
-                    placeholder = { Text(Localization.searchExpensesPlaceholder(lang), fontSize = 13.sp) },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = Emerald700)
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { onSearchQueryChange("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = Localization.clear(lang), tint = Color.Gray)
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("expense_search_input"),
-                    shape = RoundedCornerShape(16.dp),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Emerald700,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
+            // 3. FILTER DROPDOWN BUTTONS (Matches Screenshot 1 & 2: '👤 Όλα ▾' and '🔺 Όλες οι Κατηγορίες ▾')
+            item(key = "filter_dropdowns_item") {
+                val selectedMemberName = remember(selectedMemberFilter, members, lang) {
+                    if (selectedMemberFilter == null) {
+                        Localization.allFilter(lang)
+                    } else {
+                        members.find { it.id == selectedMemberFilter }?.name ?: Localization.allFilter(lang)
+                    }
+                }
 
-                // Requirement 2: Side-by-Side Dropdown Menus for Members and Categories
+                val selectedCategoryName = remember(selectedCategoryFilter, categories, lang) {
+                    if (selectedCategoryFilter == null) {
+                        Localization.allCategoriesFilter(lang)
+                    } else {
+                        categories.find { it.id == selectedCategoryFilter }?.let { Localization.translateCategory(it.name, lang) } ?: Localization.allCategoriesFilter(lang)
+                    }
+                }
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Member Dropdown Button (Left)
+                    // Member Filter Dropdown
                     Box(modifier = Modifier.weight(1f)) {
-                        val selectedMember = members.find { it.id == selectedMemberFilter }
                         Surface(
                             shape = RoundedCornerShape(14.dp),
-                            color = if (selectedMemberFilter != null) Emerald700.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, if (selectedMemberFilter != null) Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { showMemberDropdown = true }
+                                .testTag("member_filter_dropdown")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
                                 ) {
-                                    if (selectedMember != null) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(13.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(selectedMember.avatarColorHex))
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = selectedMember.name,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    } else if (selectedMemberFilter == -1L) {
-                                        Icon(Icons.Default.Group, contentDescription = null, tint = Emerald700, modifier = Modifier.size(15.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(Localization.commonFamilyFilter(lang), fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    } else {
-                                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(Localization.allFilter(lang), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = selectedMemberName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
 
                         DropdownMenu(
                             expanded = showMemberDropdown,
-                            onDismissRequest = { showMemberDropdown = false },
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                            onDismissRequest = { showMemberDropdown = false }
                         ) {
                             DropdownMenuItem(
-                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                text = { Text(Localization.allFilter(lang), fontWeight = if (selectedMemberFilter == null) FontWeight.Bold else FontWeight.Normal) },
+                                text = {
+                                    Text(
+                                        text = Localization.allFilter(lang),
+                                        fontWeight = if (selectedMemberFilter == null) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selectedMemberFilter == null) Emerald700 else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
                                 onClick = {
                                     onMemberFilterChange(null)
                                     showMemberDropdown = false
                                 }
                             )
-                            DropdownMenuItem(
-                                leadingIcon = { Icon(Icons.Default.Group, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp)) },
-                                text = { Text(Localization.commonFamilyFilter(lang), fontWeight = if (selectedMemberFilter == -1L) FontWeight.Bold else FontWeight.Normal) },
-                                onClick = {
-                                    onMemberFilterChange(-1L)
-                                    showMemberDropdown = false
-                                }
-                            )
-                            if (members.isNotEmpty()) {
-                                HorizontalDivider()
-                            }
                             members.forEach { m ->
                                 DropdownMenuItem(
-                                    leadingIcon = {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(14.dp)
-                                                .clip(CircleShape)
-                                                .background(Color(m.avatarColorHex))
+                                    text = {
+                                        Text(
+                                            text = m.name,
+                                            fontWeight = if (selectedMemberFilter == m.id) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (selectedMemberFilter == m.id) Emerald700 else MaterialTheme.colorScheme.onSurface
                                         )
                                     },
-                                    text = { Text("${m.name} (${Localization.translateRole(m.role, lang)})", fontWeight = if (selectedMemberFilter == m.id) FontWeight.Bold else FontWeight.Normal) },
                                     onClick = {
                                         onMemberFilterChange(m.id)
                                         showMemberDropdown = false
@@ -1137,78 +902,77 @@ fun ExpensesScreen(
                         }
                     }
 
-                    // Category Dropdown Button (Right)
+                    // Category Filter Dropdown
                     Box(modifier = Modifier.weight(1f)) {
-                        val selectedCategory = categories.find { it.id == selectedCategoryFilter }
                         Surface(
                             shape = RoundedCornerShape(14.dp),
-                            color = if (selectedCategoryFilter != null) Emerald700.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, if (selectedCategoryFilter != null) Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            color = MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { showCategoryDropdown = true }
+                                .testTag("category_filter_dropdown")
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
                                 ) {
-                                    if (selectedCategory != null) {
-                                        Icon(
-                                            CategoryIconHelper.getIcon(selectedCategory.iconKey),
-                                            contentDescription = null,
-                                            tint = Color(selectedCategory.colorHex),
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = Localization.translateCategory(selectedCategory.name, lang),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    } else {
-                                        Icon(Icons.Default.Category, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(15.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(Localization.allCategoriesFilter(lang), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Category,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = selectedCategoryName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
                             }
                         }
 
                         DropdownMenu(
                             expanded = showCategoryDropdown,
-                            onDismissRequest = { showCategoryDropdown = false },
-                            modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+                            onDismissRequest = { showCategoryDropdown = false }
                         ) {
                             DropdownMenuItem(
-                                leadingIcon = { Icon(Icons.Default.Category, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                                text = { Text(Localization.allCategoriesFilter(lang), fontWeight = if (selectedCategoryFilter == null) FontWeight.Bold else FontWeight.Normal) },
+                                text = {
+                                    Text(
+                                        text = Localization.allCategoriesFilter(lang),
+                                        fontWeight = if (selectedCategoryFilter == null) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selectedCategoryFilter == null) Emerald700 else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
                                 onClick = {
                                     onCategoryFilterChange(null)
                                     showCategoryDropdown = false
                                 }
                             )
-                            if (categories.isNotEmpty()) {
-                                HorizontalDivider()
-                            }
                             categories.forEach { cat ->
                                 DropdownMenuItem(
-                                    leadingIcon = {
-                                        Icon(
-                                            CategoryIconHelper.getIcon(cat.iconKey),
-                                            contentDescription = null,
-                                            tint = Color(cat.colorHex),
-                                            modifier = Modifier.size(16.dp)
+                                    text = {
+                                        Text(
+                                            text = Localization.translateCategory(cat.name, lang),
+                                            fontWeight = if (selectedCategoryFilter == cat.id) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (selectedCategoryFilter == cat.id) Emerald700 else MaterialTheme.colorScheme.onSurface
                                         )
                                     },
-                                    text = { Text(Localization.translateCategory(cat.name, lang), fontWeight = if (selectedCategoryFilter == cat.id) FontWeight.Bold else FontWeight.Normal) },
                                     onClick = {
                                         onCategoryFilterChange(cat.id)
                                         showCategoryDropdown = false
@@ -1219,458 +983,72 @@ fun ExpensesScreen(
                     }
                 }
             }
-        }
 
-
-        item { Spacer(modifier = Modifier.height(6.dp)) }
-
-        if (activeViewMode == 1) {
-            // INCOMES LIST
-            if (periodFilteredIncomes.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 20.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color(0xFF10B981).copy(alpha = 0.15f),
-                                modifier = Modifier.size(68.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.TrendingUp,
-                                        contentDescription = null,
-                                        tint = Color(0xFF059669),
-                                        modifier = Modifier.size(34.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = Localization.noIncomesFound(lang),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = Localization.noIncomesForPeriod(lang),
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                lineHeight = 19.sp
-                            )
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Button(
-                                onClick = onAddManualIncome,
-                                shape = RoundedCornerShape(14.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF059669), contentColor = Color.White),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(46.dp)
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(Localization.recordNewIncome(lang), fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-                        }
-                    }
-                }
-            } else {
-                val dayDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                val todayStr = dayDateFormat.format(Date())
-                val yesterdayStr = dayDateFormat.format(Date(System.currentTimeMillis() - 24L * 3600 * 1000))
-                val dayDisplayFormat = SimpleDateFormat("EEEE, d MMMM", Localization.getDateLocale(lang))
-
-                val incomesByDay = periodFilteredIncomes.groupBy { inc ->
-                    val dayKey = dayDateFormat.format(Date(inc.timestamp))
-                    when (dayKey) {
-                        todayStr -> Localization.today(lang)
-                        yesterdayStr -> Localization.yesterday(lang)
-                        else -> dayDisplayFormat.format(Date(inc.timestamp)).replaceFirstChar { it.uppercase() }
-                    }
-                }
-
-                incomesByDay.forEach { (dateHeader, dayIncomes) ->
-                    item(key = "income_day_header_$dateHeader") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = dateHeader,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                            Text(
-                                text = String.format(Locale.US, "+%.2f €", dayIncomes.sumOf { it.amount }),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF059669)
-                            )
-                        }
-                    }
-
-                    items(dayIncomes, key = { "inc_${it.id}_${it.cloudId}" }) { income ->
-                        val member = members.find { it.id == income.memberId }
-                        val memberColor = member?.let { Color(it.avatarColorHex) } ?: Color(0xFF3B82F6)
-
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(18.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = Color(0xFF10B981).copy(alpha = 0.15f),
-                                        modifier = Modifier.size(44.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.TrendingUp,
-                                                contentDescription = null,
-                                                tint = Color(0xFF059669),
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column {
-                                        Text(
-                                            text = income.title,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1
-                                        )
-
-                                        Spacer(modifier = Modifier.height(4.dp))
-
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            // Member Chip
-                                            // Member Pill
-                                            if (income.memberName.isNotBlank()) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(7.dp),
-                                                    color = memberColor.copy(alpha = 0.12f)
-                                                ) {
-                                                    Row(
-                                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Person,
-                                                            contentDescription = null,
-                                                            tint = memberColor,
-                                                            modifier = Modifier.size(12.dp)
-                                                        )
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text(
-                                                            text = income.memberName,
-                                                            fontSize = 11.sp,
-                                                            color = memberColor,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            // Category Chip
-                                            if (income.category.isNotBlank()) {
-                                                Surface(
-                                                    shape = RoundedCornerShape(7.dp),
-                                                    color = Color(0xFF10B981).copy(alpha = 0.12f)
-                                                ) {
-                                                    Text(
-                                                        text = Localization.translateCategory(income.category, lang),
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = Color(0xFF047857),
-                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        if (income.note.isNotBlank()) {
-                                            Spacer(modifier = Modifier.height(3.dp))
-                                            Text(
-                                                text = "📝 ${income.note}",
-                                                fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Amount & Actions
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = String.format(Locale.US, "+%.2f €", income.amount),
-                                        fontSize = 16.5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = Color(0xFF059669)
-                                    )
-
-                                    Spacer(modifier = Modifier.height(2.dp))
-
-                                    Row {
-                                        IconButton(
-                                            onClick = { onEditIncome(income) },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Edit,
-                                                contentDescription = Localization.edit(lang),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-
-                                        IconButton(
-                                            onClick = { incomeToDelete = income },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.DeleteOutline,
-                                                contentDescription = Localization.delete(lang),
-                                                tint = MaterialTheme.colorScheme.error,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // Friendly Empty state or initial fast loading state
-            if (isInitialLoading && periodFilteredExpenses.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 20.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(36.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator(
-                                color = Emerald700,
-                                strokeWidth = 3.dp,
-                                modifier = Modifier.size(36.dp)
-                            )
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH) "Loading expenses..." else "Φόρτωση εξόδων...",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            } else if (periodFilteredExpenses.isEmpty()) {
-            item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 20.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(28.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Emerald100,
-                            modifier = Modifier.size(68.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Receipt,
-                                    contentDescription = null,
-                                    tint = Emerald700,
-                                    modifier = Modifier.size(34.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = if (expenses.isEmpty()) {
-                                if (lang == Localization.Language.ENGLISH) "Welcome to Fintel!" else "Καλώς ήρθατε στο Fintel!"
-                            } else {
-                                Localization.noExpensesFound(lang)
-                            },
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = if (expenses.isEmpty()) {
-                                if (lang == Localization.Language.ENGLISH)
-                                    "Your household is clear. Start tracking your expenses quickly and easily:"
-                                else
-                                    "Το εξοδολόγιό σας είναι πεντακάθαρο. Καταχωρήστε εύκολα και γρήγορα το πρώτο σας έξοδο:"
-                            } else {
-                                Localization.noExpensesForPeriod(lang)
-                            },
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            lineHeight = 19.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
-                        // Action 1: Voice Button
-                        Button(
-                            onClick = onVoiceExpense,
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp)
-                        ) {
-                            Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(Localization.voiceInput(lang), fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Action 2: Manual Add Button
-                        OutlinedButton(
-                            onClick = onAddManualExpense,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(Localization.addExpense(lang), fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Requirement 1: Monthly Grouped Expenses (No endless scrolling, clean month separation)
-        expensesByMonth.forEachIndexed { index, monthSection ->
-            // Collapse older months by default when viewing multiple months, keeping latest month open
-            val isCollapsed = collapsedMonths[monthSection.key] ?: (expensesByMonth.size > 1 && index > 0)
-
-            // Month Section Header Card
-            item(key = "month_header_${monthSection.key}") {
+            // 4. MONTHLY SUMMARY EXPANDABLE CARD (Matches Screenshot 1 & 2: '📅 Οκτώβριος 2026 | 71 συναλλαγές | 2062.66 € ⌃')
+            item(key = "monthly_summary_card") {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clickable {
-                            collapsedMonths[monthSection.key] = !isCollapsed
-                        }
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clickable { isMonthlyListExpanded = !isMonthlyListExpanded }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            // Mint box with Calendar Icon
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Emerald700.copy(alpha = 0.12f),
-                                modifier = Modifier.size(28.dp)
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color(0xFFD1FAE5),
+                                modifier = Modifier.size(38.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Default.CalendarMonth,
                                         contentDescription = null,
-                                        tint = Emerald700,
-                                        modifier = Modifier.size(16.dp)
+                                        tint = Color(0xFF059669),
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
+
                             Column {
                                 Text(
-                                    text = monthSection.title,
-                                    fontSize = 14.sp,
+                                    text = currentMonthDisplay,
+                                    fontSize = 14.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = Localization.transactionsPlural(lang, monthSection.count),
-                                    fontSize = 11.sp,
+                                    text = "${displayItems.size} συναλλαγές",
+                                    fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Text(
-                                text = String.format(Locale.US, "%.2f €", monthSection.total),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Emerald700
+                                text = String.format(Locale.US, "%.2f €", if (selectedTypeFilter == "INCOME") totalIncomesAmount else totalExpensesAmount),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF047857)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
                             Icon(
-                                imageVector = if (isCollapsed) Icons.Default.ExpandMore else Icons.Default.ExpandLess,
-                                contentDescription = if (isCollapsed) (if (lang == Localization.Language.ENGLISH) "Expand" else "Ανάπτυξη") else (if (lang == Localization.Language.ENGLISH) "Collapse" else "Σύμπτυξη"),
+                                imageVector = if (isMonthlyListExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (isMonthlyListExpanded) "Collapse" else "Expand",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1679,237 +1057,459 @@ fun ExpensesScreen(
                 }
             }
 
-            // Days inside the month (Only if not collapsed)
-            if (!isCollapsed) {
-                monthSection.days.forEach { (dateHeader, dayExpenses) ->
-                    item(key = "day_header_${monthSection.key}_$dateHeader") {
+            // 5. TRANSACTIONS LIST (Grouped by Day: Σήμερα, Χθες, etc.)
+            if (isInitialLoading) {
+                item(key = "loading_state") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Emerald700)
+                    }
+                }
+            } else if (displayItems.isEmpty()) {
+                item(key = "empty_state") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Emerald700.copy(alpha = 0.12f),
+                                modifier = Modifier.size(60.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Receipt,
+                                        contentDescription = null,
+                                        tint = Emerald700,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = Localization.noExpensesFound(lang),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = Localization.noExpensesForPeriod(lang),
+                                fontSize = 12.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else if (isMonthlyListExpanded) {
+                groupedItems.forEach { group ->
+                    val dayLabel = group.key.second
+                    val itemsInDay = group.value
+                    val dayTotal = itemsInDay.filterIsInstance<ActivityItem.ExpenseItem>().sumOf { it.expense.amount }
+                    val dayIncomeTotal = itemsInDay.filterIsInstance<ActivityItem.IncomeItem>().sumOf { it.income.amount }
+
+                    // Day Header Row (Σήμερα - 28.00 €, Χθες - 559.20 €)
+                    item(key = "header_${group.key.first}") {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 4.dp),
+                                .padding(horizontal = 20.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = dateHeader,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
+                                text = dayLabel,
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF059669)
                             )
-                            Text(
-                                text = String.format(Locale.US, "%.2f €", dayExpenses.sumOf { it.amount }),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+
+                            val displayDayTotal = if (selectedTypeFilter == "INCOME") dayIncomeTotal else dayTotal
+                            if (displayDayTotal > 0.0) {
+                                Text(
+                                    text = String.format(Locale.US, "%.2f €", displayDayTotal),
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF64748B)
+                                )
+                            }
                         }
                     }
 
-                    items(dayExpenses, key = { it.id }) { expense ->
-                        val category = categories.find { it.id == expense.categoryId }
-                            ?: categories.find { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) == GreekVoiceParser.normalizeGreek(expense.categoryName.trim().lowercase()) }
-                        val catColor = category?.let { Color(it.colorHex) } ?: CategoryIconHelper.getColorForCategoryName(expense.categoryName)
-                        val catIcon = CategoryIconHelper.getIconForCategoryName(expense.categoryName, category?.iconKey)
-                        val fontColor = if (category != null && category.fontColorHex != 0L) {
-                            Color(category.fontColorHex)
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
+                    // Individual Cards for this Day
+                    items(itemsInDay, key = { it.key }) { item ->
+                        when (item) {
+                            is ActivityItem.ExpenseItem -> {
+                                val expense = item.expense
+                                val matchingCategory = categories.find { it.id == expense.categoryId }
+                                    ?: categories.find { it.name.equals(expense.categoryName, ignoreCase = true) }
+                                val iconKey = matchingCategory?.iconKey ?: "cart"
 
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp)
-                                .testTag("expense_card_${expense.id}")
-                                .clickable { onEditExpense(expense) },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                            ) {
-                                // Top Row: Icon + Title/Category + Amount
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
+                                // Payer display (Chip 1: green badge e.g. "👥 Γονείς" or "👤 Μάριος")
+                                val payerText = expense.getPayerCategoryOrNamesDisplay(members, lang)
+                                    .replace(Regex("\\s*\\([^)]*\\)"), "").trim()
+
+                                // Target / Beneficiary display (Chip 2: blue badge e.g. "👥 Γονείς" or "👤 Γεωργία")
+                                val beneficiaryText = expense.getBeneficiaryCategoryOrNamesDisplay(members, lang)
+                                    .replace(Regex("\\s*\\([^)]*\\)"), "").trim()
+
+                                Surface(
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                    tonalElevation = 1.dp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 2.dp)
+                                        .clickable { onEditExpense(expense) }
+                                        .testTag("expense_card_${expense.id}")
                                 ) {
-                                    Box(
+                                    Column(
                                         modifier = Modifier
-                                            .size(42.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(catColor.copy(alpha = 0.14f)),
-                                        contentAlignment = Alignment.Center
+                                            .fillMaxWidth()
+                                            .padding(14.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = catIcon,
-                                            contentDescription = null,
-                                            tint = catColor,
-                                            modifier = Modifier.size(22.dp)
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = expense.title,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = fontColor,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        // Top Row: Icon + Title + Category + Amount
                                         Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = Localization.translateCategory(expense.categoryName, lang),
-                                                fontSize = 12.sp,
-                                                color = catColor,
-                                                fontWeight = FontWeight.Medium,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            if (expense.note.isNotBlank()) {
+                                            // Category icon in soft mint rounded box
+                                            Surface(
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = Color(0xFFD1FAE5),
+                                                modifier = Modifier.size(46.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = CategoryIconHelper.getIcon(iconKey),
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF059669),
+                                                        modifier = Modifier.size(24.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = " • ${expense.note}",
-                                                    fontSize = 11.5.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    text = expense.title,
+                                                    fontSize = 15.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Text(
+                                                        text = Localization.translateCategory(expense.categoryName, lang),
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = Color(0xFF059669),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    val cardCal = remember(expense.timestamp) {
+                                                        Calendar.getInstance().apply { timeInMillis = expense.timestamp }
+                                                    }
+                                                    val hasTime = cardCal.get(Calendar.HOUR_OF_DAY) != 0 || cardCal.get(Calendar.MINUTE) != 0
+                                                    val cardDateStr = remember(expense.timestamp, locale, hasTime) {
+                                                        val pattern = if (hasTime) "dd/MM/yyyy • HH:mm" else "dd/MM/yyyy"
+                                                        SimpleDateFormat(pattern, locale).format(Date(expense.timestamp))
+                                                    }
+                                                    Text(
+                                                        text = " • $cardDateStr",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Normal,
+                                                        color = Color(0xFF64748B),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                            Text(
+                                                text = String.format(Locale.US, "%.2f €", expense.amount),
+                                                fontSize = 17.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        // Bottom Row: Member Chips + Actions (Pencil & Trash)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            ) {
+                                                // Chip 1 (Payer): Mint background
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = Color(0xFFE6F4EA),
+                                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (payerText.contains("&") || payerText.contains(",") || payerText.contains("Γονείς") || payerText.contains("Παιδιά") || payerText.contains("Συγκάτοικοι") || payerText.contains("Οικογένεια") || payerText.contains("Parents") || payerText.contains("Children") || payerText.contains("Roommates") || payerText.contains("Family")) Icons.Default.Group else Icons.Default.Person,
+                                                            contentDescription = null,
+                                                            tint = Color(0xFF047857),
+                                                            modifier = Modifier.size(13.dp)
+                                                        )
+                                                        Text(
+                                                            text = payerText,
+                                                            fontSize = 11.5.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = Color(0xFF047857),
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+
+                                                // Chip 2 (Target / Split): Soft Blue background
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = Color(0xFFEFF6FF),
+                                                    border = BorderStroke(1.dp, Color(0xFF3B82F6).copy(alpha = 0.3f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (beneficiaryText.contains("Γονείς") || beneficiaryText.contains("Παιδιά") || beneficiaryText.contains("Συγκάτοικοι") || beneficiaryText.contains("Οικογένεια") || beneficiaryText.contains("Parents") || beneficiaryText.contains("Children") || beneficiaryText.contains("Roommates") || beneficiaryText.contains("Family") || beneficiaryText.contains("&") || beneficiaryText.contains(",")) Icons.Default.Group else Icons.Default.Person,
+                                                            contentDescription = null,
+                                                            tint = Color(0xFF2563EB),
+                                                            modifier = Modifier.size(13.dp)
+                                                        )
+                                                        Text(
+                                                            text = beneficiaryText,
+                                                            fontSize = 11.5.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = Color(0xFF1D4ED8),
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            // Action Buttons: Edit & Delete
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                IconButton(
+                                                    onClick = { onEditExpense(expense) },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Edit,
+                                                        contentDescription = "Edit",
+                                                        tint = Color(0xFF64748B),
+                                                        modifier = Modifier.size(17.dp)
+                                                    )
+                                                }
+
+                                                IconButton(
+                                                    onClick = { expenseToDelete = expense },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "Delete",
+                                                        tint = Color(0xFFEF4444).copy(alpha = 0.85f),
+                                                        modifier = Modifier.size(17.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-
-                                    Spacer(modifier = Modifier.width(10.dp))
-
-                                    Text(
-                                        text = String.format(Locale.US, "%.2f €", expense.amount),
-                                        fontSize = 16.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = fontColor
-                                    )
                                 }
+                            }
 
-                                // Bottom Row: Badges (Payer with Hand Cash Icon & Beneficiary) + Edit/Delete Actions
-                                val payerDisplay = expense.getPayerCategoryOrNamesDisplay(members, lang)
-                                val beneficiaryDisplay = expense.getBeneficiaryCategoryOrNamesDisplay(members, lang)
-                                val isBeneficiaryGroup = expense.splitType == "ALL_FAMILY" ||
-                                    beneficiaryDisplay == "Οικογένεια" ||
-                                    beneficiaryDisplay == "Family" ||
-                                    beneficiaryDisplay == "Παιδιά" ||
-                                    beneficiaryDisplay == "Children" ||
-                                    beneficiaryDisplay == "Γονείς" ||
-                                    beneficiaryDisplay == "Parents" ||
-                                    beneficiaryDisplay == "Συγκάτοικοι" ||
-                                    beneficiaryDisplay == "Συνεργάτες" ||
-                                    beneficiaryDisplay.contains(",") ||
-                                    beneficiaryDisplay.contains("&")
+                            is ActivityItem.IncomeItem -> {
+                                val income = item.income
 
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                Surface(
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f)),
+                                    tonalElevation = 1.dp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 2.dp)
+                                        .clickable { onEditIncome(income) }
+                                        .testTag("income_card_${income.id}")
                                 ) {
-                                    Row(
-                                        modifier = Modifier.weight(1f, fill = false),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(14.dp)
                                     ) {
-                                        if (payerDisplay.isNotBlank()) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = Emerald700.copy(alpha = 0.12f),
-                                                border = BorderStroke(0.5.dp, Emerald700.copy(alpha = 0.25f))
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = Color(0xFFD1FAE5),
+                                                modifier = Modifier.size(46.dp)
                                             ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
+                                                Box(contentAlignment = Alignment.Center) {
                                                     Icon(
-                                                        painter = painterResource(id = R.drawable.ic_hand_cash),
-                                                        contentDescription = "Πληρωμή",
-                                                        tint = Emerald700,
-                                                        modifier = Modifier.size(13.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(
-                                                        text = payerDisplay,
-                                                        fontSize = 11.5.sp,
-                                                        color = Emerald700,
-                                                        fontWeight = FontWeight.Bold,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        if (beneficiaryDisplay.isNotBlank()) {
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = Color(0xFF2563EB).copy(alpha = 0.10f),
-                                                border = BorderStroke(0.5.dp, Color(0xFF2563EB).copy(alpha = 0.25f))
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(
-                                                        imageVector = if (isBeneficiaryGroup) Icons.Default.Group else Icons.Default.Person,
+                                                        imageVector = Icons.Default.ArrowUpward,
                                                         contentDescription = null,
-                                                        tint = Color(0xFF2563EB),
-                                                        modifier = Modifier.size(13.dp)
+                                                        tint = Color(0xFF059669),
+                                                        modifier = Modifier.size(24.dp)
                                                     )
-                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = income.title,
+                                                    fontSize = 15.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
                                                     Text(
-                                                        text = beneficiaryDisplay,
-                                                        fontSize = 11.5.sp,
-                                                        color = Color(0xFF1D4ED8),
-                                                        fontWeight = FontWeight.SemiBold,
+                                                        text = income.category.ifBlank { Localization.income(lang) },
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = Color(0xFF059669),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                    val cardCal = remember(income.timestamp) {
+                                                        Calendar.getInstance().apply { timeInMillis = income.timestamp }
+                                                    }
+                                                    val hasTime = cardCal.get(Calendar.HOUR_OF_DAY) != 0 || cardCal.get(Calendar.MINUTE) != 0
+                                                    val cardDateStr = remember(income.timestamp, locale, hasTime) {
+                                                        val pattern = if (hasTime) "dd/MM/yyyy • HH:mm" else "dd/MM/yyyy"
+                                                        SimpleDateFormat(pattern, locale).format(Date(income.timestamp))
+                                                    }
+                                                    Text(
+                                                        text = " • $cardDateStr",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Normal,
+                                                        color = Color(0xFF64748B),
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
                                                 }
                                             }
-                                        }
-                                    }
 
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(
-                                            onClick = { onEditExpense(expense) },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Edit,
-                                                contentDescription = Localization.edit(lang),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                                modifier = Modifier.size(15.dp)
+                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                            Text(
+                                                text = String.format(Locale.US, "+%.2f €", income.amount),
+                                                fontSize = 17.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF059669)
                                             )
                                         }
 
-                                        IconButton(
-                                            onClick = { expenseToDelete = expense },
-                                            modifier = Modifier.size(28.dp)
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.DeleteOutline,
-                                                contentDescription = Localization.delete(lang),
-                                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                                modifier = Modifier.size(15.dp)
-                                            )
+                                            if (income.memberName.isNotBlank()) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    color = Color(0xFFE6F4EA),
+                                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.35f))
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Person,
+                                                            contentDescription = null,
+                                                            tint = Color(0xFF047857),
+                                                            modifier = Modifier.size(13.dp)
+                                                        )
+                                                        Text(
+                                                            text = income.memberName,
+                                                            fontSize = 11.5.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = Color(0xFF047857)
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                Spacer(modifier = Modifier.width(1.dp))
+                                            }
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                IconButton(
+                                                    onClick = { onEditIncome(income) },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Edit,
+                                                        contentDescription = "Edit",
+                                                        tint = Color(0xFF64748B),
+                                                        modifier = Modifier.size(17.dp)
+                                                    )
+                                                }
+
+                                                IconButton(
+                                                    onClick = { incomeToDelete = income },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "Delete",
+                                                        tint = Color(0xFFEF4444).copy(alpha = 0.85f),
+                                                        modifier = Modifier.size(17.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1921,32 +1521,21 @@ fun ExpensesScreen(
         }
     }
 
-        // Section: Bottom Exodologio Export Options (Excel, PDF, Share)
-        item {
-            ExodologioExportCard(
-                onExportExcel = onExportExcel,
-                onExportPdf = onExportPdf,
-                onShare = onShareReport
-            )
-        }
-    }
-
     // Delete Expense Confirmation Dialog
     if (expenseToDelete != null) {
-        val target = expenseToDelete!!
+        val exp = expenseToDelete!!
         AlertDialog(
             onDismissRequest = { expenseToDelete = null },
-            shape = RoundedCornerShape(20.dp),
-            title = { Text(if (lang == Localization.Language.ENGLISH) "Delete Expense" else "Διαγραφή Εξόδου", fontWeight = FontWeight.Bold) },
-            text = { Text(if (lang == Localization.Language.ENGLISH) "Are you sure you want to delete «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)})?" else "Είστε σίγουροι ότι θέλετε να διαγράψετε το έξοδο «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)});") },
+            title = { Text(Localization.delete(lang)) },
+            text = { Text("Είστε βέβαιοι ότι θέλετε να διαγράψετε το έξοδο «${exp.title}» (${String.format(Locale.US, "%.2f €", exp.amount)});") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onDeleteExpense(target)
+                        onDeleteExpense(exp)
                         expenseToDelete = null
                     }
                 ) {
-                    Text(Localization.delete(lang), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text(Localization.delete(lang), color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -1959,20 +1548,19 @@ fun ExpensesScreen(
 
     // Delete Income Confirmation Dialog
     if (incomeToDelete != null) {
-        val target = incomeToDelete!!
+        val inc = incomeToDelete!!
         AlertDialog(
             onDismissRequest = { incomeToDelete = null },
-            shape = RoundedCornerShape(20.dp),
-            title = { Text(if (lang == Localization.Language.ENGLISH) "Delete Income" else "Διαγραφή Εσόδου", fontWeight = FontWeight.Bold) },
-            text = { Text(if (lang == Localization.Language.ENGLISH) "Are you sure you want to delete «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)})?" else "Είστε σίγουροι ότι θέλετε να διαγράψετε το έσοδο «${target.title}» (${String.format(Locale.US, "%.2f€", target.amount)});") },
+            title = { Text(Localization.delete(lang)) },
+            text = { Text("Είστε βέβαιοι ότι θέλετε να διαγράψετε το έσοδο «${inc.title}» (${String.format(Locale.US, "%.2f €", inc.amount)});") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onDeleteIncome(target)
+                        onDeleteIncome(inc)
                         incomeToDelete = null
                     }
                 ) {
-                    Text(Localization.delete(lang), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text(Localization.delete(lang), color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

@@ -161,7 +161,7 @@ fun BurgerMenuDrawer(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // User Mini Summary Header Card
-                    if (currentUser != null) {
+                    if (currentUser != null || userProfile != null) {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -180,8 +180,8 @@ fun BurgerMenuDrawer(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 UserAvatar(
-                                    photoUrl = userProfile?.photoUrl?.ifBlank { null } ?: currentUser.photoUrl?.toString(),
-                                    displayName = userProfile?.displayName?.ifBlank { null } ?: currentUser.displayName,
+                                    photoUrl = userProfile?.photoUrl?.ifBlank { null } ?: currentUser?.photoUrl?.toString(),
+                                    displayName = userProfile?.displayName?.ifBlank { null } ?: currentUser?.displayName,
                                     modifier = Modifier.size(42.dp),
                                     fontSize = 17.sp
                                 )
@@ -190,7 +190,7 @@ fun BurgerMenuDrawer(
 
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = currentUser.displayName?.ifBlank { null } ?: Localization.fintelUser(lang),
+                                        text = userProfile?.displayName?.ifBlank { null } ?: currentUser?.displayName?.ifBlank { null } ?: Localization.fintelUser(lang),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -198,7 +198,7 @@ fun BurgerMenuDrawer(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = currentUser.email ?: (if (lang == Localization.Language.ENGLISH) "Connected" else "Συνδεδεμένος"),
+                                        text = userProfile?.email?.ifBlank { null } ?: currentUser?.email ?: (if (lang == Localization.Language.ENGLISH) "Connected" else "Συνδεδεμένος"),
                                         fontSize = 11.5.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
@@ -219,6 +219,53 @@ fun BurgerMenuDrawer(
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = Emerald700.copy(alpha = 0.10f),
+                            border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onDismiss()
+                                    onOpenSettings()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Emerald700,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Sign In / Cloud Sync" else "Σύνδεση / Cloud Sync",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = Emerald700
+                                    )
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Connect Google Account" else "Συνδέστε λογαριασμό Google",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }

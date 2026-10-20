@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.components.OikoNomosLogo
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
+import com.example.ui.theme.ModernFontFamily
 import com.example.ui.viewmodel.OikoNomosViewModel
 import com.example.util.Localization
 import com.google.firebase.auth.FirebaseUser
@@ -94,8 +95,10 @@ fun EmailVerificationScreen(
 
             Text(
                 text = "Fintel",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
+                fontFamily = ModernFontFamily,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = (-0.5).sp,
                 color = Color(0xFF157347)
             )
 

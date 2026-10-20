@@ -7,7 +7,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
+val DarkColorScheme = darkColorScheme(
     primary = Emerald500,
     onPrimary = Color.White,
     primaryContainer = Emerald800,
@@ -19,8 +19,8 @@ private val DarkColorScheme = darkColorScheme(
     tertiary = Amber600,
     onTertiary = Color.White,
     background = Color(0xFF0F172A),
-    surface = Color(0xFF1E293B),
     onBackground = Color(0xFFF8FAFC),
+    surface = Color(0xFF1E293B),
     onSurface = Color(0xFFF8FAFC),
     surfaceVariant = Color(0xFF334155),
     onSurfaceVariant = Color(0xFFCBD5E1),
@@ -28,7 +28,7 @@ private val DarkColorScheme = darkColorScheme(
     errorContainer = CrimsonContainer
 )
 
-private val LightColorScheme = lightColorScheme(
+val LightColorScheme = lightColorScheme(
     primary = Emerald700,
     onPrimary = Color.White,
     primaryContainer = Emerald100,
@@ -40,30 +40,36 @@ private val LightColorScheme = lightColorScheme(
     tertiary = Amber600,
     onTertiary = Color.White,
     tertiaryContainer = Amber100,
-    onTertiaryContainer = Color(0xFF78350F),
     background = Slate50,
     onBackground = Slate900,
     surface = Color.White,
     onSurface = Slate900,
     surfaceVariant = Slate100,
     onSurfaceVariant = Slate700,
-    outline = Slate300,
     error = CrimsonError,
-    errorContainer = CrimsonContainer
+    errorContainer = CrimsonContainer,
+    outline = Slate300
 )
 
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Keep vibrant custom emerald branding
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    val chosenTypography = ClassicTypography
-
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = chosenTypography,
+        typography = ClassicTypography,
         content = content
     )
+}
+
+@Composable
+fun OikoNomosTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    MyApplicationTheme(darkTheme = darkTheme, dynamicColor = dynamicColor, content = content)
 }

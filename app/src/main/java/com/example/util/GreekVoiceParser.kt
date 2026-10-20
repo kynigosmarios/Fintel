@@ -10,14 +10,18 @@ data class ParsedVoiceExpense(
     val amount: Double,
     val categoryId: Long,
     val categoryName: String,
-    val splitType: String, // "ALL_FAMILY" or "SPECIFIC_MEMBERS"
-    val memberIds: List<Long>,
-    val memberNamesDisplay: String,
-    val splitAmountPerPerson: Double,
-    val originalPrompt: String,
+    val splitType: String = "ALL_FAMILY", // "ALL_FAMILY" or "SPECIFIC_MEMBERS"
+    val memberIds: List<Long> = emptyList(),
+    val memberNamesDisplay: String = "Κοινό Οικογένειας",
+    val splitAmountPerPerson: Double = 0.0,
+    val originalPrompt: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val payerMemberId: Long = 0L,
-    val payerMemberName: String = ""
+    val payerMemberName: String = "",
+    val memberIdsCsv: String = "",
+    val payerMemberIdsCsv: String = "",
+    val payerAmountsCsv: String = "",
+    val note: String = ""
 )
 
 object GreekVoiceParser {
@@ -625,7 +629,7 @@ object GreekVoiceParser {
             if (containsWord(norm, kw)) {
                 val kids = allMembers.filter { it.role.equals("Παιδί", ignoreCase = true) }
                 if (kids.isNotEmpty()) {
-                    val display = kids.joinToString(" & ") { it.name }
+                    val display = if (kids.size >= 2) "Παιδιά" else kids.first().name
                     return Triple("SPECIFIC_MEMBERS", kids, display)
                 }
             }
@@ -636,7 +640,7 @@ object GreekVoiceParser {
             if (containsWord(norm, kw)) {
                 val parents = allMembers.filter { it.role.equals("Γονέας", ignoreCase = true) }
                 if (parents.isNotEmpty()) {
-                    val display = parents.joinToString(" & ") { it.name }
+                    val display = if (parents.size >= 2) "Γονείς" else parents.first().name
                     return Triple("SPECIFIC_MEMBERS", parents, display)
                 }
             }
@@ -660,6 +664,12 @@ object GreekVoiceParser {
         if (matchedMembers.isNotEmpty()) {
             val display = if (matchedMembers.size == allMembers.size) {
                 "Κοινό Οικογένειας"
+            } else if (matchedMembers.size >= 2) {
+                val firstRolePlural = Localization.pluralRoleName(matchedMembers.first().role, Localization.Language.GREEK)
+                val allSame = matchedMembers.all {
+                    Localization.pluralRoleName(it.role, Localization.Language.GREEK).equals(firstRolePlural, ignoreCase = true)
+                }
+                if (allSame) firstRolePlural else matchedMembers.joinToString(" & ") { it.name }
             } else {
                 matchedMembers.joinToString(" & ") { it.name }
             }

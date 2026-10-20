@@ -215,8 +215,20 @@ fun ManualExpenseDialog(
             if (validIds.isNotEmpty()) {
                 list.addAll(validIds)
             } else if (expenseToEdit.memberNamesDisplay.isNotBlank() && !expenseToEdit.memberNamesDisplay.equals("Κοινό Οικογένειας", ignoreCase = true) && !expenseToEdit.memberNamesDisplay.equals("Family Shared", ignoreCase = true)) {
-                val matched = members.filter { m -> expenseToEdit.memberNamesDisplay.contains(m.name, ignoreCase = true) }
-                list.addAll(matched.map { it.id })
+                val raw = expenseToEdit.memberNamesDisplay.trim()
+                if (raw.equals("Γονείς", ignoreCase = true) || raw.equals("Parents", ignoreCase = true)) {
+                    val parents = members.filter { it.role.equals("Γονέας", ignoreCase = true) }
+                    list.addAll(parents.map { it.id })
+                } else if (raw.equals("Παιδιά", ignoreCase = true) || raw.equals("Children", ignoreCase = true)) {
+                    val kids = members.filter { it.role.equals("Παιδί", ignoreCase = true) }
+                    list.addAll(kids.map { it.id })
+                } else if (raw.equals("Συγκάτοικοι", ignoreCase = true) || raw.equals("Roommates", ignoreCase = true)) {
+                    val roommates = members.filter { it.role.equals("Συγκάτοικος", ignoreCase = true) || it.role.equals("Συγκάτοικοι", ignoreCase = true) }
+                    list.addAll(roommates.map { it.id })
+                } else {
+                    val matched = members.filter { m -> expenseToEdit.memberNamesDisplay.contains(m.name, ignoreCase = true) }
+                    list.addAll(matched.map { it.id })
+                }
             }
         } else {
             list.addAll(members.map { it.id })
@@ -1057,7 +1069,19 @@ fun ManualExpenseDialog(
                                 if (lang == Localization.Language.ENGLISH) "Family Shared" else "Κοινό Οικογένειας"
                             } else {
                                 val active = members.filter { finalMemberIds.contains(it.id) }
-                                active.joinToString(" & ") { it.name }
+                                if (active.size >= 2) {
+                                    val firstRolePlural = Localization.pluralRoleName(active.first().role, lang)
+                                    val allSameRole = active.all {
+                                        Localization.pluralRoleName(it.role, lang).equals(firstRolePlural, ignoreCase = true)
+                                    }
+                                    if (allSameRole) {
+                                        firstRolePlural
+                                    } else {
+                                        active.joinToString(" & ") { it.name }
+                                    }
+                                } else {
+                                    active.joinToString(" & ") { it.name }
+                                }
                             }
 
                             val finalTimestamp = if (isSelectedDateToday && expenseToEdit == null) {
@@ -1097,8 +1121,17 @@ fun ManualExpenseDialog(
                                     finalPayerAmountsCsv = finalPayerIds.joinToString(",") { id ->
                                         String.format(Locale.US, "%d:%.2f", id, perPerson)
                                     }
-                                    val names = finalPayerIds.mapNotNull { id -> members.find { it.id == id }?.name }
-                                    finalPayerName = "${names.joinToString(" & ")} (από ${String.format(Locale.US, "%.2f €", perPerson)})"
+                                    val payerMembers = finalPayerIds.mapNotNull { id -> members.find { it.id == id } }
+                                    val payerLabel = if (payerMembers.size >= 2) {
+                                        val firstRolePlural = Localization.pluralRoleName(payerMembers.first().role, lang)
+                                        val allSameRole = payerMembers.all {
+                                            Localization.pluralRoleName(it.role, lang).equals(firstRolePlural, ignoreCase = true)
+                                        }
+                                        if (allSameRole) firstRolePlural else payerMembers.joinToString(" & ") { it.name }
+                                    } else {
+                                        payerMembers.joinToString(" & ") { it.name }
+                                    }
+                                    finalPayerName = payerLabel
                                 }
                             }
 
