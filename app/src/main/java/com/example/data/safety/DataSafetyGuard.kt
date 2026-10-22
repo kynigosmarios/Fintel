@@ -113,24 +113,27 @@ object DataSafetyGuard {
                     repository.replaceAllMembers(cleanLocal)
                 }
 
-                cleanLocal.forEach { member ->
-                    val fbMember = FirebaseMember(
-                        id = member.id.toString(),
-                        householdId = activeHouseholdId,
-                        userId = userId,
-                        name = member.name.trim(),
-                        role = member.role,
-                        avatarColorHex = member.avatarColorHex,
-                        voiceKeywords = member.voiceKeywords,
-                        isDefault = member.isDefault,
-                        sortOrder = member.sortOrder
-                    )
-                    if (activeHouseholdId.isNotBlank()) {
-                        firestoreSyncRepo.syncMember(activeHouseholdId, fbMember)
+                val remoteMembers = if (activeHouseholdId.isNotBlank()) firestoreSyncRepo.getMembersOnce(activeHouseholdId) else emptyList()
+                if (remoteMembers.isEmpty()) {
+                    cleanLocal.forEach { member ->
+                        val fbMember = FirebaseMember(
+                            id = member.id.toString(),
+                            householdId = activeHouseholdId,
+                            userId = userId,
+                            name = member.name.trim(),
+                            role = member.role,
+                            avatarColorHex = member.avatarColorHex,
+                            voiceKeywords = member.voiceKeywords,
+                            isDefault = member.isDefault,
+                            sortOrder = member.sortOrder
+                        )
+                        if (activeHouseholdId.isNotBlank()) {
+                            firestoreSyncRepo.syncMember(activeHouseholdId, fbMember)
+                        }
+                        firestoreSyncRepo.syncUserMember(userId, fbMember)
                     }
-                    firestoreSyncRepo.syncUserMember(userId, fbMember)
+                    Log.d(TAG, "Secured ${cleanLocal.size} members to cloud.")
                 }
-                Log.d(TAG, "Secured ${cleanLocal.size} members to cloud.")
             }
 
             // 2. Audit & Secure Categories (each category is a unique entity by ID)
@@ -142,25 +145,28 @@ object DataSafetyGuard {
                     repository.replaceAllCategories(cleanCategories)
                 }
 
-                cleanCategories.forEach { cat ->
-                    val fbCat = FirebaseCategory(
-                        id = cat.id.toString(),
-                        householdId = activeHouseholdId,
-                        userId = userId,
-                        name = cat.name,
-                        iconKey = cat.iconKey,
-                        monthlyBudget = cat.monthlyBudget,
-                        colorHex = cat.colorHex,
-                        voiceKeywords = cat.voiceKeywords,
-                        sortOrder = cat.sortOrder,
-                        fontColorHex = cat.fontColorHex
-                    )
-                    if (activeHouseholdId.isNotBlank()) {
-                        firestoreSyncRepo.syncCategory(activeHouseholdId, fbCat)
+                val remoteCategories = if (activeHouseholdId.isNotBlank()) firestoreSyncRepo.getCategoriesOnce(activeHouseholdId) else emptyList()
+                if (remoteCategories.isEmpty()) {
+                    cleanCategories.forEach { cat ->
+                        val fbCat = FirebaseCategory(
+                            id = cat.id.toString(),
+                            householdId = activeHouseholdId,
+                            userId = userId,
+                            name = cat.name,
+                            iconKey = cat.iconKey,
+                            monthlyBudget = cat.monthlyBudget,
+                            colorHex = cat.colorHex,
+                            voiceKeywords = cat.voiceKeywords,
+                            sortOrder = cat.sortOrder,
+                            fontColorHex = cat.fontColorHex
+                        )
+                        if (activeHouseholdId.isNotBlank()) {
+                            firestoreSyncRepo.syncCategory(activeHouseholdId, fbCat)
+                        }
+                        firestoreSyncRepo.syncUserCategory(userId, fbCat)
                     }
-                    firestoreSyncRepo.syncUserCategory(userId, fbCat)
+                    Log.d(TAG, "Secured ${cleanCategories.size} categories to cloud.")
                 }
-                Log.d(TAG, "Secured ${cleanCategories.size} categories to cloud.")
             }
 
             // 3. Audit & Secure Savings Goals
@@ -190,9 +196,12 @@ object DataSafetyGuard {
             // 4. Audit & Secure Recurring Expenses
             val localRecurring = repository.getAllRecurringExpensesList()
             if (localRecurring.isNotEmpty()) {
-                localRecurring.forEach { rec ->
+                val uniqueRecurring = localRecurring.distinctBy {
+                    GreekVoiceParser.normalizeGreek(it.title.trim().lowercase())
+                }
+                uniqueRecurring.forEach { rec ->
                     val fbRec = FirebaseRecurringExpense(
-                        id = rec.id.toString(),
+                        id = if (rec.id > 0) "rec_${rec.id}" else rec.title,
                         householdId = activeHouseholdId,
                         userId = userId,
                         title = rec.title,
@@ -217,49 +226,58 @@ object DataSafetyGuard {
                     }
                     firestoreSyncRepo.syncUserRecurringExpense(userId, fbRec)
                 }
-                Log.d(TAG, "Secured ${localRecurring.size} recurring expenses to cloud.")
+                Log.d(TAG, "Secured ${uniqueRecurring.size} recurring expenses to cloud.")
             }
 
-            // 5. Audit & Secure Expenses (ensure any local expenses are mirrored in cloud with full multi-payer details)
+            // 5. Audit & Secure Expenses (ensure any genuine local expenses not yet in cloud are mirrored)
             val localExpenses = repository.getAllExpensesList()
             if (localExpenses.isNotEmpty()) {
-                localExpenses.forEach { exp ->
-                    val fbExp = exp.toFirebaseExpense(
-                        householdId = activeHouseholdId,
-                        userId = userId,
-                        userName = user.displayName ?: "Χρήστης"
-                    )
-                    if (activeHouseholdId.isNotBlank()) {
-                        firestoreSyncRepo.syncExpense(fbExp)
-                    }
-                    firestoreSyncRepo.syncUserExpense(userId, fbExp)
+                // Filter out any unsynced expenses that are duplicate recurring auto-generated phantoms
+                val unsynced = localExpenses.filter { exp ->
+                    exp.cloudId.isBlank() && !exp.note.contains("Πάγια εντολή")
                 }
-                Log.d(TAG, "Secured ${localExpenses.size} expenses to cloud.")
+                if (unsynced.isNotEmpty()) {
+                    unsynced.forEach { exp ->
+                        val fbExp = exp.toFirebaseExpense(
+                            householdId = activeHouseholdId,
+                            userId = userId,
+                            userName = user.displayName ?: "Χρήστης"
+                        )
+                        if (activeHouseholdId.isNotBlank()) {
+                            firestoreSyncRepo.syncExpense(fbExp)
+                        }
+                        firestoreSyncRepo.syncUserExpense(userId, fbExp)
+                    }
+                    Log.d(TAG, "Secured ${unsynced.size} unsynced expenses to cloud.")
+                }
             }
 
-            // 6. Audit & Secure Incomes (ensure all local incomes are mirrored in cloud)
+            // 6. Audit & Secure Incomes (ensure all local incomes not yet in cloud are mirrored)
             val localIncomes = repository.getAllIncomesList()
             if (localIncomes.isNotEmpty()) {
-                localIncomes.forEach { inc ->
-                    val fbInc = com.example.data.model.FirebaseIncome(
-                        id = inc.cloudId.ifBlank { "inc_${inc.id}" },
-                        householdId = activeHouseholdId,
-                        title = inc.title,
-                        amount = inc.amount,
-                        memberId = inc.memberId,
-                        memberName = inc.memberName,
-                        category = inc.category,
-                        timestamp = inc.timestamp,
-                        note = inc.note,
-                        createdByUid = userId,
-                        createdByName = user.displayName ?: "Χρήστης"
-                    )
-                    if (activeHouseholdId.isNotBlank()) {
-                        firestoreSyncRepo.syncIncome(fbInc)
+                val unsynced = localIncomes.filter { it.cloudId.isBlank() }
+                if (unsynced.isNotEmpty()) {
+                    unsynced.forEach { inc ->
+                        val fbInc = com.example.data.model.FirebaseIncome(
+                            id = inc.cloudId.ifBlank { "inc_${inc.id}" },
+                            householdId = activeHouseholdId,
+                            title = inc.title,
+                            amount = inc.amount,
+                            memberId = inc.memberId,
+                            memberName = inc.memberName,
+                            category = inc.category,
+                            timestamp = inc.timestamp,
+                            note = inc.note,
+                            createdByUid = userId,
+                            createdByName = user.displayName ?: "Χρήστης"
+                        )
+                        if (activeHouseholdId.isNotBlank()) {
+                            firestoreSyncRepo.syncIncome(fbInc)
+                        }
+                        firestoreSyncRepo.syncUserIncome(userId, fbInc)
                     }
-                    firestoreSyncRepo.syncUserIncome(userId, fbInc)
+                    Log.d(TAG, "Secured ${unsynced.size} unsynced incomes to cloud.")
                 }
-                Log.d(TAG, "Secured ${localIncomes.size} incomes to cloud.")
             }
 
             Log.i(TAG, "Audit complete. All user data is 100% mirrored in Firebase Cloud.")

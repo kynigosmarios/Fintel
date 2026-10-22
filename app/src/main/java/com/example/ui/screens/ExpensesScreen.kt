@@ -54,6 +54,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -159,9 +160,15 @@ fun ExpensesScreen(
         } else list
     }
 
-    // Default to the first (most recent) month e.g. "Οκτώβριος 2026"
-    var selectedMonthKey by remember(availableMonths) {
+    // Default to the first (most recent) month e.g. "Οκτώβριος 2026", and smoothly update when dataset loads
+    var selectedMonthKey by remember {
         mutableStateOf(availableMonths.firstOrNull()?.first ?: "")
+    }
+
+    LaunchedEffect(availableMonths) {
+        if (selectedMonthKey.isBlank() || (selectedMonthKey != "ALL" && availableMonths.none { it.first == selectedMonthKey })) {
+            selectedMonthKey = availableMonths.firstOrNull()?.first ?: ""
+        }
     }
 
     val currentMonthDisplay = remember(selectedMonthKey, availableMonths, lang) {

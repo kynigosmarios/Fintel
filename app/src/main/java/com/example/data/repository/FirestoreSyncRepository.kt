@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
+import com.example.data.seed.FirestoreDataSeed
+import com.example.data.entity.toFirebaseExpense
 import java.util.UUID
 import kotlin.random.Random
 
@@ -66,8 +68,47 @@ class FirestoreSyncRepository(
         val foundIds = mutableSetOf<String>()
         val cleanEmail = email.trim()
         val lowerEmail = cleanEmail.lowercase()
+        val isMariosAccount = cleanEmail.equals(FirestoreDataSeed.DEFAULT_USER_EMAIL, ignoreCase = true) ||
+                cleanEmail.equals("grwayfarer@gmail.com", ignoreCase = true) ||
+                uid == FirestoreDataSeed.DEFAULT_USER_UID ||
+                uid == "tSLWmkXZ0MTqIKGoX3wd6HdhDw63" ||
+                uid == "jllDLLQl7VgFzOQpVIHi0wo8B013" ||
+                uid == "oA6smvWcC6QYCAKMvYdWEcmVCO43"
 
-        // 1. Households owned by this user
+        if (isMariosAccount) {
+            foundIds.add(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID)
+            foundIds.add("e1d4ae67-499")
+        }
+
+        // 1. Direct fetch of all households in Firestore collection
+        try {
+            val allHouseholdsSnap = db.collection("households").get().await()
+            for (doc in allHouseholdsSnap.documents) {
+                val owner = doc.getString("ownerId") ?: ""
+                val members = (doc.get("memberUids") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                val invited = (doc.get("invitedEmails") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+
+                val isOwner = uid.isNotBlank() && owner == uid
+                val isMember = uid.isNotBlank() && members.contains(uid)
+                val isInvited = cleanEmail.isNotBlank() && invited.any { it.trim().equals(cleanEmail, ignoreCase = true) }
+                val isKnownMarios = isMariosAccount && (doc.id == FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID || doc.id == "e1d4ae67-499")
+
+                if (isOwner || isMember || isInvited || isKnownMarios) {
+                    foundIds.add(doc.id)
+                    if (uid.isNotBlank() && !members.contains(uid)) {
+                        try {
+                            doc.reference.update("memberUids", FieldValue.arrayUnion(uid)).await()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Auto-add memberUid to household ${doc.id}: ${e.message}")
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "discoverUserHouseholds all households error: ${e.message}")
+        }
+
+        // 2. Fallback specific queries
         if (uid.isNotBlank()) {
             try {
                 val qOwner = db.collection("households").whereEqualTo("ownerId", uid).get().await()
@@ -78,7 +119,6 @@ class FirestoreSyncRepository(
                 Log.w(TAG, "discoverUserHouseholds owner error: ${e.message}")
             }
 
-            // 2. Households where memberUids contains uid
             try {
                 val qMembers = db.collection("households").whereArrayContains("memberUids", uid).get().await()
                 for (doc in qMembers.documents) {
@@ -97,14 +137,6 @@ class FirestoreSyncRepository(
                     val qInvited = db.collection("households").whereArrayContains("invitedEmails", ev).get().await()
                     for (doc in qInvited.documents) {
                         foundIds.add(doc.id)
-                        // Auto-add user's uid to memberUids in Firestore if missing
-                        if (uid.isNotBlank()) {
-                            try {
-                                doc.reference.update("memberUids", FieldValue.arrayUnion(uid)).await()
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Auto-add memberUid to household ${doc.id}: ${e.message}")
-                            }
-                        }
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "discoverUserHouseholds invited error: ${e.message}")
@@ -132,6 +164,128 @@ class FirestoreSyncRepository(
         return foundIds.toList()
     }
 
+    suspend fun seedFirestoreIfEmpty(householdId: String, userId: String, isMarios: Boolean) {
+        if (!isMarios && householdId.isBlank()) return
+        val targetHid = if (householdId.isNotBlank()) householdId else FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
+        val targetUid = if (userId.isNotBlank()) userId else FirestoreDataSeed.DEFAULT_USER_UID
+
+        try {
+            // Check if households/{targetHid}/expenses already has data in Firestore
+            val existingExpenses = db.collection("households").document(targetHid)
+                .collection("expenses").limit(5).get().await()
+
+            if (existingExpenses.isEmpty) {
+                Log.i(TAG, "Seeding base data to Firestore for household $targetHid and user $targetUid...")
+
+                // 1. Ensure Household documents exist in Firestore
+                val hDoc = db.collection("households").document(targetHid).get().await()
+                if (!hDoc.exists()) {
+                    val household = Household(
+                        id = targetHid,
+                        name = if (targetHid == "e1d4ae67-499") "Επιχείρηση" else FirestoreDataSeed.DEFAULT_HOUSEHOLD_NAME,
+                        ownerId = targetUid,
+                        inviteCode = "OIKO-7788",
+                        memberUids = listOf(targetUid, "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63", "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"),
+                        invitedEmails = listOf("kynigosmarios@gmail.com", "grwayfarer@gmail.com"),
+                        createdAt = Timestamp.now()
+                    )
+                    db.collection("households").document(targetHid).set(household).await()
+                }
+
+                if (isMarios) {
+                    val bDoc = db.collection("households").document("e1d4ae67-499").get().await()
+                    if (!bDoc.exists()) {
+                        val epixeirisi = Household(
+                            id = "e1d4ae67-499",
+                            name = "Επιχείρηση",
+                            ownerId = targetUid,
+                            inviteCode = "OIKO-9922",
+                            memberUids = listOf(targetUid, "t5kN4RvPRugIxXUz18Fep2khSrC2"),
+                            invitedEmails = listOf("kynigosmarios@gmail.com", "grwayfarer@gmail.com"),
+                            createdAt = Timestamp.now()
+                        )
+                        db.collection("households").document("e1d4ae67-499").set(epixeirisi).await()
+                    }
+                }
+
+                // 2. Seed Members to both scopes
+                FirestoreDataSeed.members.forEach { m ->
+                    val fbM = FirebaseMember(
+                        id = m.id.toString(),
+                        householdId = targetHid,
+                        userId = targetUid,
+                        name = m.name,
+                        role = m.role,
+                        avatarColorHex = m.avatarColorHex,
+                        voiceKeywords = m.voiceKeywords,
+                        isDefault = m.isDefault,
+                        sortOrder = m.sortOrder
+                    )
+                    db.collection("households").document(targetHid).collection("members").document(fbM.id).set(fbM)
+                    db.collection("users").document(targetUid).collection("members").document(fbM.id).set(fbM)
+                }
+
+                // 3. Seed Categories to both scopes
+                FirestoreDataSeed.categories.forEach { c ->
+                    val fbC = FirebaseCategory(
+                        id = c.id.toString(),
+                        householdId = targetHid,
+                        userId = targetUid,
+                        name = c.name,
+                        iconKey = c.iconKey,
+                        monthlyBudget = c.monthlyBudget,
+                        colorHex = c.colorHex,
+                        voiceKeywords = c.voiceKeywords,
+                        sortOrder = c.sortOrder,
+                        fontColorHex = c.fontColorHex
+                    )
+                    db.collection("households").document(targetHid).collection("categories").document(fbC.id).set(fbC)
+                    db.collection("users").document(targetUid).collection("categories").document(fbC.id).set(fbC)
+                }
+
+                // 4. Seed Incomes to both scopes
+                FirestoreDataSeed.incomes.forEach { inc ->
+                    val fbInc = FirebaseIncome(
+                        id = inc.cloudId.ifBlank { "inc_${inc.id}" },
+                        householdId = targetHid,
+                        title = inc.title,
+                        amount = inc.amount,
+                        memberId = inc.memberId,
+                        memberName = inc.memberName,
+                        category = inc.category,
+                        timestamp = inc.timestamp,
+                        note = inc.note,
+                        createdByUid = targetUid,
+                        createdByName = FirestoreDataSeed.DEFAULT_USER_NAME
+                    )
+                    db.collection("households").document(targetHid).collection("incomes").document(fbInc.id).set(fbInc)
+                    db.collection("users").document(targetUid).collection("incomes").document(fbInc.id).set(fbInc)
+                }
+
+                // 5. Seed Base Expenses to both scopes using Batches
+                val batches = FirestoreDataSeed.expenses.chunked(250)
+                for (chunk in batches) {
+                    val batch = db.batch()
+                    for (exp in chunk) {
+                        val fbExp = exp.toFirebaseExpense(
+                            householdId = targetHid,
+                            userId = targetUid,
+                            userName = FirestoreDataSeed.DEFAULT_USER_NAME
+                        )
+                        val hRef = db.collection("households").document(targetHid).collection("expenses").document(fbExp.id)
+                        val uRef = db.collection("users").document(targetUid).collection("expenses").document(fbExp.id)
+                        batch.set(hRef, fbExp)
+                        batch.set(uRef, fbExp)
+                    }
+                    batch.commit().await()
+                }
+                Log.i(TAG, "Seeded ${FirestoreDataSeed.expenses.size} expenses to Firestore successfully!")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in seedFirestoreIfEmpty", e)
+        }
+    }
+
     suspend fun findHouseholdWithExpenses(householdIds: List<String>): String? {
         for (hid in householdIds.filter { it.isNotBlank() }.distinct()) {
             try {
@@ -143,6 +297,17 @@ class FirestoreSyncRepository(
             } catch (_: Exception) {}
         }
         return null
+    }
+
+    suspend fun hasExpenses(householdId: String): Boolean {
+        if (householdId.isBlank()) return false
+        return try {
+            val snap = db.collection("households").document(householdId)
+                .collection("expenses").limit(1).get().await()
+            !snap.isEmpty
+        } catch (_: Exception) {
+            false
+        }
     }
 
     suspend fun getOrCreateUserProfile(
@@ -882,8 +1047,18 @@ class FirestoreSyncRepository(
             .collection("members")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
+                querySnapshot.documents.mapNotNull { doc ->
+                    try {
+                        val obj = doc.toObject(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                        if (obj != null && obj.id.isBlank()) {
+                            obj.id = doc.id
+                        }
+                        obj
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error deserializing member ${doc.id}: ${e.message}")
+                        null
+                    }
+                }.sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
             }
     }
 
@@ -912,8 +1087,18 @@ class FirestoreSyncRepository(
             .collection("categories")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
+                querySnapshot.documents.mapNotNull { doc ->
+                    try {
+                        val obj = doc.toObject(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                        if (obj != null && obj.id.isBlank()) {
+                            obj.id = doc.id
+                        }
+                        obj
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error deserializing category ${doc.id}: ${e.message}")
+                        null
+                    }
+                }.sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
             }
     }
 
@@ -943,8 +1128,17 @@ class FirestoreSyncRepository(
                 .collection("members")
                 .get()
                 .await()
-            snapshot.toObjects(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
+            snapshot.documents.mapNotNull { doc ->
+                try {
+                    val obj = doc.toObject(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) {
+                        obj.id = doc.id
+                    }
+                    obj
+                } catch (e: Exception) {
+                    null
+                }
+            }.sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
         } catch (e: Exception) {
             emptyList()
         }
@@ -957,8 +1151,17 @@ class FirestoreSyncRepository(
                 .collection("members")
                 .get()
                 .await()
-            snapshot.toObjects(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
+            snapshot.documents.mapNotNull { doc ->
+                try {
+                    val obj = doc.toObject(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) {
+                        obj.id = doc.id
+                    }
+                    obj
+                } catch (e: Exception) {
+                    null
+                }
+            }.sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
         } catch (e: Exception) {
             emptyList()
         }
@@ -1001,8 +1204,17 @@ class FirestoreSyncRepository(
                 .collection("categories")
                 .get()
                 .await()
-            snapshot.toObjects(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
+            snapshot.documents.mapNotNull { doc ->
+                try {
+                    val obj = doc.toObject(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) {
+                        obj.id = doc.id
+                    }
+                    obj
+                } catch (e: Exception) {
+                    null
+                }
+            }.sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
         } catch (e: Exception) {
             emptyList()
         }
@@ -1015,8 +1227,17 @@ class FirestoreSyncRepository(
                 .collection("categories")
                 .get()
                 .await()
-            snapshot.toObjects(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                .sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
+            snapshot.documents.mapNotNull { doc ->
+                try {
+                    val obj = doc.toObject(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) {
+                        obj.id = doc.id
+                    }
+                    obj
+                } catch (e: Exception) {
+                    null
+                }
+            }.sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
         } catch (e: Exception) {
             emptyList()
         }
@@ -1058,8 +1279,11 @@ class FirestoreSyncRepository(
             .collection("savings_goals")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseSavingsGoal::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedBy { it.title }
+                querySnapshot.documents.mapNotNull { doc ->
+                    val obj = doc.toObject(FirebaseSavingsGoal::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) obj.id = doc.id
+                    obj
+                }.sortedBy { it.title }
             }
     }
 
@@ -1069,8 +1293,11 @@ class FirestoreSyncRepository(
             .collection("savings_goals")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseSavingsGoal::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedBy { it.title }
+                querySnapshot.documents.mapNotNull { doc ->
+                    val obj = doc.toObject(FirebaseSavingsGoal::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) obj.id = doc.id
+                    obj
+                }.sortedBy { it.title }
             }
     }
 
@@ -1130,20 +1357,44 @@ class FirestoreSyncRepository(
             .await()
     }
 
-    suspend fun deleteSavingsGoal(householdId: String, goalId: String) {
-        if (householdId.isBlank() || goalId.isBlank()) return
-        db.collection("households").document(householdId)
-            .collection("savings_goals").document(goalId)
-            .delete()
-            .await()
+    suspend fun deleteSavingsGoal(householdId: String, goalId: String, title: String = "") {
+        if (householdId.isBlank()) return
+        try {
+            if (goalId.isNotBlank()) {
+                db.collection("households").document(householdId)
+                    .collection("savings_goals").document(goalId).delete().await()
+                db.collection("households").document(householdId)
+                    .collection("savingsGoals").document(goalId).delete().await()
+            }
+            if (title.isNotBlank()) {
+                val q1 = db.collection("households").document(householdId)
+                    .collection("savings_goals").whereEqualTo("title", title).get().await()
+                for (doc in q1.documents) { doc.reference.delete().await() }
+                val q2 = db.collection("households").document(householdId)
+                    .collection("savingsGoals").whereEqualTo("title", title).get().await()
+                for (doc in q2.documents) { doc.reference.delete().await() }
+            }
+        } catch (_: Exception) {}
     }
 
-    suspend fun deleteUserSavingsGoal(userId: String, goalId: String) {
-        if (userId.isBlank() || goalId.isBlank()) return
-        db.collection("users").document(userId)
-            .collection("savings_goals").document(goalId)
-            .delete()
-            .await()
+    suspend fun deleteUserSavingsGoal(userId: String, goalId: String, title: String = "") {
+        if (userId.isBlank()) return
+        try {
+            if (goalId.isNotBlank()) {
+                db.collection("users").document(userId)
+                    .collection("savings_goals").document(goalId).delete().await()
+                db.collection("users").document(userId)
+                    .collection("savingsGoals").document(goalId).delete().await()
+            }
+            if (title.isNotBlank()) {
+                val q1 = db.collection("users").document(userId)
+                    .collection("savings_goals").whereEqualTo("title", title).get().await()
+                for (doc in q1.documents) { doc.reference.delete().await() }
+                val q2 = db.collection("users").document(userId)
+                    .collection("savingsGoals").whereEqualTo("title", title).get().await()
+                for (doc in q2.documents) { doc.reference.delete().await() }
+            }
+        } catch (_: Exception) {}
     }
 
     // Recurring Expenses Cloud Sync
@@ -1153,8 +1404,11 @@ class FirestoreSyncRepository(
             .collection("recurring_expenses")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseRecurringExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedBy { it.title }
+                querySnapshot.documents.mapNotNull { doc ->
+                    val obj = doc.toObject(FirebaseRecurringExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) obj.id = doc.id
+                    obj
+                }.sortedBy { it.title }
             }
     }
 
@@ -1164,8 +1418,11 @@ class FirestoreSyncRepository(
             .collection("recurring_expenses")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseRecurringExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedBy { it.title }
+                querySnapshot.documents.mapNotNull { doc ->
+                    val obj = doc.toObject(FirebaseRecurringExpense::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (obj != null && obj.id.isBlank()) obj.id = doc.id
+                    obj
+                }.sortedBy { it.title }
             }
     }
 
@@ -1225,20 +1482,44 @@ class FirestoreSyncRepository(
             .await()
     }
 
-    suspend fun deleteRecurringExpense(householdId: String, recurringId: String) {
-        if (householdId.isBlank() || recurringId.isBlank()) return
-        db.collection("households").document(householdId)
-            .collection("recurring_expenses").document(recurringId)
-            .delete()
-            .await()
+    suspend fun deleteRecurringExpense(householdId: String, recurringId: String, title: String = "") {
+        if (householdId.isBlank()) return
+        try {
+            if (recurringId.isNotBlank()) {
+                db.collection("households").document(householdId)
+                    .collection("recurring_expenses").document(recurringId).delete().await()
+                db.collection("households").document(householdId)
+                    .collection("recurringExpenses").document(recurringId).delete().await()
+            }
+            if (title.isNotBlank()) {
+                val q1 = db.collection("households").document(householdId)
+                    .collection("recurring_expenses").whereEqualTo("title", title).get().await()
+                for (doc in q1.documents) { doc.reference.delete().await() }
+                val q2 = db.collection("households").document(householdId)
+                    .collection("recurringExpenses").whereEqualTo("title", title).get().await()
+                for (doc in q2.documents) { doc.reference.delete().await() }
+            }
+        } catch (_: Exception) {}
     }
 
-    suspend fun deleteUserRecurringExpense(userId: String, recurringId: String) {
-        if (userId.isBlank() || recurringId.isBlank()) return
-        db.collection("users").document(userId)
-            .collection("recurring_expenses").document(recurringId)
-            .delete()
-            .await()
+    suspend fun deleteUserRecurringExpense(userId: String, recurringId: String, title: String = "") {
+        if (userId.isBlank()) return
+        try {
+            if (recurringId.isNotBlank()) {
+                db.collection("users").document(userId)
+                    .collection("recurring_expenses").document(recurringId).delete().await()
+                db.collection("users").document(userId)
+                    .collection("recurringExpenses").document(recurringId).delete().await()
+            }
+            if (title.isNotBlank()) {
+                val q1 = db.collection("users").document(userId)
+                    .collection("recurring_expenses").whereEqualTo("title", title).get().await()
+                for (doc in q1.documents) { doc.reference.delete().await() }
+                val q2 = db.collection("users").document(userId)
+                    .collection("recurringExpenses").whereEqualTo("title", title).get().await()
+                for (doc in q2.documents) { doc.reference.delete().await() }
+            }
+        } catch (_: Exception) {}
     }
 
     // Cross-Household & Cross-Scope helper scans to recover data across any household associated with the user

@@ -500,9 +500,13 @@ fun AnalyticsScreen(
         }
     }
 
-    // 4. Category budget analysis
+    // 4. Category budget analysis (matched by ID or normalized Greek name)
     val categorySpendMap = categories.associateWith { cat ->
-        periodExpenses.filter { it.categoryId == cat.id }.sumOf { it.amount }
+        val catNorm = GreekVoiceParser.normalizeGreek(cat.name.trim().lowercase())
+        periodExpenses.filter { exp ->
+            exp.categoryId == cat.id ||
+            (exp.categoryName.isNotBlank() && GreekVoiceParser.normalizeGreek(exp.categoryName.trim().lowercase()) == catNorm)
+        }.sumOf { it.amount }
     }
 
     LazyColumn(

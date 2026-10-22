@@ -1,26 +1,25 @@
 package com.example.data.model
 
 import com.google.firebase.Timestamp
-import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.IgnoreExtraProperties
 import com.google.firebase.firestore.PropertyName
 
 @IgnoreExtraProperties
 data class Household(
-    @DocumentId var id: String = "",
+    var id: String = "",
     var name: String = "Το Εξοδολόγιό μου",
     var ownerId: String = "",
     var inviteCode: String = "",
     var memberUids: List<String> = emptyList(),
     var invitedEmails: List<String> = emptyList(),
-    @set:PropertyName("isPremium") @get:PropertyName("isPremium") var isPremium: Boolean = false,
+    var isPremium: Boolean = false,
     var createdAt: Timestamp? = null,
     var updatedAt: Timestamp? = null
 )
 
 @IgnoreExtraProperties
 data class FirebaseExpense(
-    @DocumentId var id: String = "",
+    var id: String = "",
     var householdId: String = "",
     var title: String = "",
     var amount: Double = 0.0,
@@ -42,7 +41,7 @@ data class FirebaseExpense(
 
 @IgnoreExtraProperties
 data class UserProfile(
-    @DocumentId var uid: String = "",
+    var uid: String = "",
     var email: String = "",
     var displayName: String = "",
     var firstName: String = "",
@@ -53,7 +52,7 @@ data class UserProfile(
     var city: String = "",
     var householdId: String = "",
     var householdIds: List<String> = emptyList(),
-    @set:PropertyName("isPremium") @get:PropertyName("isPremium") var isPremium: Boolean = false,
+    var isPremium: Boolean = false,
     var photoUrl: String = "",
     var authProvider: String = "password", // "password" or "google"
     var createdAt: Timestamp? = null,
@@ -62,7 +61,7 @@ data class UserProfile(
 
 @IgnoreExtraProperties
 data class FirebaseIncome(
-    @DocumentId var id: String = "",
+    var id: String = "",
     var householdId: String = "",
     var title: String = "",
     var amount: Double = 0.0,
@@ -78,27 +77,23 @@ data class FirebaseIncome(
 
 @IgnoreExtraProperties
 data class FirebaseMember(
-    @DocumentId var id: String = "",
+    var id: String = "",
     var householdId: String = "",
     var userId: String = "",
     var name: String = "",
     var role: String = "Γονέας",
     var avatarColorHex: Long = 0xFF059669,
     var voiceKeywords: String = "",
-    @set:PropertyName("isDefault") @get:PropertyName("isDefault") var isDefault: Boolean = false,
+    @get:PropertyName("default")
+    @set:PropertyName("default")
+    var isDefault: Boolean = false,
     var sortOrder: Int = 0,
     var createdAt: Timestamp? = null
-) {
-    @PropertyName("default")
-    fun getLegacyDefault(): Boolean = isDefault
-
-    @PropertyName("default")
-    fun setLegacyDefault(value: Boolean) { isDefault = value }
-}
+)
 
 @IgnoreExtraProperties
 data class FirebaseCategory(
-    @DocumentId var id: String = "",
+    var id: String = "",
     var householdId: String = "",
     var userId: String = "",
     var name: String = "",
@@ -113,7 +108,7 @@ data class FirebaseCategory(
 
 @IgnoreExtraProperties
 data class FirebaseSavingsGoal(
-    @DocumentId var id: String = "",
+    var id: String = "",
     var householdId: String = "",
     var userId: String = "",
     var title: String = "",
@@ -128,7 +123,7 @@ data class FirebaseSavingsGoal(
 
 @IgnoreExtraProperties
 data class FirebaseRecurringExpense(
-    @DocumentId var id: String = "",
+    var id: String = "",
     var householdId: String = "",
     var userId: String = "",
     var title: String = "",
@@ -141,17 +136,11 @@ data class FirebaseRecurringExpense(
     var memberIdsCsv: String = "",
     var memberNamesDisplay: String = "Κοινό Οικογένειας",
     var note: String = "",
-    @set:PropertyName("isActive") @get:PropertyName("isActive") var isActive: Boolean = true,
+    var isActive: Boolean = true,
     var lastGeneratedMonth: String = "",
     var payerMemberId: Long = 0L,
     var payerMemberName: String = "",
     var payerMemberIdsCsv: String = "",
     var payerAmountsCsv: String = "",
     var createdAt: Timestamp? = null
-) {
-    @PropertyName("active")
-    fun getLegacyActive(): Boolean = isActive
-
-    @PropertyName("active")
-    fun setLegacyActive(value: Boolean) { isActive = value }
-}
+)

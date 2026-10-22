@@ -82,31 +82,42 @@ fun MembersScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Household Members Header Card (Spacious, balanced, never squished!)
+        // Household Members Header Card (Spacious, balanced, gorgeous)
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            shape = RoundedCornerShape(20.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(22.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             tonalElevation = 2.dp
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // Top Row: Header Info & Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f, fill = false)) {
-                        Text(
-                            text = if (lang == Localization.Language.ENGLISH) "MEMBERS & ROLES" else "ΜΕΛΗ & ΡΟΛΟΙ",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF059669),
-                            letterSpacing = 0.6.sp
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFD1FAE5),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        ) {
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "MEMBERS & ROLES" else "ΜΕΛΗ & ΡΟΛΟΙ",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF047857),
+                                letterSpacing = 0.5.sp,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
                         Text(
                             text = Localization.activeMembersCount(members.size, lang),
                             fontSize = 20.sp,
@@ -115,15 +126,16 @@ fun MembersScreen(
                         )
                     }
 
+                    // Action buttons: Invite pill + Add Member pill
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Invite / Share Button
+                        // Invite / Share Button (Soft Pill)
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFD1FAE5).copy(alpha = 0.6f),
-                            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.45f)),
+                            color = Color(0xFFD1FAE5).copy(alpha = 0.7f),
+                            border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
                             modifier = Modifier.clickable { onShareInviteCode() }
                         ) {
                             Row(
@@ -135,20 +147,18 @@ fun MembersScreen(
                                     imageVector = Icons.Default.PersonAdd,
                                     contentDescription = null,
                                     tint = Color(0xFF047857),
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Text(
                                     text = if (lang == Localization.Language.ENGLISH) "Invite" else "Πρόσκληση",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF047857),
-                                    maxLines = 1,
-                                    softWrap = false
+                                    color = Color(0xFF047857)
                                 )
                             }
                         }
 
-                        // Add Member Button (Full width, single line, beautiful emerald filled!)
+                        // Primary Add Member Button (Modern Pill)
                         Button(
                             onClick = {
                                 if (!isPremium && members.size >= 4) {
@@ -157,12 +167,16 @@ fun MembersScreen(
                                     onAddMember()
                                 }
                             },
+                            modifier = Modifier
+                                .height(38.dp)
+                                .testTag("add_member_button"),
                             shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Emerald700,
                                 contentColor = Color.White
                             ),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
@@ -173,11 +187,9 @@ fun MembersScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (lang == Localization.Language.ENGLISH) "Add" else "Προσθήκη",
-                                fontSize = 12.5.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 1,
-                                softWrap = false
+                                color = Color.White
                             )
                         }
                     }
@@ -199,10 +211,15 @@ fun MembersScreen(
                     Surface(
                         shape = CircleShape,
                         color = Color(0xFFD1FAE5),
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(72.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Group, contentDescription = null, tint = Color(0xFF059669), modifier = Modifier.size(32.dp))
+                            Icon(
+                                Icons.Default.Group,
+                                contentDescription = null,
+                                tint = Color(0xFF059669),
+                                modifier = Modifier.size(36.dp)
+                            )
                         }
                     }
 
@@ -210,7 +227,7 @@ fun MembersScreen(
 
                     Text(
                         text = if (lang == Localization.Language.ENGLISH) "No members added" else "Δεν υπάρχουν μέλη",
-                        fontSize = 16.5.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -222,7 +239,7 @@ fun MembersScreen(
                             "Add family members to track who pays what."
                         else
                             "Προσθέστε μέλη της οικογένειας για να παρακολουθείτε ποιος πληρώνει τι.",
-                        fontSize = 13.sp,
+                        fontSize = 13.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
@@ -231,15 +248,16 @@ fun MembersScreen(
 
                     Button(
                         onClick = onAddMember,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700)
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                        modifier = Modifier.height(44.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = if (lang == Localization.Language.ENGLISH) "Add Member" else "Προσθήκη Μέλους",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
+                            fontSize = 13.5.sp
                         )
                     }
                 }
@@ -249,10 +267,10 @@ fun MembersScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                 }
 
                 itemsIndexed(members, key = { _, m -> m.id }) { index, member ->
@@ -274,42 +292,42 @@ fun MembersScreen(
                                 .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Avatar initial with custom vibrant color
+                            // Avatar initial with vibrant color
                             Surface(
                                 shape = CircleShape,
                                 color = color,
-                                modifier = Modifier.size(44.dp)
+                                modifier = Modifier.size(46.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
                                         text = member.name.take(1).uppercase(Locale.getDefault()),
                                         color = Color.White,
-                                        fontSize = 18.sp,
+                                        fontSize = 19.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(14.dp))
 
                             // Details (Name + Role + Default badge)
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = member.name,
-                                    fontSize = 15.5.sp,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Spacer(modifier = Modifier.height(3.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = color.copy(alpha = 0.12f)
+                                        color = color.copy(alpha = 0.14f)
                                     ) {
                                         Text(
                                             text = Localization.translateRole(member.role, lang),
@@ -322,10 +340,10 @@ fun MembersScreen(
                                     if (member.isDefault) {
                                         Surface(
                                             shape = RoundedCornerShape(6.dp),
-                                            color = Emerald700.copy(alpha = 0.12f)
+                                            color = Emerald700.copy(alpha = 0.14f)
                                         ) {
                                             Text(
-                                                text = if (lang == Localization.Language.ENGLISH) "Default" else "Προεπιλογή",
+                                                text = if (lang == Localization.Language.ENGLISH) "★ Default" else "★ Προεπιλογή",
                                                 fontSize = 10.5.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Emerald700,
@@ -336,60 +354,84 @@ fun MembersScreen(
                                 }
                             }
 
-                            // Actions: Perfectly aligned across all rows!
+                            // Actions: Reorder, Edit, Delete
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 if (members.size > 1) {
-                                    IconButton(
-                                        onClick = { onMoveMemberUp(member) },
-                                        enabled = index > 0,
-                                        modifier = Modifier.size(28.dp)
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (index > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
+                                        modifier = Modifier.size(30.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.ArrowUpward,
-                                            contentDescription = "Move Up",
-                                            modifier = Modifier.size(15.dp),
-                                            tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f) else Color.Transparent
-                                        )
+                                        IconButton(
+                                            onClick = { onMoveMemberUp(member) },
+                                            enabled = index > 0,
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowUpward,
+                                                contentDescription = "Move Up",
+                                                modifier = Modifier.size(15.dp),
+                                                tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            )
+                                        }
                                     }
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (index < members.size - 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        IconButton(
+                                            onClick = { onMoveMemberDown(member) },
+                                            enabled = index < members.size - 1,
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDownward,
+                                                contentDescription = "Move Down",
+                                                modifier = Modifier.size(15.dp),
+                                                tint = if (index < members.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Emerald700.copy(alpha = 0.1f),
+                                    modifier = Modifier.size(32.dp)
+                                ) {
                                     IconButton(
-                                        onClick = { onMoveMemberDown(member) },
-                                        enabled = index < members.size - 1,
-                                        modifier = Modifier.size(28.dp)
+                                        onClick = { onEditMember(member) },
+                                        modifier = Modifier.fillMaxSize()
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.ArrowDownward,
-                                            contentDescription = "Move Down",
-                                            modifier = Modifier.size(15.dp),
-                                            tint = if (index < members.size - 1) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f) else Color.Transparent
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Emerald700
                                         )
                                     }
                                 }
 
-                                IconButton(
-                                    onClick = { onEditMember(member) },
-                                    modifier = Modifier.size(28.dp)
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFEF4444).copy(alpha = 0.1f),
+                                    modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { memberToDelete = member },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = Color(0xFFEF4444)
-                                    )
+                                    IconButton(
+                                        onClick = { memberToDelete = member },
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Color(0xFFEF4444)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -408,8 +450,20 @@ fun MembersScreen(
         val m = memberToDelete!!
         AlertDialog(
             onDismissRequest = { memberToDelete = null },
-            title = { Text(Localization.delete(lang)) },
-            text = { Text("Είστε βέβαιοι ότι θέλετε να διαγράψετε το μέλος «${m.name}»; Τα σχετικά έξοδα δεν θα διαγραφούν.") },
+            title = {
+                Text(
+                    text = Localization.deleteMemberConfirmTitle(lang),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (lang == Localization.Language.ENGLISH)
+                        "Are you sure you want to delete member \"${m.name}\"?"
+                    else
+                        "Είστε βέβαιοι ότι θέλετε να διαγράψετε το μέλος «${m.name}»;"
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -417,7 +471,11 @@ fun MembersScreen(
                         memberToDelete = null
                     }
                 ) {
-                    Text(Localization.delete(lang), color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                    Text(
+                        text = Localization.delete(lang),
+                        color = Color(0xFFEF4444),
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {

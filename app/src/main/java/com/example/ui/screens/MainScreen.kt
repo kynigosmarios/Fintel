@@ -511,19 +511,17 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Active Household Bar on other tabs (Tab 0 has full-bleed hero card per design)
-            if (currentTab != 0) {
-                HouseholdActiveBar(
-                    currentHousehold = currentHousehold,
-                    households = userHouseholds,
-                    appLanguage = appLanguage,
-                    isDarkTheme = isDarkTheme,
-                    onSelectHousehold = { viewModel.switchExodologio(it) },
-                    onManageHouseholdsClick = { viewModel.openExodologioDetailsDialog() },
-                    onCreateNewHouseholdClick = { viewModel.openExodologioManager() },
-                    onSwitchClick = { viewModel.openExodologioManager() }
-                )
-            }
+            // Active Household Bar (Visible across all tabs so user can always see and switch active exodologio)
+            HouseholdActiveBar(
+                currentHousehold = currentHousehold,
+                households = userHouseholds,
+                appLanguage = appLanguage,
+                isDarkTheme = isDarkTheme,
+                onSelectHousehold = { viewModel.switchExodologio(it) },
+                onManageHouseholdsClick = { viewModel.openExodologioDetailsDialog() },
+                onCreateNewHouseholdClick = { viewModel.openExodologioManager() },
+                onSwitchClick = { viewModel.openExodologioManager() }
+            )
 
             Box(
                 modifier = Modifier

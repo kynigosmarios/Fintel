@@ -28,10 +28,22 @@ object RecurringExpenseAutoProcessor {
 
     fun isAlreadyGeneratedForMonth(recurring: RecurringExpense, monthKey: String, monthExpenses: List<Expense>): Boolean {
         if (recurring.lastGeneratedMonth == monthKey) return true
+        if (recurring.lastGeneratedMonth.isNotBlank() && recurring.lastGeneratedMonth.startsWith(monthKey.take(7))) return true
+
+        val normRecTitle = GreekVoiceParser.normalizeGreek(recurring.title.trim().lowercase())
         return monthExpenses.any { expense ->
-            expense.title.equals(recurring.title, ignoreCase = true) &&
-                    expense.categoryId == recurring.categoryId &&
-                    Math.abs(expense.amount - recurring.amount) < 0.001
+            val normExpTitle = GreekVoiceParser.normalizeGreek(expense.title.trim().lowercase())
+            val titleMatches = normExpTitle == normRecTitle ||
+                    (normRecTitle.length >= 4 && normExpTitle.contains(normRecTitle)) ||
+                    (normExpTitle.length >= 4 && normRecTitle.contains(normExpTitle)) ||
+                    (normRecTitle.contains("ενοικιο") && normExpTitle.contains("ενοικιο")) ||
+                    (normRecTitle.contains("αυτοκινητ") && normExpTitle.contains("αυτοκινητ")) ||
+                    (normRecTitle.contains("netflix") && normExpTitle.contains("netflix")) ||
+                    (normRecTitle.contains("κινητ") && normExpTitle.contains("κινητ"))
+
+            val amountMatches = Math.abs(expense.amount - recurring.amount) < 2.0
+            (titleMatches && (amountMatches || expense.categoryId == recurring.categoryId)) ||
+                    (titleMatches && normExpTitle.isNotBlank())
         }
     }
 
@@ -47,6 +59,11 @@ object RecurringExpenseAutoProcessor {
             val activeRecurring = allRecurring.filter { it.isActive }
             if (activeRecurring.isEmpty()) return emptyList()
 
+            // Deduplicate active recurring by normalized title so duplicate records never trigger multiple inserts
+            val uniqueRecurring = activeRecurring.distinctBy {
+                GreekVoiceParser.normalizeGreek(it.title.trim().lowercase())
+            }
+
             val calendar = Calendar.getInstance()
             val currentYear = calendar.get(Calendar.YEAR)
             val currentMonth = calendar.get(Calendar.MONTH)
@@ -54,10 +71,60 @@ object RecurringExpenseAutoProcessor {
             val monthKey = String.format(Locale.US, "%04d-%02d", currentYear, currentMonth + 1)
 
             val allExpenses = repository.getAllExpensesList()
+            val currentMonthExpenses = allExpenses.filter { exp ->
+                val cal = Calendar.getInstance().apply { timeInMillis = exp.timestamp }
+                cal.get(Calendar.YEAR) == currentYear && cal.get(Calendar.MONTH) == currentMonth
+            }.toMutableList()
 
-            for (recurring in activeRecurring) {
+            val processedRoots = mutableSetOf<String>()
+
+            for (recurring in uniqueRecurring) {
+                val normTitle = GreekVoiceParser.normalizeGreek(recurring.title.trim().lowercase())
+                val rootKey = when {
+                    normTitle.contains("ενοικιο") -> "ενοικιο"
+                    normTitle.contains("αυτοκινητ") -> "αυτοκινητ"
+                    normTitle.contains("netflix") -> "netflix"
+                    normTitle.contains("κινητ") -> "κινητ"
+                    else -> normTitle
+                }
+
+                if (processedRoots.contains(rootKey)) {
+                    continue
+                }
+
                 if (currentDay >= recurring.dayOfMonth) {
-                    if (!isAlreadyGeneratedForMonth(recurring, monthKey, allExpenses)) {
+                    val alreadyRecorded = isAlreadyGeneratedForMonth(recurring, monthKey, currentMonthExpenses)
+                    if (alreadyRecorded) {
+                        processedRoots.add(rootKey)
+                        if (recurring.lastGeneratedMonth != monthKey) {
+                            val updatedRecurring = recurring.copy(lastGeneratedMonth = monthKey)
+                            repository.updateRecurringExpense(updatedRecurring)
+                            if (householdId.isNotBlank() && firestoreSyncRepo != null) {
+                                val fbRec = com.example.data.model.FirebaseRecurringExpense(
+                                    id = if (recurring.id > 0) "rec_${recurring.id}" else recurring.title,
+                                    householdId = householdId,
+                                    userId = user?.uid.orEmpty(),
+                                    title = recurring.title,
+                                    amount = recurring.amount,
+                                    categoryId = recurring.categoryId,
+                                    categoryName = recurring.categoryName,
+                                    frequency = recurring.frequency,
+                                    dayOfMonth = recurring.dayOfMonth,
+                                    splitType = recurring.splitType,
+                                    memberIdsCsv = recurring.memberIdsCsv,
+                                    memberNamesDisplay = recurring.memberNamesDisplay,
+                                    note = recurring.note,
+                                    isActive = recurring.isActive,
+                                    lastGeneratedMonth = monthKey,
+                                    payerMemberId = recurring.payerMemberId,
+                                    payerMemberName = recurring.payerMemberName,
+                                    payerMemberIdsCsv = recurring.payerMemberIdsCsv,
+                                    payerAmountsCsv = recurring.payerAmountsCsv
+                                )
+                                firestoreSyncRepo.syncRecurringExpense(householdId, fbRec)
+                            }
+                        }
+                    } else {
                         val expense = Expense(
                             title = recurring.title,
                             amount = recurring.amount,
@@ -77,6 +144,8 @@ object RecurringExpenseAutoProcessor {
                         val newId = repository.insertExpense(expense)
                         val insertedExpense = expense.copy(id = newId)
                         generatedList.add(insertedExpense)
+                        currentMonthExpenses.add(insertedExpense)
+                        processedRoots.add(rootKey)
 
                         val updatedRecurring = recurring.copy(lastGeneratedMonth = monthKey)
                         repository.updateRecurringExpense(updatedRecurring)
