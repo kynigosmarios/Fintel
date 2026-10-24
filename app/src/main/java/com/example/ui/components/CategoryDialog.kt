@@ -96,9 +96,6 @@ fun CategoryDialog(
     var selectedColorHex by remember(categoryToEdit) {
         mutableLongStateOf(categoryToEdit?.colorHex ?: 0xFF059669L)
     }
-    var selectedFontColorHex by remember(categoryToEdit) {
-        mutableLongStateOf(categoryToEdit?.fontColorHex ?: 0L)
-    }
     var voiceKeywords by remember(categoryToEdit) { mutableStateOf(categoryToEdit?.voiceKeywords ?: "") }
     var errorText by remember(categoryToEdit) { mutableStateOf<String?>(null) }
 
@@ -197,11 +194,7 @@ fun CategoryDialog(
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                val previewFontColor = if (selectedFontColorHex != 0L) {
-                                    Color(selectedFontColorHex)
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                }
+                                val previewFontColor = MaterialTheme.colorScheme.onSurface
                                 val previewCatColor = Color(selectedColorHex)
 
                                 Row(
@@ -348,72 +341,6 @@ fun CategoryDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 2. FONT COLOR SELECTION FOR LEDGER EXPENSES
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.FormatColorText,
-                            contentDescription = null,
-                            tint = if (selectedFontColorHex != 0L) Color(selectedFontColorHex) else Emerald700,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH) "Ledger Font Color" else "Χρώμα Γραμματοσειράς στο Εξοδολόγιο",
-                                fontSize = 13.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH)
-                                    "Expenses in this category will display with this text color"
-                                else
-                                    "Τα έξοδα αυτής της κατηγορίας θα εμφανίζονται με αυτό το χρώμα κειμένου",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        CategoryIconHelper.availableFontColors.forEach { (fontColorLong, label) ->
-                            val isSelected = selectedFontColorHex == fontColorLong
-                            val swatchColor = if (fontColorLong != 0L) Color(fontColorLong) else MaterialTheme.colorScheme.onSurface
-
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { selectedFontColorHex = fontColorLong },
-                                label = {
-                                    Text(
-                                        text = label,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (fontColorLong != 0L) swatchColor else MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
-                                leadingIcon = {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(14.dp)
-                                            .clip(CircleShape)
-                                            .background(swatchColor)
-                                            .border(1.dp, Color.Gray.copy(alpha = 0.4f), CircleShape)
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = if (fontColorLong != 0L) swatchColor.copy(alpha = 0.15f) else Emerald700.copy(alpha = 0.15f)
-                                )
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
                     // 3. ICON SELECTION
                     Text(
                         text = Localization.categoryIconLabel(lang),
@@ -520,7 +447,7 @@ fun CategoryDialog(
                                 parsedBudget,
                                 selectedColorHex,
                                 voiceKeywords.trim(),
-                                selectedFontColorHex
+                                0L
                             )
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(selectedColorHex), contentColor = Color.White),

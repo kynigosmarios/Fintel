@@ -30,7 +30,7 @@ fun OikoNomosLogo(
     ) {
         Image(
             painter = painterResource(
-                id = if (isDarkTheme) R.drawable.ic_oikonomos_logo_white else R.drawable.ic_oikonomos_logo
+                id = if (isDarkTheme) R.drawable.fintel_logo_white else R.drawable.fintel_logo
             ),
             contentDescription = "Fintel Logo",
             modifier = Modifier.fillMaxSize()

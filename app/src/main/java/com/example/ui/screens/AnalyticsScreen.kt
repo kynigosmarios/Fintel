@@ -1893,8 +1893,24 @@ fun AnalyticsScreen(
 
                     val activeCategories = categories
                         .filter { (categorySpendMap[it] ?: 0.0) > 0.01 || it.monthlyBudget > 0.01 }
-                        .sortedByDescending { categorySpendMap[it] ?: 0.0 }
-                    val displayedCats = if (activeCategories.isNotEmpty()) activeCategories else categories.take(6)
+                        .sortedWith(
+                            compareByDescending<ExpenseCategory> { cat ->
+                                val spent = categorySpendMap[cat] ?: 0.0
+                                val budget = cat.monthlyBudget
+                                if (budget > 0.0) spent / budget else 0.0
+                            }.thenByDescending { categorySpendMap[it] ?: 0.0 }
+                        )
+                    val displayedCats = if (activeCategories.isNotEmpty()) {
+                        activeCategories
+                    } else {
+                        categories.sortedWith(
+                            compareByDescending<ExpenseCategory> { cat ->
+                                val spent = categorySpendMap[cat] ?: 0.0
+                                val budget = cat.monthlyBudget
+                                if (budget > 0.0) spent / budget else 0.0
+                            }.thenByDescending { categorySpendMap[it] ?: 0.0 }
+                        ).take(6)
+                    }
 
                     if (displayedCats.isEmpty()) {
                         Text(

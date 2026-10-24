@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -288,7 +289,7 @@ fun CategoriesScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onEditCategory(category) }
+                            .animateItem()
                             .testTag("category_card_${category.id}"),
                         shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -298,138 +299,151 @@ fun CategoriesScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(14.dp),
+                                .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Category Icon in tinted container
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = color.copy(alpha = 0.16f),
-                                modifier = Modifier.size(46.dp)
+                            // Left clickable content (Icon + Details) opens Edit Dialog
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { onEditCategory(category) }
+                                    .padding(vertical = 4.dp, horizontal = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                                        contentDescription = null,
-                                        tint = color,
-                                        modifier = Modifier.size(23.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(14.dp))
-
-                            // Details (Title + Budget)
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = Localization.translateCategory(category.name, lang),
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(3.dp))
-                                if (category.monthlyBudget > 0.0) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = Emerald700.copy(alpha = 0.12f)
-                                    ) {
-                                        Text(
-                                            text = "🎯 ${Localization.remainingBudgetPrefix(lang)} ${String.format(Locale.US, "%.2f €", category.monthlyBudget)}",
-                                            fontSize = 12.sp,
-                                            color = Emerald700,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                // Category Icon in tinted container
+                                Surface(
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = color.copy(alpha = 0.16f),
+                                    modifier = Modifier.size(46.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = CategoryIconHelper.getIcon(category.iconKey),
+                                            contentDescription = null,
+                                            tint = color,
+                                            modifier = Modifier.size(23.dp)
                                         )
                                     }
-                                } else {
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                // Details (Title + Budget)
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "No budget limit" else "Χωρίς όριο",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        text = Localization.translateCategory(category.name, lang),
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    if (category.monthlyBudget > 0.0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Emerald700.copy(alpha = 0.12f)
+                                        ) {
+                                            Text(
+                                                text = "🎯 Budget: ${String.format(Locale.US, "%.2f €", category.monthlyBudget)}",
+                                                fontSize = 12.sp,
+                                                color = Emerald700,
+                                                fontWeight = FontWeight.SemiBold,
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    } else {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "No budget limit" else "Χωρίς όριο",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
                                 }
                             }
 
-                            // Actions: Reorder, Edit, Delete
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            // Actions: Reorder, Edit, Delete (isolated, distinct, responsive)
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 if (categories.size > 1) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (index > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
-                                        modifier = Modifier.size(30.dp)
-                                    ) {
-                                        IconButton(
-                                            onClick = { onMoveCategoryUp(category) },
-                                            enabled = index > 0,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.ArrowUpward,
-                                                contentDescription = "Move Up",
-                                                modifier = Modifier.size(15.dp),
-                                                tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (index > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                                else Color.Transparent
                                             )
-                                        }
-                                    }
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = if (index < categories.size - 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
-                                        modifier = Modifier.size(30.dp)
-                                    ) {
-                                        IconButton(
-                                            onClick = { onMoveCategoryDown(category) },
-                                            enabled = index < categories.size - 1,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.ArrowDownward,
-                                                contentDescription = "Move Down",
-                                                modifier = Modifier.size(15.dp),
-                                                tint = if (index < categories.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Emerald700.copy(alpha = 0.1f),
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    IconButton(
-                                        onClick = { onEditCategory(category) },
-                                        modifier = Modifier.fillMaxSize()
+                                            .clickable(enabled = index > 0) { onMoveCategoryUp(category) }
+                                            .testTag("move_up_cat_${category.id}"),
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Edit",
+                                            imageVector = Icons.Default.ArrowUpward,
+                                            contentDescription = "Move Up",
                                             modifier = Modifier.size(16.dp),
-                                            tint = Emerald700
+                                            tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (index < categories.size - 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                                else Color.Transparent
+                                            )
+                                            .clickable(enabled = index < categories.size - 1) { onMoveCategoryDown(category) }
+                                            .testTag("move_down_cat_${category.id}"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ArrowDownward,
+                                            contentDescription = "Move Down",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = if (index < categories.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
                                         )
                                     }
                                 }
 
-                                Surface(
-                                    shape = CircleShape,
-                                    color = Color(0xFFEF4444).copy(alpha = 0.1f),
-                                    modifier = Modifier.size(32.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(Emerald700.copy(alpha = 0.12f))
+                                        .clickable { onEditCategory(category) }
+                                        .testTag("edit_cat_${category.id}"),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    IconButton(
-                                        onClick = { categoryToDelete = category },
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = Color(0xFFEF4444)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = Emerald700
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFEF4444).copy(alpha = 0.12f))
+                                        .clickable { categoryToDelete = category }
+                                        .testTag("delete_cat_${category.id}"),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = Color(0xFFEF4444)
+                                    )
                                 }
                             }
                         }

@@ -193,13 +193,12 @@ fun ExpensesScreen(
     val totalIncomesAmount = remember(monthIncomes) { monthIncomes.sumOf { it.amount } }
     val netBalance = totalIncomesAmount - totalExpensesAmount
 
-    // Dynamic budget calculation: sum of monthly budgets of categories
+    // Dynamic budget calculation: exact sum of monthly budgets of categories
     val totalBudget = remember(categories) {
-        val sum = categories.sumOf { it.monthlyBudget }
-        if (sum > 0.0) sum else 2962.00
+        categories.sumOf { it.monthlyBudget }
     }
     val remainingBudget = remember(totalBudget, totalExpensesAmount) {
-        maxOf(0.0, totalBudget - totalExpensesAmount)
+        totalBudget - totalExpensesAmount
     }
     val budgetPercent = remember(totalBudget, totalExpensesAmount) {
         if (totalBudget > 0.0) ((totalExpensesAmount / totalBudget) * 100).toInt() else 0
@@ -372,28 +371,39 @@ fun ExpensesScreen(
                                     }
                                 }
 
-                                // '+ Έξοδο' Pill Button
+                                // Dynamic 'Έξοδο' / 'Έσοδο' Pill Button (No '+' symbol)
+                                val isIncomeSelected = selectedTypeFilter == "INCOME"
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
-                                    color = Color(0xFF065F46),
-                                    border = BorderStroke(1.dp, Color(0xFF34D399).copy(alpha = 0.5f)),
+                                    color = if (isIncomeSelected) Color(0xFF047857) else Color(0xFF065F46),
+                                    border = BorderStroke(1.dp, (if (isIncomeSelected) Color(0xFF10B981) else Color(0xFF34D399)).copy(alpha = 0.5f)),
                                     modifier = Modifier
-                                        .clickable { onAddManualExpense() }
-                                        .testTag("hero_add_expense_btn")
+                                        .clickable {
+                                            if (isIncomeSelected) {
+                                                onAddManualIncome()
+                                            } else {
+                                                onAddManualExpense()
+                                            }
+                                        }
+                                        .testTag(if (isIncomeSelected) "hero_add_income_btn" else "hero_add_expense_btn")
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Add,
                                             contentDescription = null,
                                             tint = Color.White,
-                                            modifier = Modifier.size(17.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
                                         Text(
-                                            text = if (lang == Localization.Language.ENGLISH) "+ Expense" else "+ Έξοδο",
+                                            text = if (isIncomeSelected) {
+                                                if (lang == Localization.Language.ENGLISH) "Income" else "Έσοδο"
+                                            } else {
+                                                if (lang == Localization.Language.ENGLISH) "Expense" else "Έξοδο"
+                                            },
                                             fontSize = 13.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White
@@ -465,7 +475,9 @@ fun ExpensesScreen(
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { onAddManualIncome() },
+                                        .clickable {
+                                            selectedTypeFilter = "INCOME"
+                                        },
                                     shape = RoundedCornerShape(16.dp),
                                     color = Color(0xFF065F46).copy(alpha = 0.35f),
                                     border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.25f))
@@ -510,7 +522,10 @@ fun ExpensesScreen(
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { onAddManualExpense() },
+                                        .clickable {
+                                            selectedTypeFilter = "EXPENSE"
+                                            onAddManualExpense()
+                                        },
                                     shape = RoundedCornerShape(16.dp),
                                     color = Color(0xFF451A1A).copy(alpha = 0.35f),
                                     border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.25f))
@@ -616,17 +631,19 @@ fun ExpensesScreen(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            // Budget Progress Section
+                            // Budget Progress Section: Actual Expenses vs Category Budget Sum
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (lang == Localization.Language.ENGLISH)
-                                        String.format(Locale.US, "Remaining Budget: %.2f €", remainingBudget)
-                                    else
-                                        String.format(Locale.US, "Υπόλοιπο Budget: %.2f €", remainingBudget),
+                                    text = String.format(
+                                        Locale.US,
+                                        if (lang == Localization.Language.ENGLISH) "Expenses: %.2f € / Budget: %.2f €" else "Έξοδα: %.2f € / Budget: %.2f €",
+                                        totalExpensesAmount,
+                                        totalBudget
+                                    ),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color.White
@@ -636,14 +653,16 @@ fun ExpensesScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     color = Color(0xFF065F46).copy(alpha = 0.8f)
                                 ) {
+                                    val remaining = totalBudget - totalExpensesAmount
                                     Text(
-                                        text = if (lang == Localization.Language.ENGLISH)
-                                            "$budgetPercent% of budget"
-                                        else
-                                            "$budgetPercent% του budget",
+                                        text = if (totalBudget > 0.0) {
+                                            "$budgetPercent% (${String.format(Locale.US, "%s%.2f €", if (remaining >= 0) "+" else "", remaining)})"
+                                        } else {
+                                            "0%"
+                                        },
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFA7F3D0),
+                                        color = if (totalExpensesAmount <= totalBudget) Color(0xFFA7F3D0) else Color(0xFFFCA5A5),
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
                                 }
@@ -1077,6 +1096,7 @@ fun ExpensesScreen(
                     }
                 }
             } else if (displayItems.isEmpty()) {
+                val isIncomeMode = selectedTypeFilter == "INCOME"
                 item(key = "empty_state") {
                     Box(
                         modifier = Modifier
@@ -1092,7 +1112,7 @@ fun ExpensesScreen(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.Receipt,
+                                        imageVector = if (isIncomeMode) Icons.AutoMirrored.Filled.TrendingUp else Icons.Default.Receipt,
                                         contentDescription = null,
                                         tint = Emerald700,
                                         modifier = Modifier.size(28.dp)
@@ -1101,18 +1121,57 @@ fun ExpensesScreen(
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = Localization.noExpensesFound(lang),
+                                text = if (isIncomeMode) {
+                                    if (lang == Localization.Language.ENGLISH) "No incomes found" else "Δεν βρέθηκαν έσοδα"
+                                } else {
+                                    Localization.noExpensesFound(lang)
+                                },
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = Localization.noExpensesForPeriod(lang),
+                                text = if (isIncomeMode) {
+                                    if (lang == Localization.Language.ENGLISH) "No incomes recorded for this month" else "Δεν υπάρχουν καταχωρημένα έσοδα για αυτόν τον μήνα"
+                                } else {
+                                    Localization.noExpensesForPeriod(lang)
+                                },
                                 fontSize = 12.5.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color(0xFF047857),
+                                modifier = Modifier.clickable {
+                                    if (isIncomeMode) onAddManualIncome() else onAddManualExpense()
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = if (isIncomeMode) {
+                                            if (lang == Localization.Language.ENGLISH) "Add Income" else "Καταχώρηση Εσόδου"
+                                        } else {
+                                            if (lang == Localization.Language.ENGLISH) "Add Expense" else "Καταχώρηση Εξόδου"
+                                        },
+                                        fontSize = 13.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1157,8 +1216,13 @@ fun ExpensesScreen(
                             is ActivityItem.ExpenseItem -> {
                                 val expense = item.expense
                                 val matchingCategory = categories.find { it.id == expense.categoryId }
-                                    ?: categories.find { it.name.equals(expense.categoryName, ignoreCase = true) }
+                                    ?: categories.find { it.name.trim().equals(expense.categoryName.trim(), ignoreCase = true) }
                                 val iconKey = matchingCategory?.iconKey ?: "cart"
+                                val categoryColor = if (matchingCategory != null && matchingCategory.colorHex != 0L) {
+                                    Color(matchingCategory.colorHex)
+                                } else {
+                                    Color(0xFF059669)
+                                }
 
                                 // Payer display (Chip 1: green badge e.g. "👥 Γονείς" or "👤 Μάριος")
                                 val payerText = expense.getPayerCategoryOrNamesDisplay(members, lang)
@@ -1178,7 +1242,7 @@ fun ExpensesScreen(
                                         .padding(horizontal = 16.dp, vertical = 2.dp)
                                         .clickable { onEditExpense(expense) }
                                         .testTag("expense_card_${expense.id}")
-                                ) {
+                                 ) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1189,17 +1253,17 @@ fun ExpensesScreen(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            // Category icon in soft mint rounded box
+                                            // Category icon in tinted rounded box matching custom category color
                                             Surface(
                                                 shape = RoundedCornerShape(12.dp),
-                                                color = Color(0xFFD1FAE5),
+                                                color = categoryColor.copy(alpha = 0.16f),
                                                 modifier = Modifier.size(46.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         imageVector = CategoryIconHelper.getIcon(iconKey),
                                                         contentDescription = null,
-                                                        tint = Color(0xFF059669),
+                                                        tint = categoryColor,
                                                         modifier = Modifier.size(24.dp)
                                                     )
                                                 }
@@ -1225,7 +1289,7 @@ fun ExpensesScreen(
                                                         text = Localization.translateCategory(expense.categoryName, lang),
                                                         fontSize = 13.sp,
                                                         fontWeight = FontWeight.Medium,
-                                                        color = Color(0xFF059669),
+                                                        color = categoryColor,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )

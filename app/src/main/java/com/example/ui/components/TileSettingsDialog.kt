@@ -193,7 +193,7 @@ fun TileSettingsDialog(
                             statusBarManager?.requestAddTileService(
                                 ComponentName(context, QuickExpenseTileService::class.java),
                                 "Fintel",
-                                Icon.createWithResource(context, R.drawable.ic_oikonomos_logo),
+                                Icon.createWithResource(context, R.drawable.fintel_logo),
                                 context.mainExecutor
                             ) { result ->
                                 addTileStatusMessage = if (result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED) {

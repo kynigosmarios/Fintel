@@ -11,6 +11,8 @@ import com.example.data.model.FirebaseRecurringExpense
 import com.example.data.model.FirebaseSavingsGoal
 import com.example.data.model.Household
 import com.example.data.model.UserProfile
+import com.example.data.model.toSafeCategory
+import com.example.data.model.toSafeMember
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -1049,11 +1051,7 @@ class FirestoreSyncRepository(
             .map { querySnapshot ->
                 querySnapshot.documents.mapNotNull { doc ->
                     try {
-                        val obj = doc.toObject(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                        if (obj != null && obj.id.isBlank()) {
-                            obj.id = doc.id
-                        }
-                        obj
+                        doc.toSafeMember()
                     } catch (e: Exception) {
                         Log.w(TAG, "Error deserializing member ${doc.id}: ${e.message}")
                         null
@@ -1089,11 +1087,7 @@ class FirestoreSyncRepository(
             .map { querySnapshot ->
                 querySnapshot.documents.mapNotNull { doc ->
                     try {
-                        val obj = doc.toObject(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                        if (obj != null && obj.id.isBlank()) {
-                            obj.id = doc.id
-                        }
-                        obj
+                        doc.toSafeCategory()
                     } catch (e: Exception) {
                         Log.w(TAG, "Error deserializing category ${doc.id}: ${e.message}")
                         null
@@ -1130,11 +1124,7 @@ class FirestoreSyncRepository(
                 .await()
             snapshot.documents.mapNotNull { doc ->
                 try {
-                    val obj = doc.toObject(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    if (obj != null && obj.id.isBlank()) {
-                        obj.id = doc.id
-                    }
-                    obj
+                    doc.toSafeMember()
                 } catch (e: Exception) {
                     null
                 }
@@ -1153,11 +1143,7 @@ class FirestoreSyncRepository(
                 .await()
             snapshot.documents.mapNotNull { doc ->
                 try {
-                    val obj = doc.toObject(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    if (obj != null && obj.id.isBlank()) {
-                        obj.id = doc.id
-                    }
-                    obj
+                    doc.toSafeMember()
                 } catch (e: Exception) {
                     null
                 }
@@ -1173,8 +1159,13 @@ class FirestoreSyncRepository(
             .collection("members")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseMember::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
+                querySnapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toSafeMember()
+                    } catch (e: Exception) {
+                        null
+                    }
+                }.sortedWith(compareBy<FirebaseMember> { it.sortOrder }.thenBy { it.id })
             }
     }
 
@@ -1206,11 +1197,7 @@ class FirestoreSyncRepository(
                 .await()
             snapshot.documents.mapNotNull { doc ->
                 try {
-                    val obj = doc.toObject(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    if (obj != null && obj.id.isBlank()) {
-                        obj.id = doc.id
-                    }
-                    obj
+                    doc.toSafeCategory()
                 } catch (e: Exception) {
                     null
                 }
@@ -1229,11 +1216,7 @@ class FirestoreSyncRepository(
                 .await()
             snapshot.documents.mapNotNull { doc ->
                 try {
-                    val obj = doc.toObject(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    if (obj != null && obj.id.isBlank()) {
-                        obj.id = doc.id
-                    }
-                    obj
+                    doc.toSafeCategory()
                 } catch (e: Exception) {
                     null
                 }
@@ -1249,8 +1232,13 @@ class FirestoreSyncRepository(
             .collection("categories")
             .snapshots()
             .map { querySnapshot ->
-                querySnapshot.toObjects(FirebaseCategory::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-                    .sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
+                querySnapshot.documents.mapNotNull { doc ->
+                    try {
+                        doc.toSafeCategory()
+                    } catch (e: Exception) {
+                        null
+                    }
+                }.sortedWith(compareBy<FirebaseCategory> { it.sortOrder }.thenBy { it.id })
             }
     }
 
@@ -1650,6 +1638,71 @@ class FirestoreSyncRepository(
         return result
     }
 
+    suspend fun syncAndCleanCategory(
+        householdIds: List<String>,
+        userId: String,
+        category: FirebaseCategory,
+        oldName: String = ""
+    ) {
+        val canonicalDocId = category.id.ifBlank { UUID.randomUUID().toString() }
+        val toSave = category.copy(id = canonicalDocId, createdAt = Timestamp.now())
+
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+            try {
+                db.collection("households").document(hId)
+                    .collection("categories").document(canonicalDocId)
+                    .set(toSave.copy(householdId = hId))
+                    .await()
+            } catch (e: Exception) {
+                Log.w("FirestoreSyncRepo", "Error syncing category to household $hId: ${e.message}")
+            }
+        }
+        if (userId.isNotBlank()) {
+            try {
+                db.collection("users").document(userId)
+                    .collection("categories").document(canonicalDocId)
+                    .set(toSave.copy(userId = userId))
+                    .await()
+            } catch (e: Exception) {
+                Log.w("FirestoreSyncRepo", "Error syncing category to user $userId: ${e.message}")
+            }
+        }
+
+        // Purge old stale documents with old name or duplicate doc IDs
+        val namesToPurge = mutableListOf<String>()
+        if (oldName.isNotBlank() && !oldName.equals(category.name, ignoreCase = true)) {
+            namesToPurge.add(oldName.trim().lowercase())
+        }
+
+        for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+            try {
+                val snapshot = db.collection("households").document(hId).collection("categories").get().await()
+                for (doc in snapshot.documents) {
+                    if (doc.id == canonicalDocId) continue
+                    val remoteName = doc.getString("name").orEmpty().trim().lowercase()
+                    if ((namesToPurge.isNotEmpty() && namesToPurge.contains(remoteName)) ||
+                        (remoteName == category.name.trim().lowercase())) {
+                        doc.reference.delete().await()
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+
+        if (userId.isNotBlank()) {
+            try {
+                val snapshot = db.collection("users").document(userId).collection("categories").get().await()
+                for (doc in snapshot.documents) {
+                    if (doc.id == canonicalDocId) continue
+                    val remoteName = doc.getString("name").orEmpty().trim().lowercase()
+                    if ((namesToPurge.isNotEmpty() && namesToPurge.contains(remoteName)) ||
+                        (remoteName == category.name.trim().lowercase())) {
+                        doc.reference.delete().await()
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+    }
+
     suspend fun deleteCategoryFromAllScopes(categoryId: String, householdIds: List<String>, userId: String) {
         if (categoryId.isBlank()) return
         if (userId.isNotBlank()) {
@@ -1657,6 +1710,72 @@ class FirestoreSyncRepository(
         }
         for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
             try { deleteCategory(hId, categoryId) } catch (e: Exception) {}
+        }
+    }
+
+    suspend fun batchUpdateMemberSortOrder(
+        householdIds: List<String>,
+        userId: String,
+        members: List<FirebaseMember>
+    ) {
+        if (members.isEmpty()) return
+        val validHouseholdIds = householdIds.filter { it.isNotBlank() }.distinct()
+
+        try {
+            val batch = db.batch()
+            for (m in members) {
+                val docId = m.id.ifBlank { "1" }
+                val updates = mapOf(
+                    "sortOrder" to m.sortOrder,
+                    "updatedAt" to Timestamp.now()
+                )
+                for (hId in validHouseholdIds) {
+                    val ref = db.collection("households").document(hId)
+                        .collection("members").document(docId)
+                    batch.set(ref, updates, SetOptions.merge())
+                }
+                if (userId.isNotBlank()) {
+                    val ref = db.collection("users").document(userId)
+                        .collection("members").document(docId)
+                    batch.set(ref, updates, SetOptions.merge())
+                }
+            }
+            batch.commit().await()
+        } catch (e: Exception) {
+            Log.w(TAG, "batchUpdateMemberSortOrder error: ${e.message}")
+        }
+    }
+
+    suspend fun batchUpdateCategorySortOrder(
+        householdIds: List<String>,
+        userId: String,
+        categories: List<FirebaseCategory>
+    ) {
+        if (categories.isEmpty()) return
+        val validHouseholdIds = householdIds.filter { it.isNotBlank() }.distinct()
+
+        try {
+            val batch = db.batch()
+            for (c in categories) {
+                val docId = c.id.ifBlank { "1" }
+                val updates = mapOf(
+                    "sortOrder" to c.sortOrder,
+                    "updatedAt" to Timestamp.now()
+                )
+                for (hId in validHouseholdIds) {
+                    val ref = db.collection("households").document(hId)
+                        .collection("categories").document(docId)
+                    batch.set(ref, updates, SetOptions.merge())
+                }
+                if (userId.isNotBlank()) {
+                    val ref = db.collection("users").document(userId)
+                        .collection("categories").document(docId)
+                    batch.set(ref, updates, SetOptions.merge())
+                }
+            }
+            batch.commit().await()
+        } catch (e: Exception) {
+            Log.w(TAG, "batchUpdateCategorySortOrder error: ${e.message}")
         }
     }
 

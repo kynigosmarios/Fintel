@@ -252,32 +252,30 @@ object DataSafetyGuard {
                 }
             }
 
-            // 6. Audit & Secure Incomes (ensure all local incomes not yet in cloud are mirrored)
+            // 6. Audit & Secure Incomes (ensure all local incomes are mirrored to cloud)
             val localIncomes = repository.getAllIncomesList()
             if (localIncomes.isNotEmpty()) {
-                val unsynced = localIncomes.filter { it.cloudId.isBlank() }
-                if (unsynced.isNotEmpty()) {
-                    unsynced.forEach { inc ->
-                        val fbInc = com.example.data.model.FirebaseIncome(
-                            id = inc.cloudId.ifBlank { "inc_${inc.id}" },
-                            householdId = activeHouseholdId,
-                            title = inc.title,
-                            amount = inc.amount,
-                            memberId = inc.memberId,
-                            memberName = inc.memberName,
-                            category = inc.category,
-                            timestamp = inc.timestamp,
-                            note = inc.note,
-                            createdByUid = userId,
-                            createdByName = user.displayName ?: "Χρήστης"
-                        )
-                        if (activeHouseholdId.isNotBlank()) {
-                            firestoreSyncRepo.syncIncome(fbInc)
-                        }
-                        firestoreSyncRepo.syncUserIncome(userId, fbInc)
+                localIncomes.forEach { inc ->
+                    val docId = inc.cloudId.ifBlank { "inc_${inc.id}" }
+                    val fbInc = com.example.data.model.FirebaseIncome(
+                        id = docId,
+                        householdId = activeHouseholdId.ifBlank { com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID },
+                        title = inc.title,
+                        amount = inc.amount,
+                        memberId = inc.memberId,
+                        memberName = inc.memberName,
+                        category = inc.category,
+                        timestamp = inc.timestamp,
+                        note = inc.note,
+                        createdByUid = userId,
+                        createdByName = user.displayName ?: "Χρήστης"
+                    )
+                    if (activeHouseholdId.isNotBlank()) {
+                        firestoreSyncRepo.syncIncome(fbInc)
                     }
-                    Log.d(TAG, "Secured ${unsynced.size} unsynced incomes to cloud.")
+                    firestoreSyncRepo.syncUserIncome(userId, fbInc)
                 }
+                Log.d(TAG, "Secured ${localIncomes.size} local incomes to cloud.")
             }
 
             Log.i(TAG, "Audit complete. All user data is 100% mirrored in Firebase Cloud.")

@@ -126,6 +126,10 @@ class ExpenseRepository(
         if (existingCategories == 0) {
             seedStandardCategories()
         }
+        val existingIncomes = expenseDao.getAllIncomesList().size
+        if (existingIncomes == 0) {
+            expenseDao.insertIncomes(com.example.data.seed.FirestoreDataSeed.incomes)
+        }
     }
 
     suspend fun seedMariosDataIfEmpty() {

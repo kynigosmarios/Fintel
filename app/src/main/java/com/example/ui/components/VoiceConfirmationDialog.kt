@@ -114,17 +114,24 @@ fun VoiceConfirmationDialog(
 
     val selectedPayerIds = remember(pendingExpense, members) {
         val list = mutableStateListOf<Long>()
-        val cleanPayer = pendingExpense.payerMemberName.replace(Regex("\\([^)]*\\)"), "").trim()
-        if (cleanPayer.equals("Γονείς", ignoreCase = true) || cleanPayer.equals("Parents", ignoreCase = true)) {
-            val parents = members.filter { it.role.equals("Γονέας", ignoreCase = true) }
-            if (parents.isNotEmpty()) list.addAll(parents.map { it.id })
-        } else {
-            val names = cleanPayer.split(Regex("[&,/]+")).map { it.trim() }.filter { it.isNotBlank() }
-            val matched = members.filter { m -> names.any { n -> n.equals(m.name, ignoreCase = true) || cleanPayer.contains(m.name, ignoreCase = true) } }
-            if (matched.isNotEmpty()) {
-                list.addAll(matched.map { it.id })
-            } else if (pendingExpense.payerMemberId != 0L) {
-                list.add(pendingExpense.payerMemberId)
+        if (pendingExpense.payerMemberIdsCsv.isNotBlank()) {
+            val ids = pendingExpense.payerMemberIdsCsv.split(",").mapNotNull { it.trim().toLongOrNull() }
+            val valid = ids.filter { id -> members.any { it.id == id } }
+            if (valid.isNotEmpty()) list.addAll(valid)
+        }
+        if (list.isEmpty()) {
+            val cleanPayer = pendingExpense.payerMemberName.replace(Regex("\\([^)]*\\)"), "").trim()
+            if (cleanPayer.equals("Γονείς", ignoreCase = true) || cleanPayer.equals("Parents", ignoreCase = true)) {
+                val parents = members.filter { it.role.equals("Γονέας", ignoreCase = true) }
+                if (parents.isNotEmpty()) list.addAll(parents.map { it.id })
+            } else {
+                val names = cleanPayer.split(Regex("[&,/]+")).map { it.trim() }.filter { it.isNotBlank() }
+                val matched = members.filter { m -> names.any { n -> n.equals(m.name, ignoreCase = true) || cleanPayer.contains(m.name, ignoreCase = true) } }
+                if (matched.isNotEmpty()) {
+                    list.addAll(matched.map { it.id })
+                } else if (pendingExpense.payerMemberId != 0L) {
+                    list.add(pendingExpense.payerMemberId)
+                }
             }
         }
         if (list.isEmpty()) {

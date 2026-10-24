@@ -25,6 +25,7 @@ import com.example.data.model.UserProfile
 import com.example.data.repository.ExpenseRepository
 import com.example.data.repository.FirestoreSyncRepository
 import com.example.data.safety.DataSafetyGuard
+import com.example.data.seed.FirestoreDataSeed
 import com.example.util.GreekVoiceParser
 import com.example.util.Localization
 import com.example.util.ParsedVoiceExpense
@@ -190,6 +191,14 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 if (localIncomes.isNotEmpty()) {
                     _allIncomes.value = localIncomes
                 }
+                val localCategories = repository.getAllCategoriesList()
+                if (localCategories.isNotEmpty()) {
+                    _allCategories.value = localCategories
+                }
+                val localMembers = repository.getAllMembersList()
+                if (localMembers.isNotEmpty()) {
+                    _allMembers.value = localMembers
+                }
                 // Automatic check and execution of standing orders due today or this month
                 checkAndProcessDueRecurringExpenses()
             } catch (e: Exception) {
@@ -227,6 +236,34 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                     if (!isSame) {
                         _allIncomes.value = roomIncomes
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            repository.allCategories.collect { roomCategories ->
+                if (categoryReorderJob?.isActive == true) return@collect
+                if (roomCategories.isNotEmpty()) {
+                    val current = _allCategories.value
+                    val isSame = current.size == roomCategories.size && current.zip(roomCategories).all { (a, b) ->
+                        a.id == b.id && a.sortOrder == b.sortOrder && a.name == b.name && a.monthlyBudget == b.monthlyBudget && a.colorHex == b.colorHex
+                    }
+                    if (!isSame) {
+                        _allCategories.value = roomCategories
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            repository.allMembers.collect { roomMembers ->
+                if (memberReorderJob?.isActive == true) return@collect
+                if (roomMembers.isNotEmpty()) {
+                    val current = _allMembers.value
+                    val isSame = current.size == roomMembers.size && current.zip(roomMembers).all { (a, b) ->
+                        a.id == b.id && a.sortOrder == b.sortOrder && a.name == b.name && a.role == b.role && a.avatarColorHex == b.avatarColorHex
+                    }
+                    if (!isSame) {
+                        _allMembers.value = roomMembers
                     }
                 }
             }
@@ -501,6 +538,9 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
 
+        val hasCustomRemoteSort = validRemote.any { it.sortOrder > 0 }
+        val hasCustomLocalSort = currentLocal.any { it.sortOrder > 0 }
+
         // Database is the SOURCE OF TRUTH!
         val sortedRemote = validRemote.sortedWith(
             compareBy<FirebaseMember> { it.sortOrder }
@@ -514,7 +554,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         var nextAssignedId = 2L
         val cleanMembers = mutableListOf<FamilyMember>()
-        grouped.forEach { (_, list) ->
+        grouped.forEach { (normName, list) ->
             val chosen = list.maxByOrNull { it.createdAt?.seconds ?: 0L } ?: list.first()
             val parsedId = chosen.id.toLongOrNull()
             val isPrimary = chosen.isDefault || chosen.id == "1" || (cleanMembers.isEmpty() && (chosen.name.equals(user?.displayName, ignoreCase = true) || chosen.name.equals(profile?.displayName, ignoreCase = true)))
@@ -529,6 +569,16 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 nextAssignedId++
             }
 
+            val matchingLocal = currentLocal.find {
+                it.id == finalId || GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) == normName
+            }
+
+            val finalSort = when {
+                hasCustomRemoteSort -> chosen.sortOrder
+                hasCustomLocalSort && matchingLocal != null -> matchingLocal.sortOrder
+                else -> cleanMembers.size
+            }
+
             cleanMembers.add(
                 FamilyMember(
                     id = finalId,
@@ -537,7 +587,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     avatarColorHex = if (chosen.avatarColorHex != 0L) chosen.avatarColorHex else (if (finalId == 1L) 0xFF059669 else 0xFF0284C7),
                     voiceKeywords = chosen.voiceKeywords.trim(),
                     isDefault = finalId == 1L,
-                    sortOrder = chosen.sortOrder
+                    sortOrder = finalSort
                 )
             )
         }
@@ -545,6 +595,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         val finalMembers = cleanMembers
             .distinctBy { it.id }
             .sortedWith(compareBy<FamilyMember> { it.sortOrder }.thenBy { it.id })
+            .mapIndexed { idx, m -> m.copy(sortOrder = idx) }
+
+        if (hasCustomLocalSort && !hasCustomRemoteSort) {
+            syncUpdatedMembersToCloud(finalMembers)
+        }
 
         val areDifferent = finalMembers.size != currentLocal.size ||
             finalMembers.any { fm ->
@@ -560,6 +615,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         if (areDifferent) {
             repository.replaceAllMembers(finalMembers)
+            _allMembers.value = finalMembers
         }
     }
 
@@ -604,6 +660,9 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
 
+        val hasCustomRemoteSort = incomingCats.any { it.sortOrder > 0 }
+        val hasCustomLocalSort = currentLocal.any { it.sortOrder > 0 }
+
         // Group incoming by normalized Greek name to prevent duplicate categories and ID shifting
         val grouped = incomingCats
             .filter { it.name.isNotBlank() }
@@ -616,9 +675,9 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             val canonical = canonicalMap[normName]
             // Choose entry matching canonical ID if present, otherwise latest or first
             val chosen = if (canonical != null) {
-                list.find { it.id == canonical.id.toString() } ?: list.first()
+                list.find { it.id == canonical.id.toString() } ?: list.maxByOrNull { it.createdAt?.seconds ?: 0L } ?: list.first()
             } else {
-                list.first()
+                list.maxByOrNull { it.createdAt?.seconds ?: 0L } ?: list.first()
             }
 
             val parsedId = chosen.id.toLongOrNull()
@@ -637,7 +696,17 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             val finalIcon = chosen.iconKey.ifBlank { canonical?.iconKey ?: "cart" }
             val finalColor = if (chosen.colorHex != 0L) chosen.colorHex else (canonical?.colorHex ?: 0xFF059669)
             val finalKeywords = chosen.voiceKeywords.ifBlank { canonical?.voiceKeywords ?: "" }
-            val finalSort = canonical?.sortOrder ?: (if (chosen.sortOrder != 0) chosen.sortOrder else cleanCategories.size)
+
+            val matchingLocal = currentLocal.find {
+                it.id == finalCatId || GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) == normName
+            }
+
+            val finalSort = when {
+                hasCustomRemoteSort -> chosen.sortOrder
+                hasCustomLocalSort && matchingLocal != null -> matchingLocal.sortOrder
+                canonical != null -> canonical.sortOrder
+                else -> cleanCategories.size
+            }
 
             cleanCategories.add(
                 ExpenseCategory(
@@ -657,12 +726,17 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         canonicalMap.values.forEach { canonical ->
             val norm = GreekVoiceParser.normalizeGreek(canonical.name.trim().lowercase())
             if (cleanCategories.none { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) == norm }) {
-                cleanCategories.add(canonical)
+                cleanCategories.add(canonical.copy(sortOrder = cleanCategories.size))
             }
         }
 
         val finalCategories = cleanCategories
             .sortedWith(compareBy<ExpenseCategory> { it.sortOrder }.thenBy { it.id })
+            .mapIndexed { idx, cat -> cat.copy(sortOrder = idx) }
+
+        if (hasCustomLocalSort && !hasCustomRemoteSort) {
+            syncUpdatedCategoriesToCloud(finalCategories)
+        }
 
         val areDifferent = finalCategories.size != currentLocal.size ||
             finalCategories.any { fc ->
@@ -678,6 +752,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         if (areDifferent) {
             repository.replaceAllCategories(finalCategories)
+            _allCategories.value = finalCategories
         }
     }
 
@@ -837,9 +912,31 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 // 6. RECOVER / RESTORE INCOMES (Zero Data Loss across all household IDs & user mirror)
                 val allCloudIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHouseholdIds, user.uid)
                 if (allCloudIncomes.isNotEmpty()) {
-                    val activeHouseholdIncomes = allCloudIncomes.filter { it.householdId == activeHouseholdId }
-                    val incomesToShow = if (activeHouseholdIncomes.isNotEmpty()) activeHouseholdIncomes else allCloudIncomes
-                    updateCombinedIncomes(householdList = incomesToShow, userList = allCloudIncomes, targetHid = activeHouseholdId)
+                    updateCombinedIncomes(householdList = allCloudIncomes, userList = allCloudIncomes, targetHid = activeHouseholdId)
+                } else {
+                    val localIncomes = repository.getAllIncomesList()
+                    if (localIncomes.isNotEmpty()) {
+                        localIncomes.forEach { inc ->
+                            val docId = inc.cloudId.ifBlank { "inc_${inc.id}_${java.util.UUID.randomUUID()}" }
+                            val fbInc = FirebaseIncome(
+                                id = docId,
+                                householdId = activeHouseholdId.ifBlank { com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID },
+                                title = inc.title,
+                                amount = inc.amount,
+                                memberId = inc.memberId,
+                                memberName = inc.memberName,
+                                category = inc.category,
+                                timestamp = inc.timestamp,
+                                note = inc.note,
+                                createdByUid = user.uid,
+                                createdByName = user.displayName ?: "Χρήστης"
+                            )
+                            if (activeHouseholdId.isNotBlank()) {
+                                firestoreSyncRepo.syncIncome(fbInc)
+                            }
+                            firestoreSyncRepo.syncUserIncome(user.uid, fbInc)
+                        }
+                    }
                 }
 
                 // Check and execute any due standing orders
@@ -924,9 +1021,19 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private fun mapFirebaseIncomesToDomain(remoteIncomes: List<FirebaseIncome>): List<Income> {
         val currentMems = allMembers.value
         val currentCats = allCategories.value
+        val currentIncomes = _allIncomes.value
 
         return remoteIncomes.map { remote ->
-            val hashId = Math.abs(remote.id.hashCode().toLong())
+            // 1. Stable, consistent ID resolution:
+            // If we already have a local income with this cloudId or matching content, preserve its local Room id!
+            val existingLocal = currentIncomes.find {
+                (it.cloudId.isNotBlank() && it.cloudId == remote.id) ||
+                (it.title == remote.title && Math.abs(it.timestamp - remote.timestamp) < 5000 && Math.abs(it.amount - remote.amount) < 0.01)
+            }
+            val hashId = Math.abs(remote.id.hashCode().toLong()).coerceAtLeast(1L)
+            val resolvedId = existingLocal?.id
+                ?: (if (remote.id.startsWith("inc_")) remote.id.removePrefix("inc_").toLongOrNull() else null)
+                ?: hashId
 
             val matchingMember = if (remote.memberId != 0L) {
                 currentMems.find { it.id == remote.memberId }
@@ -934,23 +1041,14 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 currentMems.find { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) == GreekVoiceParser.normalizeGreek(remote.memberName.trim().lowercase()) }
             } else null
 
-            val finalMemberId = when {
-                remote.memberId == 0L && remote.memberName.isBlank() -> 0L
-                matchingMember != null -> matchingMember.id
-                currentMems.isNotEmpty() && remote.memberId != 0L -> 0L // Member was deleted -> clear field
-                else -> remote.memberId
-            }
-            val finalMemberName = when {
-                finalMemberId == 0L -> ""
-                matchingMember != null -> matchingMember.name // Update to changed member name
-                else -> remote.memberName
-            }
+            val finalMemberId = matchingMember?.id ?: remote.memberId
+            val finalMemberName = matchingMember?.name ?: remote.memberName
 
             val matchingCat = currentCats.find { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) == GreekVoiceParser.normalizeGreek(remote.category.trim().lowercase()) }
             val finalCat = if (matchingCat != null) matchingCat.name else remote.category
 
             Income(
-                id = if (hashId == 0L) 1L else hashId,
+                id = resolvedId,
                 cloudId = remote.id,
                 title = remote.title,
                 amount = remote.amount,
@@ -1025,10 +1123,13 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         userList: List<FirebaseIncome>? = null,
         targetHid: String? = null
     ) {
+        val currentHid = targetHid ?: _currentHousehold.value?.id.orEmpty()
         if (householdList != null) lastHouseholdIncomes = householdList
         if (userList != null) lastUserIncomes = userList
 
-        val combined = (lastHouseholdIncomes + lastUserIncomes)
+        val relevantUserIncomes = lastUserIncomes
+
+        val combinedRemote = (lastHouseholdIncomes + relevantUserIncomes)
             .distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
             .sortedWith(
                 compareByDescending<FirebaseIncome> { it.timestamp }
@@ -1036,24 +1137,87 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     .thenByDescending { it.id }
             )
 
-        if (combined.isNotEmpty()) {
-            val domain = mapFirebaseIncomesToDomain(combined)
+        val domainRemote = mapFirebaseIncomesToDomain(combinedRemote)
+
+        // ZERO DATA LOSS GUARANTEE:
+        // Merge with local Room / in-memory incomes so any incomes entered locally or yesterday are NEVER lost or wiped!
+        val currentLocal = if (_allIncomes.value.isNotEmpty()) _allIncomes.value else emptyList()
+        val mergedList = domainRemote.toMutableList()
+
+        for (local in currentLocal) {
+            val existsInRemote = mergedList.any {
+                (it.cloudId.isNotBlank() && local.cloudId.isNotBlank() && it.cloudId == local.cloudId) ||
+                (it.id > 0 && local.id > 0 && it.id == local.id) ||
+                (it.title == local.title && Math.abs(it.timestamp - local.timestamp) < 5000 && Math.abs(it.amount - local.amount) < 0.01)
+            }
+            if (!existsInRemote) {
+                mergedList.add(local)
+                // Mirror local income to cloud in background
+                viewModelScope.launch {
+                    val user = _currentUser.value
+                    val docId = local.cloudId.ifBlank { "inc_${local.id}_${java.util.UUID.randomUUID()}" }
+                    val fbInc = FirebaseIncome(
+                        id = docId,
+                        householdId = currentHid.ifBlank { com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID },
+                        title = local.title,
+                        amount = local.amount,
+                        memberId = local.memberId,
+                        memberName = local.memberName,
+                        category = local.category,
+                        timestamp = local.timestamp,
+                        note = local.note,
+                        createdByUid = user?.uid ?: "",
+                        createdByName = user?.displayName ?: "Χρήστης"
+                    )
+                    if (currentHid.isNotBlank()) {
+                        firestoreSyncRepo.syncIncome(fbInc)
+                    }
+                    if (user != null) {
+                        firestoreSyncRepo.syncUserIncome(user.uid, fbInc)
+                    }
+                }
+            }
+        }
+
+        val dedupedList = mergedList
+            .distinctBy { it.cloudId.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
+
+        val usedIds = mutableSetOf<Long>()
+        var nextAvailableId = 1L
+        val sortedMerged = dedupedList
+            .sortedWith(
+                compareByDescending<Income> { it.timestamp }.thenByDescending { it.id }
+            )
+            .map { inc ->
+                val chosenId = if (inc.id > 0L && usedIds.add(inc.id)) {
+                    inc.id
+                } else {
+                    while (usedIds.contains(nextAvailableId)) {
+                        nextAvailableId++
+                    }
+                    usedIds.add(nextAvailableId)
+                    nextAvailableId
+                }
+                if (chosenId != inc.id) inc.copy(id = chosenId) else inc
+            }
+
+        if (sortedMerged.isNotEmpty()) {
             val current = _allIncomes.value
-            val isSame = current.size == domain.size && current.zip(domain).all { (a, b) ->
+            val isSame = current.size == sortedMerged.size && current.zip(sortedMerged).all { (a, b) ->
                 a.id == b.id && a.amount == b.amount && a.title == b.title && a.timestamp == b.timestamp
             }
             if (!isSame) {
-                _allIncomes.value = domain
+                _allIncomes.value = sortedMerged
                 viewModelScope.launch {
                     try {
-                        repository.insertIncomes(domain)
+                        repository.replaceAllIncomes(sortedMerged)
                     } catch (e: Exception) {
                         Log.d("OikoNomosVM", "Room cache combined incomes: ${e.message}")
                     }
                 }
             }
         } else {
-            if (householdList != null && (userList != null || lastUserIncomes.isEmpty())) {
+            if (householdList != null && userList != null && currentLocal.isEmpty()) {
                 _allIncomes.value = emptyList()
             }
         }
@@ -1245,17 +1409,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
             try {
                 val direct = firestoreSyncRepo.getIncomesOnce(householdId)
-                if (direct.isNotEmpty()) {
-                    updateCombinedIncomes(householdList = direct, targetHid = householdId)
-                } else {
-                    val allHids = (_userProfile.value?.householdIds.orEmpty() + listOf(householdId, "3e9a25a0-2e7", "e1d4ae67-499")).filter { it.isNotBlank() }.distinct()
-                    val allIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHids, _currentUser.value?.uid.orEmpty())
-                    val matching = allIncomes.filter { it.householdId == householdId }
-                    if (matching.isNotEmpty()) {
-                        updateCombinedIncomes(householdList = matching, targetHid = householdId)
-                    } else if (allIncomes.isNotEmpty() && householdId == com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) {
-                        updateCombinedIncomes(householdList = allIncomes, targetHid = householdId)
-                    }
+                val allHids = (_userProfile.value?.householdIds.orEmpty() + listOf(householdId, "3e9a25a0-2e7", "e1d4ae67-499")).filter { it.isNotBlank() }.distinct()
+                val allIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHids, _currentUser.value?.uid.orEmpty())
+                val combinedDirect = (direct + allIncomes).distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
+                if (combinedDirect.isNotEmpty()) {
+                    updateCombinedIncomes(householdList = combinedDirect, userList = allIncomes, targetHid = householdId)
                 }
             } catch (e: Exception) {
                 Log.w("OikoNomosVM", "Initial direct incomes fetch: ${e.message}")
@@ -1871,6 +2029,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         categoriesSyncJob?.cancel()
         _allExpenses.value = emptyList()
         _allIncomes.value = emptyList()
+        _allMembers.value = emptyList()
+        _allCategories.value = emptyList()
         viewModelScope.launch {
             if (com.example.data.safety.DataSafetyGuard.validateDestructiveOperation(
                     com.example.data.safety.DataSafetyGuard.DestructionReason.EXPLICIT_SIGN_OUT
@@ -1900,6 +2060,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         categoriesSyncJob?.cancel()
         _allExpenses.value = emptyList()
         _allIncomes.value = emptyList()
+        _allMembers.value = emptyList()
+        _allCategories.value = emptyList()
         viewModelScope.launch {
             if (com.example.data.safety.DataSafetyGuard.validateDestructiveOperation(
                     com.example.data.safety.DataSafetyGuard.DestructionReason.EXPLICIT_FACTORY_RESET
@@ -1916,11 +2078,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private val _allIncomes = MutableStateFlow<List<Income>>(emptyList())
     val allIncomes: StateFlow<List<Income>> = _allIncomes.asStateFlow()
 
-    val allMembers: StateFlow<List<FamilyMember>> = repository.allMembers
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val _allMembers = MutableStateFlow<List<FamilyMember>>(emptyList())
+    val allMembers: StateFlow<List<FamilyMember>> = _allMembers.asStateFlow()
 
-    val allCategories: StateFlow<List<ExpenseCategory>> = repository.allCategories
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val _allCategories = MutableStateFlow<List<ExpenseCategory>>(emptyList())
+    val allCategories: StateFlow<List<ExpenseCategory>> = _allCategories.asStateFlow()
 
     val allRecurringExpenses: StateFlow<List<RecurringExpense>> = repository.allRecurringExpenses
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -1979,7 +2141,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         _searchQuery
     ) { incomes, memberId, query ->
         incomes.filter { inc ->
-            val matchMember = memberId == null || inc.memberId == memberId
+            val matchMember = when (memberId) {
+                null -> true
+                -1L -> inc.memberId == 0L
+                else -> inc.memberId == memberId || inc.memberId == 0L
+            }
             val matchQuery = if (query.isBlank()) {
                 true
             } else {
@@ -3401,16 +3567,21 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         timestamp: Long,
         note: String
     ) {
-        val existing = _editingIncome.value
-            ?: if (id > 0) _allIncomes.value.find { it.id == id } else null
+        val isEditing = id > 0 || (_editingIncome.value != null && _editingIncome.value?.id != 0L && (id == 0L || id == _editingIncome.value?.id))
+        val existing = if (isEditing) {
+            _editingIncome.value ?: _allIncomes.value.find { it.id == id }
+        } else null
         dismissManualIncomeDialog()
 
         viewModelScope.launch {
             val user = _currentUser.value
             val household = _currentHousehold.value
+            val fallbackHid = _userHouseholds.value.firstOrNull()?.id
+                ?: com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
             val targetHouseholdId = household?.id?.ifBlank { null }
                 ?: _userProfile.value?.householdId?.ifBlank { null }
-                ?: prefs.getString("last_household_id", "") ?: ""
+                ?: prefs.getString("last_household_id", "")?.ifBlank { null }
+                ?: fallbackHid
             val targetUserId = user?.uid ?: ""
 
             val existingDocId = existing?.cloudId?.ifBlank { null }
@@ -3419,9 +3590,9 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     inList?.cloudId?.ifBlank { null }
                 } else null
 
-            val docId = existingDocId ?: if (id > 0) "inc_$id" else java.util.UUID.randomUUID().toString()
+            val docId = if (isEditing) (existingDocId ?: if (id > 0) "inc_$id" else java.util.UUID.randomUUID().toString()) else java.util.UUID.randomUUID().toString()
 
-            val targetId = if (id > 0) id else (existing?.id ?: 0L)
+            val targetId = if (isEditing) (if (id > 0) id else (existing?.id ?: 0L)) else 0L
             var domainIncome = Income(
                 id = targetId,
                 cloudId = docId,
@@ -3783,6 +3954,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun deleteMember(member: FamilyMember) {
+        _allMembers.value = _allMembers.value.filter { it.id != member.id }
         viewModelScope.launch {
             repository.deleteMember(member)
             val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(_currentHousehold.value?.id.orEmpty())).filter { it.isNotBlank() }.distinct()
@@ -4057,6 +4229,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun deleteCategory(category: ExpenseCategory) {
+        _allCategories.value = _allCategories.value.filter { it.id != category.id }
         viewModelScope.launch {
             repository.deleteCategory(category)
             val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(_currentHousehold.value?.id.orEmpty())).filter { it.isNotBlank() }.distinct()
@@ -4139,47 +4312,69 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     // =========================================================================
-    // 1. REORDERING: MEMBERS & CATEGORIES (Up / Down Reorder)
+    // 1. REORDERING: MEMBERS & CATEGORIES (Instant 0ms UI & Background Batch Sync)
     // =========================================================================
+    private var memberReorderJob: Job? = null
+    private var categoryReorderJob: Job? = null
+
     fun moveMemberUp(member: FamilyMember) {
-        viewModelScope.launch {
-            val list = repository.getAllMembersList().toMutableList()
-            val index = list.indexOfFirst { it.id == member.id }
-            if (index > 0) {
-                val prev = list[index - 1]
-                list[index - 1] = member.copy(sortOrder = index - 1)
-                list[index] = prev.copy(sortOrder = index)
-                val updated = list.mapIndexed { i, m -> m.copy(sortOrder = i) }
-                repository.replaceAllMembers(updated)
-                syncUpdatedMembersToCloud(updated)
-            }
-        }
+        val current = _allMembers.value.toMutableList()
+        val index = current.indexOfFirst { it.id == member.id }
+        if (index <= 0) return
+
+        val prev = current[index - 1]
+        current[index - 1] = member.copy(sortOrder = index - 1)
+        current[index] = prev.copy(sortOrder = index)
+        val updated = current.mapIndexed { i, m -> m.copy(sortOrder = i) }
+
+        // ⚡ INSTANT IN-MEMORY UPDATE: UI reflects change in 0ms!
+        _allMembers.value = updated
+
+        // Debounced background persistence
+        scheduleMemberReorderSave(updated)
     }
 
     fun moveMemberDown(member: FamilyMember) {
-        viewModelScope.launch {
-            val list = repository.getAllMembersList().toMutableList()
-            val index = list.indexOfFirst { it.id == member.id }
-            if (index in 0 until list.size - 1) {
-                val next = list[index + 1]
-                list[index + 1] = member.copy(sortOrder = index + 1)
-                list[index] = next.copy(sortOrder = index)
-                val updated = list.mapIndexed { i, m -> m.copy(sortOrder = i) }
-                repository.replaceAllMembers(updated)
-                syncUpdatedMembersToCloud(updated)
-            }
+        val current = _allMembers.value.toMutableList()
+        val index = current.indexOfFirst { it.id == member.id }
+        if (index < 0 || index >= current.size - 1) return
+
+        val next = current[index + 1]
+        current[index + 1] = member.copy(sortOrder = index + 1)
+        current[index] = next.copy(sortOrder = index)
+        val updated = current.mapIndexed { i, m -> m.copy(sortOrder = i) }
+
+        // ⚡ INSTANT IN-MEMORY UPDATE: UI reflects change in 0ms!
+        _allMembers.value = updated
+
+        // Debounced background persistence
+        scheduleMemberReorderSave(updated)
+    }
+
+    private fun scheduleMemberReorderSave(updated: List<FamilyMember>) {
+        memberReorderJob?.cancel()
+        memberReorderJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(350)
+            repository.updateMembers(updated)
+            syncUpdatedMembersToCloud(updated)
         }
     }
 
     private suspend fun syncUpdatedMembersToCloud(members: List<FamilyMember>) {
         val householdId = _currentHousehold.value?.id.orEmpty()
         val uid = _currentUser.value?.uid.orEmpty()
-        val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(householdId)).filter { it.isNotBlank() }.distinct()
-        members.forEach { m ->
-            val fb = FirebaseMember(
+        val effectiveHouseholdId = householdId.ifBlank {
+            _userProfile.value?.householdId?.ifBlank { FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID } ?: FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
+        }
+        val effectiveUid = uid.ifBlank {
+            auth.currentUser?.uid?.ifBlank { FirestoreDataSeed.DEFAULT_USER_UID } ?: FirestoreDataSeed.DEFAULT_USER_UID
+        }
+        val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(effectiveHouseholdId, FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID)).filter { it.isNotBlank() }.distinct()
+        val fbMembers = members.map { m ->
+            FirebaseMember(
                 id = m.id.toString(),
-                householdId = householdId,
-                userId = uid,
+                householdId = effectiveHouseholdId,
+                userId = effectiveUid,
                 name = m.name,
                 role = m.role,
                 avatarColorHex = m.avatarColorHex,
@@ -4187,52 +4382,68 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 isDefault = m.isDefault,
                 sortOrder = m.sortOrder
             )
-            for (hId in allHouseholdIds) {
-                firestoreSyncRepo.syncMember(hId, fb.copy(householdId = hId))
-            }
-            if (uid.isNotBlank()) firestoreSyncRepo.syncUserMember(uid, fb)
         }
+        firestoreSyncRepo.batchUpdateMemberSortOrder(allHouseholdIds, effectiveUid, fbMembers)
     }
 
     fun moveCategoryUp(category: ExpenseCategory) {
-        viewModelScope.launch {
-            val list = repository.getAllCategoriesList().toMutableList()
-            val index = list.indexOfFirst { it.id == category.id }
-            if (index > 0) {
-                val prev = list[index - 1]
-                list[index - 1] = category.copy(sortOrder = index - 1)
-                list[index] = prev.copy(sortOrder = index)
-                val updated = list.mapIndexed { i, c -> c.copy(sortOrder = i) }
-                repository.replaceAllCategories(updated)
-                syncUpdatedCategoriesToCloud(updated)
-            }
-        }
+        val current = _allCategories.value.toMutableList()
+        val index = current.indexOfFirst { it.id == category.id }
+        if (index <= 0) return
+
+        val prev = current[index - 1]
+        current[index - 1] = category.copy(sortOrder = index - 1)
+        current[index] = prev.copy(sortOrder = index)
+        val updated = current.mapIndexed { i, c -> c.copy(sortOrder = i) }
+
+        // ⚡ INSTANT IN-MEMORY UPDATE: UI reflects change in 0ms!
+        _allCategories.value = updated
+
+        // Debounced background persistence
+        scheduleCategoryReorderSave(updated)
     }
 
     fun moveCategoryDown(category: ExpenseCategory) {
-        viewModelScope.launch {
-            val list = repository.getAllCategoriesList().toMutableList()
-            val index = list.indexOfFirst { it.id == category.id }
-            if (index in 0 until list.size - 1) {
-                val next = list[index + 1]
-                list[index + 1] = category.copy(sortOrder = index + 1)
-                list[index] = next.copy(sortOrder = index)
-                val updated = list.mapIndexed { i, c -> c.copy(sortOrder = i) }
-                repository.replaceAllCategories(updated)
-                syncUpdatedCategoriesToCloud(updated)
-            }
+        val current = _allCategories.value.toMutableList()
+        val index = current.indexOfFirst { it.id == category.id }
+        if (index < 0 || index >= current.size - 1) return
+
+        val next = current[index + 1]
+        current[index + 1] = category.copy(sortOrder = index + 1)
+        current[index] = next.copy(sortOrder = index)
+        val updated = current.mapIndexed { i, c -> c.copy(sortOrder = i) }
+
+        // ⚡ INSTANT IN-MEMORY UPDATE: UI reflects change in 0ms!
+        _allCategories.value = updated
+
+        // Debounced background persistence
+        scheduleCategoryReorderSave(updated)
+    }
+
+    private fun scheduleCategoryReorderSave(updated: List<ExpenseCategory>) {
+        categoryReorderJob?.cancel()
+        categoryReorderJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(350)
+            repository.updateCategories(updated)
+            syncUpdatedCategoriesToCloud(updated)
         }
     }
 
     private suspend fun syncUpdatedCategoriesToCloud(categories: List<ExpenseCategory>) {
         val householdId = _currentHousehold.value?.id.orEmpty()
         val uid = _currentUser.value?.uid.orEmpty()
-        val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(householdId)).filter { it.isNotBlank() }.distinct()
-        categories.forEach { c ->
-            val fb = FirebaseCategory(
+        val effectiveHouseholdId = householdId.ifBlank {
+            _userProfile.value?.householdId?.ifBlank { FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID } ?: FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
+        }
+        val effectiveUid = uid.ifBlank {
+            auth.currentUser?.uid?.ifBlank { FirestoreDataSeed.DEFAULT_USER_UID } ?: FirestoreDataSeed.DEFAULT_USER_UID
+        }
+        val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(effectiveHouseholdId, FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID)).filter { it.isNotBlank() }.distinct()
+        val fbCategories = categories.map { c ->
+            FirebaseCategory(
                 id = c.id.toString(),
-                householdId = householdId,
-                userId = uid,
+                householdId = effectiveHouseholdId,
+                userId = effectiveUid,
                 name = c.name,
                 iconKey = c.iconKey,
                 monthlyBudget = c.monthlyBudget,
@@ -4241,11 +4452,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 sortOrder = c.sortOrder,
                 fontColorHex = c.fontColorHex
             )
-            for (hId in allHouseholdIds) {
-                firestoreSyncRepo.syncCategory(hId, fb.copy(householdId = hId))
-            }
-            if (uid.isNotBlank()) firestoreSyncRepo.syncUserCategory(uid, fb)
         }
+        firestoreSyncRepo.batchUpdateCategorySortOrder(allHouseholdIds, effectiveUid, fbCategories)
     }
 
     // =========================================================================

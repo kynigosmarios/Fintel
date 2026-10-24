@@ -13,5 +13,5 @@
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:contentDescription="@string/app_name"
-        android:src="@drawable/ic_oikonomos_logo" />
+        android:src="@drawable/fintel_logo_white" />
 </LinearLayout>

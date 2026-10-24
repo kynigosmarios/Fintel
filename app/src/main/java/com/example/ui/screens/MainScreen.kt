@@ -124,7 +124,6 @@ import com.example.ui.components.VoiceConfirmationDialog
 import com.example.ui.components.VoiceInputDialog
 import com.example.ui.components.VoiceListeningOverlay
 import com.example.ui.components.VoiceMicButton
-import com.example.ui.screens.SavingsAndRecurringScreen
 import com.example.ui.theme.Amber700
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald400
@@ -142,7 +141,6 @@ import kotlinx.coroutines.launch
 enum class AppTab(val title: String) {
     EXPENSES("Έξοδα"),
     ANALYTICS("Αναλυτικά"),
-    SAVINGS("Αποταμίευση"),
     MEMBERS("Μέλη"),
     CATEGORIES("Κατηγορίες")
 }
@@ -442,31 +440,11 @@ fun MainScreen(
                         onClick = { currentTab = 2 },
                         icon = {
                             Icon(
-                                imageVector = if (currentTab == 2) Icons.Default.Savings else Icons.Outlined.Savings,
-                                contentDescription = com.example.util.Localization.tabSavings(lang)
-                            )
-                        },
-                        label = { Text(com.example.util.Localization.tabSavings(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Medium) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF064E3B),
-                            selectedTextColor = Color(0xFF064E3B),
-                            indicatorColor = Color(0xFFD1FAE5),
-                            unselectedIconColor = Color(0xFF475569),
-                            unselectedTextColor = Color(0xFF64748B)
-                        ),
-                        modifier = Modifier.testTag("tab_goals")
-                    )
-
-                    NavigationBarItem(
-                        selected = currentTab == 3,
-                        onClick = { currentTab = 3 },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentTab == 3) Icons.Default.Group else Icons.Outlined.Group,
+                                imageVector = if (currentTab == 2) Icons.Default.Group else Icons.Outlined.Group,
                                 contentDescription = com.example.util.Localization.tabMembers(lang)
                             )
                         },
-                        label = { Text(com.example.util.Localization.tabMembers(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Medium) },
+                        label = { Text(com.example.util.Localization.tabMembers(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color(0xFF064E3B),
                             selectedTextColor = Color(0xFF064E3B),
@@ -478,15 +456,15 @@ fun MainScreen(
                     )
 
                     NavigationBarItem(
-                        selected = currentTab == 4,
-                        onClick = { currentTab = 4 },
+                        selected = currentTab == 3,
+                        onClick = { currentTab = 3 },
                         icon = {
                             Icon(
-                                imageVector = if (currentTab == 4) Icons.Default.Category else Icons.Outlined.Category,
+                                imageVector = if (currentTab == 3) Icons.Default.Category else Icons.Outlined.Category,
                                 contentDescription = com.example.util.Localization.tabCategories(lang)
                             )
                         },
-                        label = { Text(com.example.util.Localization.tabCategories(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 4) FontWeight.Bold else FontWeight.Medium) },
+                        label = { Text(com.example.util.Localization.tabCategories(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = Color(0xFF064E3B),
                             selectedTextColor = Color(0xFF064E3B),
@@ -568,28 +546,9 @@ fun MainScreen(
                         members = members,
                         appLanguage = appLanguage,
                         onExportReport = { viewModel.openExportReportDialog() },
-                        onManageCategories = { currentTab = 4 }
+                        onManageCategories = { currentTab = 3 }
                     )
-                    2 -> {
-                        androidx.compose.runtime.LaunchedEffect(Unit) {
-                            viewModel.checkAndProcessDueRecurringExpenses()
-                        }
-                        SavingsAndRecurringScreen(
-                            goals = savingsGoals,
-                            recurringExpenses = recurringExpenses,
-                            appLanguage = appLanguage,
-                            onAddGoal = { viewModel.openSavingsGoalDialog() },
-                            onEditGoal = { viewModel.openSavingsGoalDialog(it) },
-                            onDeleteGoal = { viewModel.deleteSavingsGoal(it) },
-                            onDepositToGoal = { goal, amt -> viewModel.depositToGoal(goal, amt) },
-                            onAddRecurring = { viewModel.openRecurringExpenseDialog() },
-                            onEditRecurring = { viewModel.openRecurringExpenseDialog(it) },
-                            onDeleteRecurring = { viewModel.deleteRecurringExpense(it) },
-                            onExecuteRecurringNow = { viewModel.executeRecurringExpenseNow(it) },
-                            onToggleRecurringActive = { viewModel.toggleRecurringActive(it) }
-                        )
-                    }
-                    3 -> MembersScreen(
+                    2 -> MembersScreen(
                         members = members,
                         currentHousehold = currentHousehold,
                         isPremium = userProfile?.isPremium == true,
@@ -603,7 +562,7 @@ fun MainScreen(
                         onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
                         onShareInviteCode = { showInviteDialog = true }
                     )
-                    4 -> CategoriesScreen(
+                    3 -> CategoriesScreen(
                         categories = categories,
                         appLanguage = appLanguage,
                         onAddCategory = { viewModel.openCategoryDialog() },

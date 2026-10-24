@@ -98,14 +98,14 @@ fun ManualIncomeDialog(
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
 
-    var title by remember { mutableStateOf(incomeToEdit?.title ?: "") }
-    var amountText by remember {
+    var title by remember(incomeToEdit) { mutableStateOf(incomeToEdit?.title ?: "") }
+    var amountText by remember(incomeToEdit) {
         mutableStateOf(incomeToEdit?.let { String.format(Locale.US, "%.2f", it.amount) } ?: "")
     }
-    var selectedCategory by remember {
+    var selectedCategory by remember(incomeToEdit) {
         mutableStateOf(incomeToEdit?.category ?: "Μισθός")
     }
-    var selectedMemberId by remember {
+    var selectedMemberId by remember(incomeToEdit, members) {
         val initialId = if (incomeToEdit != null) {
             if (incomeToEdit.memberId == 0L || incomeToEdit.memberName.isBlank()) 0L
             else if (members.any { it.id == incomeToEdit.memberId }) incomeToEdit.memberId
@@ -115,10 +115,10 @@ fun ManualIncomeDialog(
         }
         mutableStateOf(initialId)
     }
-    var selectedTimestamp by remember {
+    var selectedTimestamp by remember(incomeToEdit) {
         mutableLongStateOf(incomeToEdit?.timestamp ?: System.currentTimeMillis())
     }
-    var note by remember { mutableStateOf(incomeToEdit?.note ?: "") }
+    var note by remember(incomeToEdit) { mutableStateOf(incomeToEdit?.note ?: "") }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -132,8 +132,25 @@ fun ManualIncomeDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let {
-                        selectedTimestamp = it
+                    datePickerState.selectedDateMillis?.let { utcMillis ->
+                        val cal = java.util.Calendar.getInstance()
+                        val curHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+                        val curMinute = cal.get(java.util.Calendar.MINUTE)
+                        val curSecond = cal.get(java.util.Calendar.SECOND)
+
+                        val utcCal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply {
+                            timeInMillis = utcMillis
+                        }
+
+                        val targetCal = java.util.Calendar.getInstance().apply {
+                            set(java.util.Calendar.YEAR, utcCal.get(java.util.Calendar.YEAR))
+                            set(java.util.Calendar.MONTH, utcCal.get(java.util.Calendar.MONTH))
+                            set(java.util.Calendar.DAY_OF_MONTH, utcCal.get(java.util.Calendar.DAY_OF_MONTH))
+                            set(java.util.Calendar.HOUR_OF_DAY, curHour)
+                            set(java.util.Calendar.MINUTE, curMinute)
+                            set(java.util.Calendar.SECOND, curSecond)
+                        }
+                        selectedTimestamp = targetCal.timeInMillis
                     }
                     showDatePicker = false
                 }) {

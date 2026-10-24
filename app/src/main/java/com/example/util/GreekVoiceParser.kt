@@ -28,8 +28,10 @@ object GreekVoiceParser {
 
     fun containsWord(text: String, word: String): Boolean {
         if (word.isBlank() || text.isBlank()) return false
-        val pattern = "(?:^|[^\\p{L}\\p{Nd}])" + Regex.escape(word) + "(?:$|[^\\p{L}\\p{Nd}])"
-        return Regex(pattern).containsMatchIn(text)
+        val normWord = word.replace('ς', 'σ')
+        val normText = text.replace('ς', 'σ')
+        val pattern = "(?:^|[^\\p{L}\\p{Nd}])" + Regex.escape(normWord) + "(?:$|[^\\p{L}\\p{Nd}])"
+        return Regex(pattern).containsMatchIn(normText)
     }
 
     fun normalizeGreek(text: String): String {
@@ -209,30 +211,62 @@ object GreekVoiceParser {
 
     private val GREEK_WORDS_MAP = mapOf(
         // Thousands
+        "εκατομμυριο" to GreekWordToken(1000000.0, NumScale.THOUSAND),
+        "εκατομμυρια" to GreekWordToken(1000000.0, NumScale.THOUSAND),
         "χιλια" to GreekWordToken(1000.0, NumScale.THOUSAND),
         "χιλιες" to GreekWordToken(1000.0, NumScale.THOUSAND),
+        "χιλιοι" to GreekWordToken(1000.0, NumScale.THOUSAND),
         "χιλιαδες" to GreekWordToken(1000.0, NumScale.THOUSAND),
+        "χιλιαδων" to GreekWordToken(1000.0, NumScale.THOUSAND),
+        "χιλιαρικα" to GreekWordToken(1000.0, NumScale.THOUSAND),
+        "χιλιαρικο" to GreekWordToken(1000.0, NumScale.THOUSAND),
 
         // Hundreds
         "εννιακοσια" to GreekWordToken(900.0, NumScale.HUNDRED),
         "εννεακοσια" to GreekWordToken(900.0, NumScale.HUNDRED),
         "εννιακοσιες" to GreekWordToken(900.0, NumScale.HUNDRED),
+        "εννιακοσιοι" to GreekWordToken(900.0, NumScale.HUNDRED),
+        "εννιακοσιους" to GreekWordToken(900.0, NumScale.HUNDRED),
+        "εννιακοσιων" to GreekWordToken(900.0, NumScale.HUNDRED),
         "οκτακοσια" to GreekWordToken(800.0, NumScale.HUNDRED),
         "οχτακοσια" to GreekWordToken(800.0, NumScale.HUNDRED),
         "οκτακοσιες" to GreekWordToken(800.0, NumScale.HUNDRED),
+        "οχτακοσιες" to GreekWordToken(800.0, NumScale.HUNDRED),
+        "οκτακοσιοι" to GreekWordToken(800.0, NumScale.HUNDRED),
+        "οχτακοσιοι" to GreekWordToken(800.0, NumScale.HUNDRED),
+        "οκτακοσιους" to GreekWordToken(800.0, NumScale.HUNDRED),
+        "οχτακοσιους" to GreekWordToken(800.0, NumScale.HUNDRED),
         "επτακοσια" to GreekWordToken(700.0, NumScale.HUNDRED),
         "εφτακοσια" to GreekWordToken(700.0, NumScale.HUNDRED),
         "επτακοσιες" to GreekWordToken(700.0, NumScale.HUNDRED),
+        "εφτακοσιες" to GreekWordToken(700.0, NumScale.HUNDRED),
+        "επτακοσιοι" to GreekWordToken(700.0, NumScale.HUNDRED),
+        "εφτακοσιοι" to GreekWordToken(700.0, NumScale.HUNDRED),
+        "επτακοσιους" to GreekWordToken(700.0, NumScale.HUNDRED),
+        "εφτακοσιους" to GreekWordToken(700.0, NumScale.HUNDRED),
         "εξακοσια" to GreekWordToken(600.0, NumScale.HUNDRED),
         "εξακοσιες" to GreekWordToken(600.0, NumScale.HUNDRED),
+        "εξακοσιοι" to GreekWordToken(600.0, NumScale.HUNDRED),
+        "εξακοσιους" to GreekWordToken(600.0, NumScale.HUNDRED),
         "πεντακοσια" to GreekWordToken(500.0, NumScale.HUNDRED),
         "πεντακοσιες" to GreekWordToken(500.0, NumScale.HUNDRED),
+        "πεντακοσιοι" to GreekWordToken(500.0, NumScale.HUNDRED),
+        "πεντακοσιους" to GreekWordToken(500.0, NumScale.HUNDRED),
         "τετρακοσια" to GreekWordToken(400.0, NumScale.HUNDRED),
         "τετρακοσιες" to GreekWordToken(400.0, NumScale.HUNDRED),
+        "τετρακοσιοι" to GreekWordToken(400.0, NumScale.HUNDRED),
+        "τετρακοσιους" to GreekWordToken(400.0, NumScale.HUNDRED),
+        "τετρακοσιων" to GreekWordToken(400.0, NumScale.HUNDRED),
         "τριακοσια" to GreekWordToken(300.0, NumScale.HUNDRED),
         "τριακοσιες" to GreekWordToken(300.0, NumScale.HUNDRED),
+        "τριακοσιοι" to GreekWordToken(300.0, NumScale.HUNDRED),
+        "τριακοσιους" to GreekWordToken(300.0, NumScale.HUNDRED),
+        "τριακοσιων" to GreekWordToken(300.0, NumScale.HUNDRED),
         "διακοσια" to GreekWordToken(200.0, NumScale.HUNDRED),
         "διακοσιες" to GreekWordToken(200.0, NumScale.HUNDRED),
+        "διακοσιοι" to GreekWordToken(200.0, NumScale.HUNDRED),
+        "διακοσιους" to GreekWordToken(200.0, NumScale.HUNDRED),
+        "διακοσιων" to GreekWordToken(200.0, NumScale.HUNDRED),
         "εκατον" to GreekWordToken(100.0, NumScale.HUNDRED),
         "εκατο" to GreekWordToken(100.0, NumScale.HUNDRED),
 
@@ -245,7 +279,108 @@ object GreekVoiceParser {
         "σαραντα" to GreekWordToken(40.0, NumScale.TENS),
         "τριαντα" to GreekWordToken(30.0, NumScale.TENS),
         "εικοσι" to GreekWordToken(20.0, NumScale.TENS),
+
+        // Compound Tens (21-99)
+        "εικοσιενα" to GreekWordToken(21.0, NumScale.TENS),
+        "εικοσιδυο" to GreekWordToken(22.0, NumScale.TENS),
+        "εικοσιτρια" to GreekWordToken(23.0, NumScale.TENS),
+        "εικοσιτρεις" to GreekWordToken(23.0, NumScale.TENS),
+        "εικοσιτεσσερα" to GreekWordToken(24.0, NumScale.TENS),
+        "εικοσιτεσσερις" to GreekWordToken(24.0, NumScale.TENS),
         "εικοσιπεντε" to GreekWordToken(25.0, NumScale.TENS),
+        "εικοσιεξι" to GreekWordToken(26.0, NumScale.TENS),
+        "εικοσιεπτα" to GreekWordToken(27.0, NumScale.TENS),
+        "εικοσιεφτα" to GreekWordToken(27.0, NumScale.TENS),
+        "εικοσιοκτω" to GreekWordToken(28.0, NumScale.TENS),
+        "εικοσιοχτω" to GreekWordToken(28.0, NumScale.TENS),
+        "εικοσιεννια" to GreekWordToken(29.0, NumScale.TENS),
+        "εικοσιεννεα" to GreekWordToken(29.0, NumScale.TENS),
+
+        "τριανταενα" to GreekWordToken(31.0, NumScale.TENS),
+        "τριανταδυο" to GreekWordToken(32.0, NumScale.TENS),
+        "τριαντατρια" to GreekWordToken(33.0, NumScale.TENS),
+        "τριαντατρεις" to GreekWordToken(33.0, NumScale.TENS),
+        "τριαντατεσσερα" to GreekWordToken(34.0, NumScale.TENS),
+        "τριαντατεσσερις" to GreekWordToken(34.0, NumScale.TENS),
+        "τριανταπεντε" to GreekWordToken(35.0, NumScale.TENS),
+        "τριανταεξι" to GreekWordToken(36.0, NumScale.TENS),
+        "τριανταεπτα" to GreekWordToken(37.0, NumScale.TENS),
+        "τριανταεφτα" to GreekWordToken(37.0, NumScale.TENS),
+        "τριανταοκτω" to GreekWordToken(38.0, NumScale.TENS),
+        "τριανταοχτω" to GreekWordToken(38.0, NumScale.TENS),
+        "τριανταεννια" to GreekWordToken(39.0, NumScale.TENS),
+
+        "σαρανταενα" to GreekWordToken(41.0, NumScale.TENS),
+        "σαρανταδυο" to GreekWordToken(42.0, NumScale.TENS),
+        "σαραντατρια" to GreekWordToken(43.0, NumScale.TENS),
+        "σαραντατρεις" to GreekWordToken(43.0, NumScale.TENS),
+        "σαραντατεσσερα" to GreekWordToken(44.0, NumScale.TENS),
+        "σαραντατεσσερις" to GreekWordToken(44.0, NumScale.TENS),
+        "σαρανταπεντε" to GreekWordToken(45.0, NumScale.TENS),
+        "σαρανταεξι" to GreekWordToken(46.0, NumScale.TENS),
+        "σαρανταεπτα" to GreekWordToken(47.0, NumScale.TENS),
+        "σαρανταεφτα" to GreekWordToken(47.0, NumScale.TENS),
+        "σαρανταοκτω" to GreekWordToken(48.0, NumScale.TENS),
+        "σαρανταοχτω" to GreekWordToken(48.0, NumScale.TENS),
+        "σαρανταεννια" to GreekWordToken(49.0, NumScale.TENS),
+
+        "πενηνταενα" to GreekWordToken(51.0, NumScale.TENS),
+        "πενηνταδυο" to GreekWordToken(52.0, NumScale.TENS),
+        "πενηντατρια" to GreekWordToken(53.0, NumScale.TENS),
+        "πενηντατρεις" to GreekWordToken(53.0, NumScale.TENS),
+        "πενηντατεσσερα" to GreekWordToken(54.0, NumScale.TENS),
+        "πενηντατεσσερις" to GreekWordToken(54.0, NumScale.TENS),
+        "πενηνταπεντε" to GreekWordToken(55.0, NumScale.TENS),
+        "πενηνταεξι" to GreekWordToken(56.0, NumScale.TENS),
+        "πενηνταεπτα" to GreekWordToken(57.0, NumScale.TENS),
+        "πενηνταεφτα" to GreekWordToken(57.0, NumScale.TENS),
+        "πενηνταοκτω" to GreekWordToken(58.0, NumScale.TENS),
+        "πενηνταοχτω" to GreekWordToken(58.0, NumScale.TENS),
+        "πενηνταεννια" to GreekWordToken(59.0, NumScale.TENS),
+
+        "εξηνταενα" to GreekWordToken(61.0, NumScale.TENS),
+        "εξηνταδυο" to GreekWordToken(62.0, NumScale.TENS),
+        "εξηντατρια" to GreekWordToken(63.0, NumScale.TENS),
+        "εξηντατεσσερα" to GreekWordToken(64.0, NumScale.TENS),
+        "εξηνταπεντε" to GreekWordToken(65.0, NumScale.TENS),
+        "εξηνταεξι" to GreekWordToken(66.0, NumScale.TENS),
+        "εξηνταεπτα" to GreekWordToken(67.0, NumScale.TENS),
+        "εξηνταεφτα" to GreekWordToken(67.0, NumScale.TENS),
+        "εξηνταοκτω" to GreekWordToken(68.0, NumScale.TENS),
+        "εξηνταεννια" to GreekWordToken(69.0, NumScale.TENS),
+
+        "εβδομηνταενα" to GreekWordToken(71.0, NumScale.TENS),
+        "εβδομηνταδυο" to GreekWordToken(72.0, NumScale.TENS),
+        "εβδομηντατρια" to GreekWordToken(73.0, NumScale.TENS),
+        "εβδομηντατεσσερα" to GreekWordToken(74.0, NumScale.TENS),
+        "εβδομηνταπεντε" to GreekWordToken(75.0, NumScale.TENS),
+        "εβδομηνταεξι" to GreekWordToken(76.0, NumScale.TENS),
+        "εβδομηνταεπτα" to GreekWordToken(77.0, NumScale.TENS),
+        "εβδομηνταεφτα" to GreekWordToken(77.0, NumScale.TENS),
+        "εβδομηνταοκτω" to GreekWordToken(78.0, NumScale.TENS),
+        "εβδομηνταεννια" to GreekWordToken(79.0, NumScale.TENS),
+
+        "ογδονταενα" to GreekWordToken(81.0, NumScale.TENS),
+        "ογδονταδυο" to GreekWordToken(82.0, NumScale.TENS),
+        "ογδοντατρια" to GreekWordToken(83.0, NumScale.TENS),
+        "ογδοντατεσσερα" to GreekWordToken(84.0, NumScale.TENS),
+        "ογδονταπεντε" to GreekWordToken(85.0, NumScale.TENS),
+        "ογδονταεξι" to GreekWordToken(86.0, NumScale.TENS),
+        "ογδονταεπτα" to GreekWordToken(87.0, NumScale.TENS),
+        "ογδονταεφτα" to GreekWordToken(87.0, NumScale.TENS),
+        "ογδονταοκτω" to GreekWordToken(88.0, NumScale.TENS),
+        "ογδονταεννια" to GreekWordToken(89.0, NumScale.TENS),
+
+        "ενενηνταενα" to GreekWordToken(91.0, NumScale.TENS),
+        "ενενηνταδυο" to GreekWordToken(92.0, NumScale.TENS),
+        "ενενηντατρια" to GreekWordToken(93.0, NumScale.TENS),
+        "ενενηντατεσσερα" to GreekWordToken(94.0, NumScale.TENS),
+        "ενενηνταπεντε" to GreekWordToken(95.0, NumScale.TENS),
+        "ενενηνταεξι" to GreekWordToken(96.0, NumScale.TENS),
+        "ενενηνταεπτα" to GreekWordToken(97.0, NumScale.TENS),
+        "ενενηνταεφτα" to GreekWordToken(97.0, NumScale.TENS),
+        "ενενηνταοκτω" to GreekWordToken(98.0, NumScale.TENS),
+        "ενενηνταεννια" to GreekWordToken(99.0, NumScale.TENS),
 
         // Teens
         "δεκαεννια" to GreekWordToken(19.0, NumScale.TEEN_OR_UNIT),
@@ -258,6 +393,14 @@ object GreekVoiceParser {
         "δεκαξι" to GreekWordToken(16.0, NumScale.TEEN_OR_UNIT),
         "δεκαπεντε" to GreekWordToken(15.0, NumScale.TEEN_OR_UNIT),
         "δεκατεσσερα" to GreekWordToken(14.0, NumScale.TEEN_OR_UNIT),
+        "δεκατεσσερις" to GreekWordToken(14.0, NumScale.TEEN_OR_UNIT),
+        "δεκατεσσαρα" to GreekWordToken(14.0, NumScale.TEEN_OR_UNIT),
+        "δεκατρια" to GreekWordToken(13.0, NumScale.TEEN_OR_UNIT),
+        "δεκατρεις" to GreekWordToken(13.0, NumScale.TEEN_OR_UNIT),
+        "δωδεκα" to GreekWordToken(12.0, NumScale.TEEN_OR_UNIT),
+        "εντεκα" to GreekWordToken(11.0, NumScale.TEEN_OR_UNIT),
+        "ενδεκα" to GreekWordToken(11.0, NumScale.TEEN_OR_UNIT),
+        "δεκα" to GreekWordToken(10.0, NumScale.TEEN_OR_UNIT),
         "δεκατεσσερις" to GreekWordToken(14.0, NumScale.TEEN_OR_UNIT),
         "δεκατρια" to GreekWordToken(13.0, NumScale.TEEN_OR_UNIT),
         "δεκατρεις" to GreekWordToken(13.0, NumScale.TEEN_OR_UNIT),
@@ -308,32 +451,53 @@ object GreekVoiceParser {
         val original: String = ""
     )
 
+    data class AmountResult(
+        val amount: Double,
+        val consumedWords: Set<String>
+    )
+
     fun extractAmount(norm: String): Double? {
+        return extractAmountDetailed(norm)?.amount
+    }
+
+    fun extractAmountDetailed(norm: String): AmountResult? {
         val words = norm.split(Regex("\\s+")).map { it.trim('.', ',', ':', ';', '!', '?', '-', '/') }.filter { it.isNotBlank() }
 
         // 1. Try word-based parsing by analyzing sequences of Greek numbers / digits
-        val amountFromTokens = parseAmountFromWordsAndDigits(words)
-        if (amountFromTokens != null && amountFromTokens > 0.0) {
+        val amountFromTokens = parseAmountFromWordsAndDigitsDetailed(words)
+        if (amountFromTokens != null && amountFromTokens.amount > 0.0) {
             return amountFromTokens
         }
 
-        // 2. Check for explicit decimal pattern e.g. "4.30", "5.30", "12.50", "4.30 ευρω"
-        val regexDecimal = Regex("(\\d+\\.\\d{1,2})\\s*(?:ευρω|ευρα)?")
+        // 2. Check for explicit decimal pattern e.g. "4.30", "5.30", "12.50", "4.30 ευρω", "14726,70"
+        val regexThousandsWithComma = Regex("(\\d{1,3}(?:[.]\\d{3})+)[,](\\d{1,2})\\s*(?:ευρω|ευρα)?")
+        val thMatch = regexThousandsWithComma.find(norm)
+        if (thMatch != null) {
+            val numStr = thMatch.groupValues[1].replace(".", "") + "." + thMatch.groupValues[2]
+            val num = numStr.toDoubleOrNull()
+            if (num != null && num > 0.0) {
+                return AmountResult(num, setOf(thMatch.value.trim(), thMatch.groupValues[1], thMatch.groupValues[2], "ευρω", "ευρα"))
+            }
+        }
+
+        val regexDecimal = Regex("(\\d+[.,]\\d{1,2})\\s*(?:ευρω|ευρα)?")
         val decMatch = regexDecimal.find(norm)
         if (decMatch != null) {
-            val num = decMatch.groupValues[1].toDoubleOrNull()
+            val numStr = decMatch.groupValues[1].replace(',', '.')
+            val num = numStr.toDoubleOrNull()
             if (num != null && num > 0.0) {
-                return num
+                return AmountResult(num, setOf(decMatch.value.trim(), decMatch.groupValues[1], "ευρω", "ευρα"))
             }
         }
 
         // 3. Fallback: Check standalone numbers with / without currency e.g. "15 ευρω", "540"
-        val regexDigits = Regex("(\\d+(?:\\.\\d+)?)\\s*(?:ευρω|ευρα)?")
+        val regexDigits = Regex("(\\d+(?:[.,]\\d+)?)\\s*(?:ευρω|ευρα)?")
         val matches = regexDigits.findAll(norm).toList()
         for (m in matches) {
-            val num = m.groupValues[1].toDoubleOrNull()
+            val numStr = m.groupValues[1].replace(',', '.')
+            val num = numStr.toDoubleOrNull()
             if (num != null && num > 0.0) {
-                return num
+                return AmountResult(num, setOf(m.value.trim(), m.groupValues[1], "ευρω", "ευρα"))
             }
         }
 
@@ -349,7 +513,7 @@ object GreekVoiceParser {
         for (t in tokens) {
             if (t.scale == NumScale.THOUSAND) {
                 val mult = if (current == 0.0) 1.0 else current
-                total += mult * 1000.0
+                total += mult * t.value
                 current = 0.0
             } else {
                 current += t.value
@@ -365,12 +529,16 @@ object GreekVoiceParser {
         return when {
             raw in 1.0..9.0 && hasCentsUnit -> raw / 100.0 // 5 λεπτά -> 0.05
             raw in 1.0..9.0 -> raw * 10.0 / 100.0          // "πέντε και τρία" -> 0.30
-            raw in 10.0..99.0 -> raw / 100.0               // 30 -> 0.30, 40 -> 0.40
+            raw in 10.0..99.0 -> raw / 100.0               // 30 -> 0.30, 40 -> 0.40, 70 -> 0.70
             else -> 0.0
         }
     }
 
     private fun parseAmountFromWordsAndDigits(words: List<String>): Double? {
+        return parseAmountFromWordsAndDigitsDetailed(words)?.amount
+    }
+
+    private fun parseAmountFromWordsAndDigitsDetailed(words: List<String>): AmountResult? {
         if (words.isEmpty()) return null
 
         val tokens = mutableListOf<ParsedToken>()
@@ -390,7 +558,7 @@ object GreekVoiceParser {
                     tokens.add(ParsedToken(TokenType.NUMBER, gw.num, gw.scale, original = w))
                 }
                 else -> {
-                    val asNum = w.toDoubleOrNull()
+                    val asNum = w.replace(',', '.').toDoubleOrNull()
                     if (asNum != null) {
                         val scale = when {
                             asNum >= 1000 -> NumScale.THOUSAND
@@ -409,8 +577,8 @@ object GreekVoiceParser {
 
         // 1. Direct decimal token check (e.g. speech recognizer returned "4.30" or "5.30")
         for (t in tokens) {
-            if (t.type == TokenType.NUMBER && t.original.matches(Regex("^\\d+\\.\\d+$"))) {
-                if (t.value > 0.0) return t.value
+            if (t.type == TokenType.NUMBER && t.original.matches(Regex("^\\d+[.,]\\d+$"))) {
+                if (t.value > 0.0) return AmountResult(t.value, setOf(t.original, "ευρω", "ευρα"))
             }
         }
 
@@ -420,22 +588,22 @@ object GreekVoiceParser {
                 ((i + 1 < tokens.size && tokens[i + 1].type == TokenType.CURRENCY) ||
                  (i > 0 && tokens[i - 1].type == TokenType.CURRENCY))
             ) {
-                return 0.50
+                return AmountResult(0.50, setOf("μισο", "ευρω", "ευρα"))
             }
         }
 
         // 2. CURRENCY-based parsing ("ευρω" / "ευρα")
         // Examples: "4 ευρώ και 30 λεπτά", "4 ευρώ 30 λεπτά", "4 ευρώ και 30", "4 ευρώ 30",
-        // "τέσσερα ευρώ και τριάντα λεπτά", "πέντε ευρώ και τριάντα", "4 ευρώ"
+        // "τετρακόσια ευρώ", "δεκατέσσερις χιλιάδες επτακόσια εικοσιέξι ευρώ και εβδομήντα λεπτά"
         val curIndices = tokens.indices.filter { tokens[it].type == TokenType.CURRENCY }
         for (cIdx in curIndices) {
             // Collect euros backwards from cIdx - 1
             var startEuros = cIdx - 1
-            while (startEuros >= 0 && tokens[startEuros].type == TokenType.NUMBER) {
+            while (startEuros >= 0 && (tokens[startEuros].type == TokenType.NUMBER || tokens[startEuros].type == TokenType.AND)) {
                 startEuros--
             }
             startEuros++
-            val eurosTokens = tokens.subList(startEuros, cIdx)
+            val eurosTokens = tokens.subList(startEuros, cIdx).filter { it.type == TokenType.NUMBER }
             val euros = computeNumberSequence(eurosTokens)
 
             if (euros > 0.0) {
@@ -452,7 +620,14 @@ object GreekVoiceParser {
                 val hasCentsUnit = (endCents < tokens.size && tokens[endCents].type == TokenType.CENTS_UNIT)
                 val cents = computeCents(centsTokens, hasCentsUnit)
 
-                return euros + cents
+                val consumed = mutableSetOf<String>()
+                for (k in startEuros until (if (hasCentsUnit) endCents + 1 else endCents)) {
+                    consumed.add(tokens[k].original)
+                }
+                consumed.add("ευρω")
+                consumed.add("ευρα")
+
+                return AmountResult(euros + cents, consumed)
             }
         }
 
@@ -477,7 +652,11 @@ object GreekVoiceParser {
             val cents = computeCents(centsTokens, hasCentsUnit)
 
             if (euros > 0.0 && cents > 0.0) {
-                return euros + cents
+                val consumed = mutableSetOf<String>()
+                for (k in startEuros until (if (hasCentsUnit) endCents + 1 else endCents)) {
+                    consumed.add(tokens[k].original)
+                }
+                return AmountResult(euros + cents, consumed)
             }
         }
 
@@ -495,7 +674,6 @@ object GreekVoiceParser {
 
                 if (numTokens.size >= 2) {
                     val lastToken = numTokens.last()
-                    // If the last token is in 1..99 and cannot be a compound addition with the previous
                     val prevTokens = numTokens.dropLast(1)
                     val prevScale = prevTokens.last().scale
                     val lastScale = lastToken.scale
@@ -508,7 +686,9 @@ object GreekVoiceParser {
                         val euros = computeNumberSequence(prevTokens)
                         val cents = computeCents(listOf(lastToken), hasCentsUnit)
                         if (euros > 0.0 && cents > 0.0) {
-                            return euros + cents
+                            val consumed = numTokens.map { it.original }.toMutableSet()
+                            if (hasCentsUnit) consumed.add(tokens[endSeq].original)
+                            return AmountResult(euros + cents, consumed)
                         }
                     }
                 }
@@ -517,14 +697,17 @@ object GreekVoiceParser {
                 if (hasCentsUnit) {
                     val cents = computeCents(numTokens, hasCentsUnit = true)
                     if (cents > 0.0) {
-                        return cents
+                        val consumed = numTokens.map { it.original }.toMutableSet()
+                        consumed.add(tokens[endSeq].original)
+                        return AmountResult(cents, consumed)
                     }
                 }
 
-                // 6. Simple number: e.g. "πεντακόσια σαράντα", "500"
+                // 6. Simple number: e.g. "πεντακόσια σαράντα", "500", "τετρακοσια"
                 val singleNum = computeNumberSequence(numTokens)
                 if (singleNum > 0.0) {
-                    return singleNum
+                    val consumed = numTokens.map { it.original }.toMutableSet()
+                    return AmountResult(singleNum, consumed)
                 }
 
                 idx = endSeq
@@ -536,6 +719,107 @@ object GreekVoiceParser {
         return null
     }
 
+    data class ParsedPayerResult(
+        val primaryId: Long,
+        val displayName: String,
+        val payerIdsCsv: String,
+        val payerAmountsCsv: String,
+        val payers: List<FamilyMember>
+    )
+
+    /**
+     * Generates Greek inflected cases for member names (nominative, accusative, genitive)
+     * e.g. "Μάριος" -> ["μαριος", "μαριο", "μαριου", "μαριε", "μαριον", "μαριοσ"]
+     * e.g. "Βασιλική" -> ["βασιλικη", "βασιλικης", "βασιλικησ"]
+     */
+    fun getMemberNameVariations(member: FamilyMember): List<String> {
+        val list = mutableListOf<String>()
+
+        fun addWithInflections(raw: String) {
+            val clean = raw.trim()
+                .replace("\"", "")
+                .replace("'", "")
+                .replace("«", "")
+                .replace("»", "")
+                .replace("“", "")
+                .replace("”", "")
+            if (clean.isBlank()) return
+
+            val parts = clean.split(Regex("[\\s,;/-]+")).filter { it.isNotBlank() }
+            if (parts.size > 1) {
+                for (p in parts) {
+                    addWithInflections(p)
+                }
+            }
+
+            val norm = normalizeGreek(clean)
+            if (norm.length >= 2) {
+                list.add(norm)
+                list.add(norm.replace('ς', 'σ'))
+                list.add(norm.replace('σ', 'ς'))
+
+                val normSigma = norm.replace('σ', 'ς')
+                when {
+                    normSigma.endsWith("ος") -> {
+                        val stem = normSigma.dropLast(2)
+                        list.add(stem + "ο")
+                        list.add(stem + "ου")
+                        list.add(stem + "ε")
+                        list.add(stem + "ον")
+                        list.add(stem + "οσ")
+                        list.add(stem + "ουσ")
+                    }
+                    normSigma.endsWith("ης") -> {
+                        val stem = normSigma.dropLast(2)
+                        list.add(stem + "η")
+                        list.add(stem + "ηδες")
+                        list.add(stem + "ηδων")
+                        list.add(stem + "ησ")
+                    }
+                    normSigma.endsWith("ας") -> {
+                        val stem = normSigma.dropLast(2)
+                        list.add(stem + "α")
+                        list.add(stem + "αδες")
+                        list.add(stem + "αδων")
+                        list.add(stem + "ασ")
+                    }
+                    normSigma.endsWith("α") -> {
+                        list.add(normSigma + "ς")
+                        list.add(normSigma + "σ")
+                    }
+                    normSigma.endsWith("η") -> {
+                        list.add(normSigma + "ς")
+                        list.add(normSigma + "σ")
+                    }
+                }
+
+                when (norm.replace('ς', 'σ')) {
+                    "μαριοσ" -> {
+                        list.add("marios")
+                        list.add("mario")
+                    }
+                    "βασιλικη" -> {
+                        list.add("vasiliki")
+                        list.add("vicky")
+                    }
+                    "μελινα" -> {
+                        list.add("melina")
+                    }
+                    "γεωργια" -> {
+                        list.add("georgia")
+                    }
+                }
+            }
+        }
+
+        addWithInflections(member.name)
+        member.voiceKeywords.split(Regex("[,;/\n]+")).forEach { kw ->
+            addWithInflections(kw)
+        }
+
+        return list.distinct().filter { it.length >= 2 }
+    }
+
     fun parse(
         prompt: String,
         categories: List<ExpenseCategory>,
@@ -543,20 +827,31 @@ object GreekVoiceParser {
     ): ParsedVoiceExpense {
         val norm = normalizeGreek(prompt)
 
-        // 1. Requirement 8: Date Extraction (e.g. "3 Οκτωβρίου", "χθες", etc.)
+        // 1. Date Extraction (e.g. "3 Οκτωβρίου", "χθες", etc.)
         val (detectedTimestamp, cleanedNorm) = extractDate(norm)
 
-        // 2. Requirement 7: Amount Extraction (e.g. "πέντε σαράντα" -> 5.40, "πεντακόσια σαράντα" -> 540)
-        val amount = extractAmount(cleanedNorm) ?: extractAmount(norm) ?: 10.0
+        // 2. Amount Extraction (supports numbers from 0.01 to 1,000,000+)
+        val amountDetailed = extractAmountDetailed(cleanedNorm) ?: extractAmountDetailed(norm)
+        val amount = amountDetailed?.amount ?: 10.0
+        val consumedAmountWords = amountDetailed?.consumedWords ?: emptySet()
 
-        // 3. Member Extraction (Beneficiaries)
-        val (splitType, matchedMembers, memberDisplay) = extractMembers(cleanedNorm, allMembers)
+        // 3. Payer vs Beneficiary Extraction with magic words: "για", "αφορά", "αφορούν"
+        val (payerResult, beneficiaryInfo, consumedMemberWords) = extractPayerAndBeneficiaries(
+            cleanedNorm = cleanedNorm,
+            allMembers = allMembers,
+            amount = amount
+        )
+        val (splitType, matchedMembers, memberDisplay) = beneficiaryInfo
 
-        // 3b. Payer Extraction (Who paid the expense)
-        val (payerId, payerName) = extractPayer(cleanedNorm, allMembers)
-
-        // 4. Category & Title Extraction
-        val (category, title) = extractCategoryAndTitle(cleanedNorm, prompt, categories, allMembers)
+        // 4. Category & Title/Description Extraction
+        val (category, title) = extractCategoryAndTitleDetailed(
+            norm = cleanedNorm,
+            originalPrompt = prompt,
+            categories = categories,
+            allMembers = allMembers,
+            consumedAmountWords = consumedAmountWords,
+            consumedMemberWords = consumedMemberWords
+        )
 
         val splitPerPerson = if (matchedMembers.isNotEmpty()) {
             amount / matchedMembers.size
@@ -575,58 +870,170 @@ object GreekVoiceParser {
             splitAmountPerPerson = splitPerPerson,
             originalPrompt = prompt,
             timestamp = detectedTimestamp,
-            payerMemberId = payerId,
-            payerMemberName = payerName
+            payerMemberId = payerResult.primaryId,
+            payerMemberName = payerResult.displayName,
+            payerMemberIdsCsv = payerResult.payerIdsCsv,
+            payerAmountsCsv = payerResult.payerAmountsCsv,
+            memberIdsCsv = matchedMembers.joinToString(",") { it.id.toString() },
+            note = title
         )
     }
 
-    private fun extractPayer(
-        norm: String,
-        allMembers: List<FamilyMember>
-    ): Pair<Long, String> {
+    /**
+     * Requirement 3: Payer vs Beneficiaries with "για" / "αφορά".
+     * Supports single and multiple payers, as well as single and multiple beneficiaries.
+     * E.g. "Έξι ευρώ καφέδες Μάριος για Μάριο και Βασιλική":
+     * - Payer: Μάριος
+     * - Beneficiaries: [Μάριος, Βασιλική]
+     */
+    private fun extractPayerAndBeneficiaries(
+        cleanedNorm: String,
+        allMembers: List<FamilyMember>,
+        amount: Double
+    ): Triple<ParsedPayerResult, Triple<String, List<FamilyMember>, String>, Set<String>> {
         val defaultParent = allMembers.firstOrNull { it.role.equals("Γονέας", ignoreCase = true) }
             ?: allMembers.firstOrNull()
-        val defaultId = defaultParent?.id ?: 0L
-        val defaultName = defaultParent?.name ?: ""
+        val defaultPayerId = defaultParent?.id ?: 0L
+        val defaultPayerName = defaultParent?.name ?: ""
 
-        for (m in allMembers) {
-            val nameNorm = normalizeGreek(m.name)
-            val keywords = m.voiceKeywords.split(",").map { normalizeGreek(it.trim()) }.filter { it.isNotBlank() }
-            val allKw = (keywords + nameNorm).distinct()
+        val consumedWords = mutableSetOf<String>()
 
-            for (kw in allKw) {
-                if (norm.contains("πληρωσε $kw") ||
-                    norm.contains("πληρωσε ο $kw") ||
-                    norm.contains("πληρωσε η $kw") ||
-                    norm.contains("$kw πληρωσε") ||
-                    norm.contains("πληρωμη απο $kw") ||
-                    norm.contains("εβαλε ο $kw") ||
-                    norm.contains("εβαλε η $kw") ||
-                    norm.contains("εβαλε $kw")
-                ) {
-                    return Pair(m.id, m.name)
+        fun buildPayerResult(payers: List<FamilyMember>): ParsedPayerResult {
+            val list = if (payers.isNotEmpty()) payers else listOfNotNull(defaultParent)
+            val primary = list.firstOrNull()
+            val primaryId = primary?.id ?: defaultPayerId
+            val displayName = if (list.size >= 2) {
+                list.joinToString(" & ") { it.name }
+            } else {
+                primary?.name ?: defaultPayerName
+            }
+            val idsCsv = list.joinToString(",") { it.id.toString() }
+            val splitAmt = if (list.isNotEmpty()) amount / list.size else amount
+            val amountsCsv = list.joinToString(",") { "${it.id}:${String.format(Locale.US, "%.2f", splitAmt)}" }
+            return ParsedPayerResult(primaryId, displayName, idsCsv, amountsCsv, list)
+        }
+
+        // Magic words for beneficiaries: "για", "αφορα", "αφορουν" (Unicode-safe word boundaries)
+        val beneficiaryPattern = Regex("(?:^|[^\\p{L}\\p{Nd}])(για|αφορα|αφορουν)(?:\\s+(?:τον|την|το|τους|τις|τα|ολη\\s+την|ολο\\s+το))?(?=$|[^\\p{L}\\p{Nd}])", RegexOption.IGNORE_CASE)
+        val match = beneficiaryPattern.find(cleanedNorm)
+
+        if (match != null) {
+            val kwGroup = match.groups[1]!!
+            val beforePart = cleanedNorm.substring(0, kwGroup.range.first).trim()
+            val afterPart = cleanedNorm.substring(match.range.last + 1).trim()
+
+            match.value.split(Regex("[^\\p{L}\\p{Nd}]+")).filter { it.isNotBlank() }.forEach { consumedWords.add(it) }
+            consumedWords.add("για")
+            consumedWords.add("αφορα")
+            consumedWords.add("αφορουν")
+
+            // 1. Beneficiaries extracted from afterPart
+            val beneficiaryResult = extractBeneficiariesFromText(afterPart, allMembers, consumedWords)
+
+            // 2. Payers extracted from beforePart (who paid)
+            val matchedPayers = mutableListOf<FamilyMember>()
+            for (m in allMembers) {
+                val variations = getMemberNameVariations(m)
+                val found = variations.any { v -> containsWord(beforePart, v) }
+                if (found && !matchedPayers.contains(m)) {
+                    matchedPayers.add(m)
+                    variations.filter { containsWord(beforePart, it) }.forEach { consumedWords.add(it) }
                 }
             }
+
+            if (matchedPayers.size >= 2) {
+                consumedWords.add("και")
+                consumedWords.add("κι")
+            }
+
+            val payerResult = buildPayerResult(matchedPayers)
+            return Triple(payerResult, beneficiaryResult, consumedWords)
+        } else {
+            // No "για" / "αφορά" present:
+            // If explicit payer phrase: "πληρωσε ο/η..."
+            var explicitPayer: FamilyMember? = null
+            for (m in allMembers) {
+                val variations = getMemberNameVariations(m)
+                for (v in variations) {
+                    if (cleanedNorm.contains("πληρωσε $v") ||
+                        cleanedNorm.contains("πληρωσε ο $v") ||
+                        cleanedNorm.contains("πληρωσε η $v") ||
+                        cleanedNorm.contains("$v πληρωσε") ||
+                        cleanedNorm.contains("πληρωμη απο $v") ||
+                        cleanedNorm.contains("εβαλε ο $v") ||
+                        cleanedNorm.contains("εβαλε η $v") ||
+                        cleanedNorm.contains("εβαλε $v")
+                    ) {
+                        explicitPayer = m
+                        consumedWords.add(v)
+                        consumedWords.add("πληρωσε")
+                        consumedWords.add("εβαλε")
+                        consumedWords.add("πληρωμη")
+                        break
+                    }
+                }
+                if (explicitPayer != null) break
+            }
+
+            val matchedPayers = mutableListOf<FamilyMember>()
+            if (explicitPayer != null) {
+                matchedPayers.add(explicitPayer)
+            } else {
+                for (m in allMembers) {
+                    val variations = getMemberNameVariations(m)
+                    if (variations.any { containsWord(cleanedNorm, it) } && !matchedPayers.contains(m)) {
+                        matchedPayers.add(m)
+                        variations.filter { containsWord(cleanedNorm, it) }.forEach { consumedWords.add(it) }
+                    }
+                }
+            }
+
+            if (matchedPayers.size >= 2) {
+                consumedWords.add("και")
+                consumedWords.add("κι")
+            }
+
+            val payerResult = buildPayerResult(matchedPayers)
+            val beneficiaryResult = if (matchedPayers.isEmpty()) {
+                Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
+            } else if (matchedPayers.size == allMembers.size) {
+                Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
+            } else {
+                val display = if (matchedPayers.size >= 2) {
+                    val firstRolePlural = Localization.pluralRoleName(matchedPayers.first().role, Localization.Language.GREEK)
+                    val allSame = matchedPayers.all {
+                        Localization.pluralRoleName(it.role, Localization.Language.GREEK).equals(firstRolePlural, ignoreCase = true)
+                    }
+                    if (allSame) firstRolePlural else matchedPayers.joinToString(" & ") { it.name }
+                } else {
+                    matchedPayers.first().name
+                }
+                Triple("SPECIFIC_MEMBERS", matchedPayers, display)
+            }
+
+            return Triple(payerResult, beneficiaryResult, consumedWords)
         }
-        return Pair(defaultId, defaultName)
     }
 
-    private fun extractMembers(
-        norm: String,
-        allMembers: List<FamilyMember>
+    private fun extractBeneficiariesFromText(
+        text: String,
+        allMembers: List<FamilyMember>,
+        consumedWords: MutableSet<String>
     ): Triple<String, List<FamilyMember>, String> {
         val allFamilyKeywords = listOf(
             "οικογενεια", "ολοι", "σπιτι", "κοινο", "σπιτιου", "ολο το σπιτι", "παντες", "κοινα"
         )
         for (kw in allFamilyKeywords) {
-            if (containsWord(norm, kw)) {
+            if (containsWord(text, kw)) {
+                consumedWords.add(kw)
                 return Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
             }
         }
 
-        val kidsKeywords = listOf("παιδια", "παιδιων", "στα παιδια", "για τα παιδια", "τα παιδια")
+        val kidsKeywords = listOf("παιδια", "παιδιων", "στα παιδια", "τα παιδια")
         for (kw in kidsKeywords) {
-            if (containsWord(norm, kw)) {
+            if (containsWord(text, kw)) {
+                consumedWords.add(kw)
                 val kids = allMembers.filter { it.role.equals("Παιδί", ignoreCase = true) }
                 if (kids.isNotEmpty()) {
                     val display = if (kids.size >= 2) "Παιδιά" else kids.first().name
@@ -635,9 +1042,10 @@ object GreekVoiceParser {
             }
         }
 
-        val parentsKeywords = listOf("γονεις", "γονιων", "στους γονεις", "για τους γονεις", "οι γονεις")
+        val parentsKeywords = listOf("γονεις", "γονιων", "στους γονεις", "οι γονεις")
         for (kw in parentsKeywords) {
-            if (containsWord(norm, kw)) {
+            if (containsWord(text, kw)) {
+                consumedWords.add(kw)
                 val parents = allMembers.filter { it.role.equals("Γονέας", ignoreCase = true) }
                 if (parents.isNotEmpty()) {
                     val display = if (parents.size >= 2) "Γονείς" else parents.first().name
@@ -646,32 +1054,22 @@ object GreekVoiceParser {
             }
         }
 
-        // Check individual member voice keywords
+        // Match individual members by name variations
         val matchedMembers = mutableListOf<FamilyMember>()
         for (member in allMembers) {
-            val keywords = member.voiceKeywords.split(",").map { normalizeGreek(it.trim()) }
-            val nameNorm = normalizeGreek(member.name)
-            val allMemberKw = (keywords + nameNorm).filter { it.isNotBlank() }
-
-            val found = allMemberKw.any { kw ->
-                containsWord(norm, kw)
-            }
+            val variations = getMemberNameVariations(member)
+            val found = variations.any { v -> containsWord(text, v) }
             if (found && !matchedMembers.contains(member)) {
                 matchedMembers.add(member)
+                variations.filter { containsWord(text, it) }.forEach { consumedWords.add(it) }
             }
         }
 
         if (matchedMembers.isNotEmpty()) {
-            val display = if (matchedMembers.size == allMembers.size) {
-                "Κοινό Οικογένειας"
-            } else if (matchedMembers.size >= 2) {
-                val firstRolePlural = Localization.pluralRoleName(matchedMembers.first().role, Localization.Language.GREEK)
-                val allSame = matchedMembers.all {
-                    Localization.pluralRoleName(it.role, Localization.Language.GREEK).equals(firstRolePlural, ignoreCase = true)
-                }
-                if (allSame) firstRolePlural else matchedMembers.joinToString(" & ") { it.name }
-            } else {
+            val display = if (matchedMembers.size >= 2) {
                 matchedMembers.joinToString(" & ") { it.name }
+            } else {
+                matchedMembers.first().name
             }
             return Triple("SPECIFIC_MEMBERS", matchedMembers, display)
         }
@@ -679,158 +1077,13 @@ object GreekVoiceParser {
         return Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
     }
 
-    /**
-     * Extracts spoken description keywords from the user prompt when words are spoken
-     * that do not belong to system commands, amounts, dates, or family members.
-     */
-    fun extractDescriptionKeywords(
-        originalPrompt: String,
-        allMembers: List<FamilyMember>,
-        categories: List<ExpenseCategory>
-    ): String? {
-        val rawTokens = originalPrompt.trim().split(Regex("[\\s,;!?]+")).filter { it.isNotBlank() }
-        if (rawTokens.isEmpty()) return null
-
-        val memberWords = mutableSetOf<String>()
-        for (m in allMembers) {
-            memberWords.add(normalizeGreek(m.name))
-            m.voiceKeywords.split(",").forEach {
-                val kw = normalizeGreek(it.trim())
-                if (kw.isNotBlank()) memberWords.add(kw)
-            }
-        }
-        val familyWords = setOf(
-            "οικογενεια", "ολοι", "σπιτι", "κοινο", "σπιτιου", "παντες", "κοινα",
-            "παιδια", "παιδιων", "γονεις", "γονιων", "μενα", "εμενα", "εσυ", "εσενα"
-        )
-        val payerWords = setOf(
-            "πληρωσε", "εβαλε", "πληρωμη", "χρεωση"
-        )
-        val commandWords = setOf(
-            "καταχωρησε", "βαλε", "γραψε", "σημειωσε", "περασε", "προσθεσε",
-            "εξοδο", "εξοδα", "νεο", "ευρω", "λεπτα", "λεπτο", "cent", "cents",
-            "χθες", "χτες", "σημερα", "προχθες", "προχτες", "πριν", "μερες", "ημερες"
-        )
-        val prepositionsAndArticles = setOf(
-            "για", "στο", "στον", "στην", "στα", "στους", "στις", "σε",
-            "απο", "του", "της", "των", "ο", "η", "το", "τον", "την", "τα", "τους"
-        )
-        val greekNumbers = setOf(
-            "ενα", "μια", "δυο", "τρεις", "τρια", "τεσσερις", "τεσσερα", "πεντε", "εξι",
-            "επτα", "εφτα", "οκτω", "οχτω", "εννια", "δεκα", "εντεκα", "δωδεκα",
-            "δεκατρια", "δεκατεσσερα", "δεκαπεντε", "δεκαεξι", "δεκαεπτα", "δεκαοκτω", "δεκαεννια",
-            "εικοσι", "τριαντα", "σαραντα", "πενηντα", "εξηντα", "εβδομηντα", "ογδοντα", "ενενηντα",
-            "εκατο", "εκατον", "διακοσια", "τριακοσια", "τετρακοσια", "πεντακοσια", "εξακοσια",
-            "επτακοσια", "οκτακοσια", "εννιακοσια", "χιλια", "χιλιαδες"
-        )
-        val monthWords = setOf(
-            "ιανουαριου", "ιανουαριος", "γεναρη", "γεναρης",
-            "φεβρουαριου", "φεβρουαριος", "φλεβαρη", "φλεβαρης",
-            "μαρτιου", "μαρτιος", "μαρτη", "μαρτης",
-            "απριλιου", "απριλιος", "απριλη", "απριλης",
-            "μαιου", "μαιος", "μαη", "μαης",
-            "ιουνιου", "ιουνιος", "ιουνη", "ιουνης",
-            "ιουλιου", "ιουλιος", "ιουλη", "ιουλης",
-            "αυγουστου", "αυγουστος",
-            "σεπτεμβριου", "σεπτεμβριος", "σεπτεμβρη", "σεπτεμβρης",
-            "οκτωβριου", "οκτωβριος", "οκτωβρη", "οκτωβρης",
-            "νοεμβριου", "νοεμβριος", "νοεμβρη", "νοεμβρης",
-            "δεκεμβριου", "δεκεμβριος", "δεκεμβρη", "δεκεμβρης"
-        )
-
-        val categoryWords = mutableSetOf<String>()
-        for (cat in categories) {
-            val catNorm = normalizeGreek(cat.name)
-            categoryWords.add(catNorm)
-            catNorm.split(Regex("[\\s,;!?/]+")).forEach { w ->
-                if (w.length >= 3) categoryWords.add(w)
-            }
-            cat.voiceKeywords.split(",").forEach { kwRaw ->
-                val kw = normalizeGreek(kwRaw.trim())
-                if (kw.isNotBlank()) {
-                    categoryWords.add(kw)
-                    kw.split(Regex("[\\s,;!?/]+")).forEach { w ->
-                        if (w.length >= 3) categoryWords.add(w)
-                    }
-                }
-            }
-        }
-        val knownSpecificWords = listOf(
-            "σουβλακια", "σουβλακι", "πιτσα", "πιτσες", "καφεδες", "καφες",
-            "κολυμβητηριο", "σουπερ", "μαρκετ", "σκλαβενιτης", "βασιλοπουλος", "lidl",
-            "βενζινη", "ψιλικα", "περιπτερο", "ενοικιο", "ρευμα", "δεη", "αεριο",
-            "κοινοχρηστα", "δανεια", "δανειο", "δοση", "αυτοκινητου", "γατες", "γατα",
-            "γατοτροφη", "χρωστουμενα", "διασκεδαση", "δωρα", "δωρο", "φαρμακειο",
-            "γιατρος", "αγγλικα", "φροντιστηριο", "τενις", "μπασκετ", "ποδοσφαιρο"
-        )
-        categoryWords.addAll(knownSpecificWords)
-
-        val keptTokens = mutableListOf<String>()
-        for (token in rawTokens) {
-            val cleanToken = token.trim().replace(Regex("[^\\p{L}\\p{Nd}]"), "")
-            if (cleanToken.isBlank()) continue
-            val normToken = normalizeGreek(cleanToken)
-
-            if (cleanToken.matches(Regex("\\d+([.,]\\d+)?"))) continue
-            if (greekNumbers.contains(normToken)) continue
-            if (monthWords.contains(normToken)) continue
-            if (commandWords.contains(normToken)) continue
-            if (memberWords.contains(normToken) || familyWords.contains(normToken)) continue
-            if (payerWords.contains(normToken)) continue
-            if (prepositionsAndArticles.contains(normToken)) continue
-
-            keptTokens.add(cleanToken)
-        }
-
-        if (keptTokens.isEmpty()) return null
-
-        // Check if there are tokens that do NOT belong to any category
-        val nonCategoryTokens = keptTokens.filter { token ->
-            val norm = normalizeGreek(token)
-            !categoryWords.contains(norm)
-        }
-
-        val targetTokens = if (nonCategoryTokens.isNotEmpty()) {
-            // User spoke custom description keywords (e.g. "παπούτσια Nike", "απορρυπαντικό", "service")
-            // If the phrase contains "και" between a category word and custom word (e.g. "καφέδες και τοστ"),
-            // keep the full combination. Otherwise filter out standalone category words.
-            val hasConjunction = keptTokens.any { normalizeGreek(it) == "και" }
-            if (hasConjunction && keptTokens.size <= 4) {
-                keptTokens
-            } else {
-                // Strip standalone category words so only the custom description remains
-                val filtered = keptTokens.filter { token ->
-                    val norm = normalizeGreek(token)
-                    !categoryWords.contains(norm) || norm == "και"
-                }.toMutableList()
-                if (filtered.isNotEmpty()) filtered else keptTokens
-            }
-        } else {
-            // All spoken tokens belong to category names/keywords - no separate custom description
-            return null
-        }
-
-        val resultList = targetTokens.toMutableList()
-        while (resultList.isNotEmpty() && normalizeGreek(resultList.first()) == "και") {
-            resultList.removeAt(0)
-        }
-        while (resultList.isNotEmpty() && normalizeGreek(resultList.last()) == "και") {
-            resultList.removeAt(resultList.size - 1)
-        }
-
-        if (resultList.isEmpty()) return null
-
-        val resultStr = resultList.joinToString(" ").trim()
-        if (resultStr.length < 2) return null
-
-        return resultStr.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
-    }
-
-    private fun extractCategoryAndTitle(
+    private fun extractCategoryAndTitleDetailed(
         norm: String,
         originalPrompt: String,
         categories: List<ExpenseCategory>,
-        allMembers: List<FamilyMember>
+        allMembers: List<FamilyMember>,
+        consumedAmountWords: Set<String>,
+        consumedMemberWords: Set<String>
     ): Pair<ExpenseCategory, String> {
         val specificTitles = listOf(
             "σουβλακια" to "Σουβλάκια",
@@ -881,10 +1134,8 @@ object GreekVoiceParser {
             }
         }
 
-        // Check if user spoke specific keywords not matching standard commands or members
-        val spokenCustomDescription = extractDescriptionKeywords(originalPrompt, allMembers, categories)
-
         var bestCategory: ExpenseCategory? = null
+        var matchedCategoryWord: String? = null
         var maxKeywordLength = 0
 
         // 1. Search category keywords in normalized prompt
@@ -898,32 +1149,15 @@ object GreekVoiceParser {
                     if (kw.length > maxKeywordLength) {
                         maxKeywordLength = kw.length
                         bestCategory = cat
+                        matchedCategoryWord = kw
                     }
                 }
             }
         }
 
-        // 2. If spoken custom description exists, also test matching its keywords against categories
-        if (bestCategory == null && spokenCustomDescription != null) {
-            val descNorm = normalizeGreek(spokenCustomDescription)
-            for (cat in categories) {
-                val keywords = cat.voiceKeywords.split(",").map { normalizeGreek(it.trim()) }
-                val catNameNorm = normalizeGreek(cat.name)
-                val allKw = (keywords + catNameNorm).filter { it.isNotBlank() }
-
-                for (kw in allKw) {
-                    if (containsWord(descNorm, kw)) {
-                        bestCategory = cat
-                        break
-                    }
-                }
-                if (bestCategory != null) break
-            }
-        }
-
-        // 3. Fallback domain category matching
+        // 2. Fallback domain category matching
         if (bestCategory == null) {
-            val searchTarget = (norm + " " + (spokenCustomDescription?.let { normalizeGreek(it) } ?: "")).lowercase(Locale.ROOT)
+            val searchTarget = norm.lowercase(Locale.ROOT)
             if (searchTarget.contains("παπουτσ") || searchTarget.contains("ρουχ") || searchTarget.contains("μπλουζ") || searchTarget.contains("zara")) {
                 bestCategory = categories.find { it.name.contains("Ένδυση", ignoreCase = true) || it.name.contains("Αγορές", ignoreCase = true) || it.name.contains("Shopping", ignoreCase = true) }
             } else if (searchTarget.contains("λαδι") || searchTarget.contains("συνεργει") || searchTarget.contains("λαστιχ") || searchTarget.contains("βενζιν") || searchTarget.contains("γκαραζ") || searchTarget.contains("parking")) {
@@ -949,19 +1183,81 @@ object GreekVoiceParser {
                 voiceKeywords = ""
             )
 
-        // When user speaks words that are not command/member words, use them as description
-        val finalTitle = if (detectedTitle != null) {
-            if (spokenCustomDescription == null ||
-                spokenCustomDescription.equals(detectedTitle, ignoreCase = true) ||
-                normalizeGreek(spokenCustomDescription) == normalizeGreek(detectedTitle)
-            ) {
-                detectedTitle
+        // Requirement 4: Extract leftover words from originalPrompt as "Περιγραφή" (Description)
+        val rawTokens = originalPrompt.trim().split(Regex("[\\s,;!?]+")).filter { it.isNotBlank() }
+
+        val ignoredWords = mutableSetOf<String>()
+        ignoredWords.addAll(consumedAmountWords.map { normalizeGreek(it) })
+        ignoredWords.addAll(consumedMemberWords.map { normalizeGreek(it) })
+        if (matchedCategoryWord != null) {
+            matchedCategoryWord.split(Regex("\\s+")).forEach { ignoredWords.add(normalizeGreek(it)) }
+        }
+        val catNameNorm = normalizeGreek(category.name)
+        catNameNorm.split(Regex("\\s+")).forEach { ignoredWords.add(it) }
+
+        // Standard structural words to ignore in description
+        val systemWords = setOf(
+            "ευρω", "ευρα", "λεπτα", "λεπτο", "cent", "cents", "και", "κι",
+            "για", "αφορα", "αφορουν", "τον", "την", "το", "τους", "τις", "τα",
+            "στο", "στον", "στην", "στα", "στους", "στις", "σε", "απο", "του", "της", "των",
+            "ο", "η", "πληρωσε", "εβαλε", "πληρωμη", "χρεωση",
+            "καταχωρησε", "βαλε", "γραψε", "σημειωσε", "περασε", "προσθεσε", "εξοδο", "εξοδα", "νεο",
+            "σημερα", "χθες", "χτες", "προχθες", "προχτες"
+        )
+        ignoredWords.addAll(systemWords)
+
+        for (m in allMembers) {
+            getMemberNameVariations(m).forEach { ignoredWords.add(it) }
+        }
+
+        val leftoverTokens = mutableListOf<String>()
+        val n = rawTokens.size
+        for (i in 0 until n) {
+            val token = rawTokens[i]
+            val clean = token.trim().replace(Regex("[^\\p{L}\\p{Nd}]"), "")
+            if (clean.isBlank()) continue
+            val normClean = normalizeGreek(clean)
+
+            if (clean.matches(Regex("\\d+([.,]\\d+)?"))) continue
+
+            val isIgnored = ignoredWords.any { it.replace('ς', 'σ') == normClean.replace('ς', 'σ') }
+            if (isIgnored) continue
+
+            if (GREEK_WORDS_MAP.containsKey(normClean)) continue
+
+            // Preserve connector "και" / "κι" only if connecting two valid leftover descriptive tokens
+            if (normClean == "και" || normClean == "κι") {
+                if (leftoverTokens.isNotEmpty() && i + 1 < n) {
+                    val nextClean = rawTokens[i + 1].trim().replace(Regex("[^\\p{L}\\p{Nd}]"), "")
+                    val nextNorm = normalizeGreek(nextClean)
+                    val nextIgnored = ignoredWords.any { it.replace('ς', 'σ') == nextNorm.replace('ς', 'σ') } ||
+                            GREEK_WORDS_MAP.containsKey(nextNorm) ||
+                            nextClean.matches(Regex("\\d+([.,]\\d+)?"))
+                    if (!nextIgnored && nextClean.isNotBlank()) {
+                        leftoverTokens.add(clean)
+                    }
+                }
+                continue
+            }
+
+            leftoverTokens.add(clean)
+        }
+
+        // If leftover tokens exist, they form the spoken custom description!
+        val customDescription = if (leftoverTokens.isNotEmpty()) {
+            val joined = leftoverTokens.joinToString(" ").trim()
+            if (joined.length >= 2) {
+                joined.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
             } else {
-                spokenCustomDescription
+                null
             }
         } else {
-            spokenCustomDescription ?: category.name
+            null
         }
+
+        val finalTitle = customDescription
+            ?: detectedTitle
+            ?: category.name
 
         return Pair(category, finalTitle)
     }
