@@ -491,10 +491,22 @@ fun AnalyticsScreen(
             payerSpendMap[member] ?: 0.0
         } else {
             val ind = individualSpendMap[member] ?: 0.0
-            val comShare = if (splitMode == 1 && hasFamilyWithKids) {
-                if (parentsList.isNotEmpty()) commonHouseholdSpend / parentsList.size else 0.0
-            } else {
-                0.0
+            val comShare = when {
+                splitMode == 2 -> 0.0 // Kids mode: direct child expenses
+                hasFamilyWithKids -> {
+                    // In a family with kids, parents share the common household expenses
+                    if (member.role.equals("Γονέας", ignoreCase = true) && parentsList.isNotEmpty()) {
+                        commonHouseholdSpend / parentsList.size
+                    } else if (parentsList.isEmpty() && members.isNotEmpty()) {
+                        commonHouseholdSpend / members.size
+                    } else {
+                        0.0
+                    }
+                }
+                else -> {
+                    // In other households, all members participate in common household expenses
+                    if (members.isNotEmpty()) commonHouseholdSpend / members.size else 0.0
+                }
             }
             ind + comShare
         }
@@ -1808,6 +1820,12 @@ fun AnalyticsScreen(
                                             }
                                             val subtitle = when (splitMode) {
                                                 3 -> if (lang == Localization.Language.ENGLISH) "Total paid: ${String.format(Locale.US, "%.2f €", spend)}" else "Πλήρωσε συνολικά: ${String.format(Locale.US, "%.2f €", spend)}"
+                                                0 -> if (com > 0.01) {
+                                                    if (lang == Localization.Language.ENGLISH) "Direct: ${String.format(Locale.US, "%.1f€", ind)} • Shared: ${String.format(Locale.US, "%.1f€", com)}"
+                                                    else "Ατομικά: ${String.format(Locale.US, "%.1f€", ind)} • Κοινό: ${String.format(Locale.US, "%.1f€", com)}"
+                                                } else {
+                                                    Localization.translateRole(member.role, lang)
+                                                }
                                                 else -> Localization.translateRole(member.role, lang)
                                             }
                                             Text(
