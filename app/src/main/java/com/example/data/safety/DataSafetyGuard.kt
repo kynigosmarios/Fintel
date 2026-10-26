@@ -259,7 +259,7 @@ object DataSafetyGuard {
                     val docId = inc.cloudId.ifBlank { "inc_${inc.id}" }
                     val fbInc = com.example.data.model.FirebaseIncome(
                         id = docId,
-                        householdId = activeHouseholdId.ifBlank { com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID },
+                        householdId = activeHouseholdId,
                         title = inc.title,
                         amount = inc.amount,
                         memberId = inc.memberId,

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -87,8 +88,14 @@ import java.util.Date
 import java.util.Locale
 
 sealed class ActivityItem(val timestamp: Long, val key: String) {
-    data class ExpenseItem(val expense: Expense) : ActivityItem(expense.timestamp, "exp_${expense.id}_${expense.cloudId}")
-    data class IncomeItem(val income: Income) : ActivityItem(income.timestamp, "inc_${income.id}")
+    data class ExpenseItem(val expense: Expense) : ActivityItem(
+        expense.timestamp,
+        "exp_${expense.id}_${if (expense.cloudId.isNotBlank()) expense.cloudId else expense.timestamp.toString()}_${expense.title.hashCode()}"
+    )
+    data class IncomeItem(val income: Income) : ActivityItem(
+        income.timestamp,
+        "inc_${income.id}_${if (income.cloudId.isNotBlank()) income.cloudId else income.timestamp.toString()}_${income.title.hashCode()}"
+    )
 }
 
 @Composable
@@ -1211,7 +1218,10 @@ fun ExpensesScreen(
                     }
 
                     // Individual Cards for this Day
-                    items(itemsInDay, key = { it.key }) { item ->
+                    itemsIndexed(
+                        itemsInDay,
+                        key = { index, item -> "${item.key}_${group.key.first}_$index" }
+                    ) { _, item ->
                         when (item) {
                             is ActivityItem.ExpenseItem -> {
                                 val expense = item.expense

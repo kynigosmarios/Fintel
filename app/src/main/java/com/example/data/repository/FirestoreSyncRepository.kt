@@ -71,8 +71,8 @@ class FirestoreSyncRepository(
         val cleanEmail = email.trim()
         val lowerEmail = cleanEmail.lowercase()
         val isMariosAccount = cleanEmail.equals(FirestoreDataSeed.DEFAULT_USER_EMAIL, ignoreCase = true) ||
-                cleanEmail.equals("grwayfarer@gmail.com", ignoreCase = true) ||
                 uid == FirestoreDataSeed.DEFAULT_USER_UID ||
+                uid == "t5kN4RvPRugIxXUz18Fep2khSrC2" ||
                 uid == "tSLWmkXZ0MTqIKGoX3wd6HdhDw63" ||
                 uid == "jllDLLQl7VgFzOQpVIHi0wo8B013" ||
                 uid == "oA6smvWcC6QYCAKMvYdWEcmVCO43"
@@ -82,10 +82,17 @@ class FirestoreSyncRepository(
             foundIds.add("e1d4ae67-499")
         }
 
+        val mariosHids = setOf(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
+
         // 1. Direct fetch of all households in Firestore collection
         try {
             val allHouseholdsSnap = db.collection("households").get().await()
             for (doc in allHouseholdsSnap.documents) {
+                // Critical: Marios's households belong ONLY to Marios. Other accounts cannot join or inherit them.
+                if (mariosHids.contains(doc.id) && !isMariosAccount) {
+                    continue
+                }
+
                 val owner = doc.getString("ownerId") ?: ""
                 val members = (doc.get("memberUids") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
                 val invited = (doc.get("invitedEmails") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
@@ -93,7 +100,7 @@ class FirestoreSyncRepository(
                 val isOwner = uid.isNotBlank() && owner == uid
                 val isMember = uid.isNotBlank() && members.contains(uid)
                 val isInvited = cleanEmail.isNotBlank() && invited.any { it.trim().equals(cleanEmail, ignoreCase = true) }
-                val isKnownMarios = isMariosAccount && (doc.id == FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID || doc.id == "e1d4ae67-499")
+                val isKnownMarios = isMariosAccount && mariosHids.contains(doc.id)
 
                 if (isOwner || isMember || isInvited || isKnownMarios) {
                     foundIds.add(doc.id)
@@ -163,7 +170,8 @@ class FirestoreSyncRepository(
             }
         }
 
-        return foundIds.toList()
+        val finalFound = if (isMariosAccount) foundIds else foundIds.filterNot { mariosHids.contains(it) }
+        return finalFound.distinct().toList()
     }
 
     suspend fun seedFirestoreIfEmpty(householdId: String, userId: String, isMarios: Boolean) {
@@ -188,7 +196,7 @@ class FirestoreSyncRepository(
                         ownerId = targetUid,
                         inviteCode = "OIKO-7788",
                         memberUids = listOf(targetUid, "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63", "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"),
-                        invitedEmails = listOf("kynigosmarios@gmail.com", "grwayfarer@gmail.com"),
+                        invitedEmails = listOf("kynigosmarios@gmail.com"),
                         createdAt = Timestamp.now()
                     )
                     db.collection("households").document(targetHid).set(household).await()
@@ -203,7 +211,7 @@ class FirestoreSyncRepository(
                             ownerId = targetUid,
                             inviteCode = "OIKO-9922",
                             memberUids = listOf(targetUid, "t5kN4RvPRugIxXUz18Fep2khSrC2"),
-                            invitedEmails = listOf("kynigosmarios@gmail.com", "grwayfarer@gmail.com"),
+                            invitedEmails = listOf("kynigosmarios@gmail.com"),
                             createdAt = Timestamp.now()
                         )
                         db.collection("households").document("e1d4ae67-499").set(epixeirisi).await()
@@ -359,20 +367,34 @@ class FirestoreSyncRepository(
                 existing.authProvider
             } else "password"
 
-            val allHids = (existing.householdIds + listOf(existing.householdId) + discoveredHids)
+            val isMariosAccount = email.trim().equals(FirestoreDataSeed.DEFAULT_USER_EMAIL, ignoreCase = true) ||
+                    uid == FirestoreDataSeed.DEFAULT_USER_UID ||
+                    uid == "t5kN4RvPRugIxXUz18Fep2khSrC2" ||
+                    uid == "tSLWmkXZ0MTqIKGoX3wd6HdhDw63" ||
+                    uid == "jllDLLQl7VgFzOQpVIHi0wo8B013" ||
+                    uid == "oA6smvWcC6QYCAKMvYdWEcmVCO43"
+            val mariosHouseholds = setOf(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
+
+            // Critical security check: non-Marios users MUST NOT have Marios's households!
+            val rawHids = (existing.householdIds + listOf(existing.householdId) + discoveredHids)
                 .filter { it.isNotBlank() }
                 .distinct()
+            val allHids = if (isMariosAccount) rawHids else rawHids.filterNot { mariosHouseholds.contains(it) }
+
+            // If non-Marios had Marios's household set as existing.householdId, clear it
+            val cleanExistingHid = if (isMariosAccount || !mariosHouseholds.contains(existing.householdId)) existing.householdId else ""
+
+            // Non-Marios accounts strictly cannot access or inherit Marios households
 
             // Resolve best active household:
-            // If existing.householdId has no expenses, but another discovered household DOES have expenses, prioritize the one with actual data!
-            val bestActiveHid = if (existing.householdId.isNotBlank()) {
+            val bestActiveHid = if (cleanExistingHid.isNotBlank()) {
                 val currentHasExp = try {
-                    !db.collection("households").document(existing.householdId).collection("expenses").limit(1).get().await().isEmpty
+                    !db.collection("households").document(cleanExistingHid).collection("expenses").limit(1).get().await().isEmpty
                 } catch (_: Exception) { false }
                 if (currentHasExp) {
-                    existing.householdId
+                    cleanExistingHid
                 } else {
-                    findHouseholdWithExpenses(allHids) ?: existing.householdId
+                    findHouseholdWithExpenses(allHids) ?: cleanExistingHid
                 }
             } else {
                 findHouseholdWithExpenses(allHids) ?: allHids.firstOrNull() ?: ""
@@ -406,7 +428,16 @@ class FirestoreSyncRepository(
             userRef.set(merged, SetOptions.merge()).await()
             merged
         } else {
-            val allDiscovered = discoveredHids.filter { it.isNotBlank() }.distinct()
+            val isMariosAccount = email.trim().equals(FirestoreDataSeed.DEFAULT_USER_EMAIL, ignoreCase = true) ||
+                    uid == FirestoreDataSeed.DEFAULT_USER_UID ||
+                    uid == "t5kN4RvPRugIxXUz18Fep2khSrC2" ||
+                    uid == "tSLWmkXZ0MTqIKGoX3wd6HdhDw63" ||
+                    uid == "jllDLLQl7VgFzOQpVIHi0wo8B013" ||
+                    uid == "oA6smvWcC6QYCAKMvYdWEcmVCO43"
+            val mariosHouseholds = setOf(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
+
+            val rawDiscovered = discoveredHids.filter { it.isNotBlank() }.distinct()
+            val allDiscovered = if (isMariosAccount) rawDiscovered else rawDiscovered.filterNot { mariosHouseholds.contains(it) }
             val (initialHouseholdId, initialHouseholdIds) = if (allDiscovered.isNotEmpty()) {
                 val withExp = findHouseholdWithExpenses(allDiscovered) ?: allDiscovered.first()
                 Pair(withExp, allDiscovered)
@@ -463,14 +494,25 @@ class FirestoreSyncRepository(
             createdAt = Timestamp.now()
         )
 
-        db.collection("households").document(householdId).set(household).await()
+        try {
+            db.collection("households").document(householdId).set(household).await()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving new household: ${e.message}")
+        }
 
-        // Update user profile with householdId and add to householdIds list
-        val userRef = db.collection("users").document(ownerUid)
-        userRef.update(
-            "householdId", householdId,
-            "householdIds", FieldValue.arrayUnion(householdId)
-        ).await()
+        // Update user profile with householdId and add to householdIds list using merge
+        try {
+            val userRef = db.collection("users").document(ownerUid)
+            userRef.set(
+                mapOf(
+                    "householdId" to householdId,
+                    "householdIds" to FieldValue.arrayUnion(householdId)
+                ),
+                SetOptions.merge()
+            ).await()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error updating user with new household: ${e.message}")
+        }
 
         return household
     }

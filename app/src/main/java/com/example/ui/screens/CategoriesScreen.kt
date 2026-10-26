@@ -283,7 +283,7 @@ fun CategoriesScreen(
                     Spacer(modifier = Modifier.height(2.dp))
                 }
 
-                itemsIndexed(categories, key = { _, c -> c.id }) { index, category ->
+                itemsIndexed(categories, key = { index, c -> if (c.id > 0) "cat_${c.id}_$index" else "cat_idx_$index" }) { index, category ->
                     val color = if (category.colorHex != 0L) Color(category.colorHex) else Emerald700
 
                     Card(

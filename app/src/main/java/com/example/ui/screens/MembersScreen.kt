@@ -327,7 +327,7 @@ fun MembersScreen(
                     Spacer(modifier = Modifier.height(2.dp))
                 }
 
-                itemsIndexed(members, key = { _, m -> m.id }) { index, member ->
+                itemsIndexed(members, key = { index, m -> if (m.id > 0) "mem_${m.id}_$index" else "mem_idx_$index" }) { index, member ->
                     val color = Color(member.avatarColorHex)
 
                     Card(

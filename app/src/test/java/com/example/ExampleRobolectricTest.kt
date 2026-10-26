@@ -472,4 +472,39 @@ class ExampleRobolectricTest {
         val fbExp = exp.toFirebaseExpense("household-1", "user-1", "Μάριος")
         assertEquals("existing-uuid-1234", fbExp.id)
     }
+
+    @Test
+    fun `test main activity startup does not crash`() {
+        val controller = org.robolectric.Robolectric.buildActivity(MainActivity::class.java)
+        controller.create().start().resume()
+        val activity = controller.get()
+        org.junit.Assert.assertNotNull(activity)
+    }
+
+    @Test
+    fun `test user verification and Marios isolation logic`() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()
+        if (com.google.firebase.FirebaseApp.getApps(context).isEmpty()) {
+            val options = com.google.firebase.FirebaseOptions.Builder()
+                .setApplicationId("1:123456789:android:abcdef")
+                .setProjectId("oikonomos-test")
+                .setApiKey("fakeApiKey123456789")
+                .build()
+            com.google.firebase.FirebaseApp.initializeApp(context, options)
+        }
+        val vm = com.example.ui.viewmodel.OikoNomosViewModel(context)
+        
+        // Marios email check
+        assertTrue(vm.isMariosUser(email = "kynigosmarios@gmail.com"))
+        // grwayfarer email check: MUST NOT be Marios
+        assertFalse(vm.isMariosUser(email = "grwayfarer@gmail.com"))
+        assertFalse(vm.isMariosUser(email = "otheruser@example.com"))
+
+        // Verification is false for null user
+        assertFalse(vm.isUserVerified(null))
+    }
 }
+
+
+
+

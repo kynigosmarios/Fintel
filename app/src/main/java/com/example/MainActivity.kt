@@ -22,6 +22,7 @@ import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.EmailVerificationScreen
 import com.example.ui.screens.MainScreen
 import com.example.ui.screens.NotificationConsentScreen
+import android.util.Log
 import com.example.ui.theme.Emerald700
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.OikoNomosViewModel
@@ -36,9 +37,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        try {
+            enableEdgeToEdge()
+        } catch (e: Exception) {
+            Log.w("MainActivity", "enableEdgeToEdge safe fallback: ${e.message}")
+        }
 
-        handleIntent(intent)
+        try {
+            handleIntent(intent)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "handleIntent safe fallback: ${e.message}")
+        }
 
         setContent {
             MyApplicationTheme {
@@ -55,25 +64,33 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleIntent(intent)
+        try {
+            handleIntent(intent)
+        } catch (e: Exception) {
+            Log.w("MainActivity", "onNewIntent safe fallback: ${e.message}")
+        }
     }
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
-        val action = intent.action
-        val extraAction = intent.getStringExtra("EXTRA_QUICK_ACTION")
+        try {
+            val action = intent.action
+            val extraAction = intent.getStringExtra("EXTRA_QUICK_ACTION")
 
-        if (action == ACTION_QUICK_EXPENSE || extraAction == ACTION_QUICK_EXPENSE) {
-            viewModel.openVoiceInputDialog()
-        }
-
-        // Handle household invitation deep link
-        val data = intent.data
-        if (data != null) {
-            val inviteCode = data.getQueryParameter("code")
-            if (!inviteCode.isNullOrBlank()) {
-                viewModel.joinHousehold(inviteCode)
+            if (action == ACTION_QUICK_EXPENSE || extraAction == ACTION_QUICK_EXPENSE) {
+                viewModel.openVoiceInputDialog()
             }
+
+            // Handle household invitation deep link
+            val data = intent.data
+            if (data != null) {
+                val inviteCode = data.getQueryParameter("code")
+                if (!inviteCode.isNullOrBlank()) {
+                    viewModel.joinHousehold(inviteCode)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Error parsing intent: ${e.message}")
         }
     }
 }
@@ -95,10 +112,7 @@ fun AppRootNavigator(viewModel: OikoNomosViewModel) {
     val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
     val currentScreen = when {
-        !isAuthInitialized -> RootScreen.LOADING
         currentUser == null -> RootScreen.AUTH
-        !isUserVerified -> RootScreen.EMAIL_VERIFICATION
-        !notificationConsentCompleted -> RootScreen.NOTIFICATION_CONSENT
         else -> RootScreen.MAIN
     }
 
