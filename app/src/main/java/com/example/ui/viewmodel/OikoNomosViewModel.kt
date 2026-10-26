@@ -1809,11 +1809,48 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun deleteCurrentUserAccount() {
         viewModelScope.launch {
+            val user = auth.currentUser ?: _currentUser.value
+            val uid = user?.uid
+            if (user == null || uid.isNullOrBlank()) {
+                showSnackbar(if (_appLanguage.value == "EN") "No active user session found" else "Δεν βρέθηκε ενεργός συνδεδεμένος χρήστης")
+                return@launch
+            }
             try {
-                auth.currentUser?.delete()?.await()
-                showSnackbar("Ο λογαριασμός διαγράφηκε επιτυχώς")
+                // 1. Wipe remote data from Firestore for this user
+                val hIds = _userHouseholds.value.map { it.id }
+                firestoreSyncRepo.deleteUserEntireData(uid, hIds)
+
+                // 2. Delete the Firebase Auth account
+                user.delete().await()
+
+                // 3. Clear local device cache & Room DB
+                repository.clearAllData()
+                clearUserProfileFromPrefs()
+                prefs.edit().clear().apply()
+                cancelAllSyncJobs()
+
+                // 4. Reset in-memory state
+                _currentUser.value = null
+                _userProfile.value = null
+                _currentHousehold.value = null
+                _userHouseholds.value = emptyList()
+                _allExpenses.value = emptyList()
+                _allIncomes.value = emptyList()
+                _allMembers.value = emptyList()
+                _allCategories.value = emptyList()
+
+                showSnackbar(if (_appLanguage.value == "EN") "Your account and personal data have been completely deleted" else "Ο λογαριασμός και όλα τα δεδομένα σας διαγράφηκαν επιτυχώς")
+            } catch (e: com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException) {
+                Log.w("OikoNomosVM", "Recent login required for account deletion: ${e.message}")
+                showSnackbar(
+                    if (_appLanguage.value == "EN")
+                        "For your security, please sign out, sign in again, and retry Account Deletion."
+                    else
+                        "Για λόγους ασφαλείας, παρακαλούμε αποσυνδεθείτε, συνδεθείτε ξανά και πατήστε πάλι Διαγραφή Λογαριασμού."
+                )
             } catch (e: Exception) {
-                showSnackbar("Σφάλμα διαγραφής: ${e.message}")
+                Log.e("OikoNomosVM", "deleteCurrentUserAccount error", e)
+                showSnackbar("Σφάλμα διαγραφής: ${e.localizedMessage ?: e.message}")
             }
         }
     }

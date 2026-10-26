@@ -28,9 +28,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Key
@@ -46,6 +48,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -118,13 +122,12 @@ fun AuthScreen(
     var isSignUp by remember { mutableStateOf(false) }
     var isForgotPassword by remember { mutableStateOf(false) }
 
-    // Enhanced Registration Fields (Requirement 1 & 2)
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var birthDate by remember { mutableStateOf("") }
     var phoneNumber by remember { mutableStateOf("") }
-    var occupation by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
+    var countryCode by remember { mutableStateOf("+30") }
+    var showCountryDropdown by remember { mutableStateOf(false) }
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -183,15 +186,7 @@ fun AuthScreen(
                 color = Color(0xFF157347)
             )
 
-            Text(
-                text = if (lang == Localization.Language.ENGLISH) "Smart Expense & Budget Tracker" else "Έξοδα, Έσοδα & Προϋπολογισμός",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Auth Card
             Card(
@@ -835,10 +830,10 @@ fun AuthScreen(
                                     horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Person,
+                                        painter = painterResource(id = R.drawable.ic_google_logo),
                                         contentDescription = "Google",
-                                        tint = Emerald700,
-                                        modifier = Modifier.size(22.dp)
+                                        tint = Color.Unspecified,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(
@@ -871,55 +866,120 @@ fun AuthScreen(
 
                         // Form Fields
                         if (isSignUp) {
-                            // First Name & Last Name (Requirement 2 & 3: separate Όνομα, Επίθετο)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = firstName,
-                                    onValueChange = {
-                                        firstName = it
-                                        errorMessage = null
-                                    },
-                                    label = { Text(if (lang == Localization.Language.ENGLISH) "First Name" else "Όνομα") },
-                                    placeholder = { Text("π.χ. Γιώργος") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Person, contentDescription = null, tint = Emerald700)
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Right) }),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("auth_first_name_field")
-                                )
-
-                                OutlinedTextField(
-                                    value = lastName,
-                                    onValueChange = {
-                                        lastName = it
-                                        errorMessage = null
-                                    },
-                                    label = { Text(if (lang == Localization.Language.ENGLISH) "Last Name" else "Επίθετο") },
-                                    placeholder = { Text("π.χ. Παπαδόπουλος") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Badge, contentDescription = null, tint = Emerald700)
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("auth_last_name_field")
-                                )
-                            }
+                            // 1. Email (email type)
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = {
+                                    email = it
+                                    errorMessage = null
+                                },
+                                label = { Text("Email *") },
+                                placeholder = { Text("example@gmail.com") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Email, contentDescription = null, tint = Emerald700)
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Email,
+                                    imeAction = ImeAction.Next
+                                ),
+                                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("auth_email_field")
+                            )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Date of Birth (Requirement 3: Ημερομηνία Γέννησης) with Clickable Dialog Picker
+                            // 2. Κωδικός Πρόσβασης (κρυφός)
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = {
+                                    password = it
+                                    errorMessage = null
+                                },
+                                label = { Text(if (lang == Localization.Language.ENGLISH) "Password *" else "Κωδικός Πρόσβασης *") },
+                                placeholder = { Text(if (lang == Localization.Language.ENGLISH) "At least 6 characters" else "Τουλάχιστον 6 χαρακτήρες") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Lock, contentDescription = null, tint = Emerald700)
+                                },
+                                trailingIcon = {
+                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                        Icon(
+                                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                            contentDescription = if (lang == Localization.Language.ENGLISH) "Show password" else "Εμφάνιση κωδικού"
+                                        )
+                                    }
+                                },
+                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Password,
+                                    imeAction = ImeAction.Next
+                                ),
+                                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("auth_password_field")
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 3. Όνομα (κείμενο)
+                            OutlinedTextField(
+                                value = firstName,
+                                onValueChange = {
+                                    firstName = it
+                                    errorMessage = null
+                                },
+                                label = { Text(if (lang == Localization.Language.ENGLISH) "First Name *" else "Όνομα *") },
+                                placeholder = { Text(if (lang == Localization.Language.ENGLISH) "e.g. John" else "π.χ. Μάριος") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Person, contentDescription = null, tint = Emerald700)
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Next
+                                ),
+                                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("auth_first_name_field")
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 4. Επίθετο (κείμενο)
+                            OutlinedTextField(
+                                value = lastName,
+                                onValueChange = {
+                                    lastName = it
+                                    errorMessage = null
+                                },
+                                label = { Text(if (lang == Localization.Language.ENGLISH) "Last Name *" else "Επίθετο *") },
+                                placeholder = { Text(if (lang == Localization.Language.ENGLISH) "e.g. Doe" else "π.χ. Παπαδόπουλος") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Badge, contentDescription = null, tint = Emerald700)
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Next
+                                ),
+                                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("auth_last_name_field")
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 5. Ημερομηνία Γέννησης (ημερολόγιο)
                             OutlinedTextField(
                                 value = birthDate,
                                 onValueChange = { birthDate = it },
@@ -931,7 +991,7 @@ fun AuthScreen(
                                 },
                                 trailingIcon = {
                                     IconButton(onClick = { showDatePickerDialog = true }) {
-                                        Icon(Icons.Default.CalendarMonth, contentDescription = "Pick Date", tint = Emerald700)
+                                        Icon(Icons.Default.EditCalendar, contentDescription = "Pick Date", tint = Emerald700)
                                     }
                                 },
                                 singleLine = true,
@@ -944,131 +1004,144 @@ fun AuthScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Mobile Phone Number (Required for 6-digit SMS verification and sync)
+                            // 6. Κινητό Τηλέφωνο (αριθμός, με πρόθεμα χώρας μπροστά, προεπιλεγμένη η Ελλάδα)
                             OutlinedTextField(
                                 value = phoneNumber,
                                 onValueChange = {
-                                    phoneNumber = it
+                                    val digitsOnly = it.filter { ch -> ch.isDigit() }
+                                    phoneNumber = digitsOnly
                                     errorMessage = null
                                 },
-                                label = { Text(if (lang == Localization.Language.ENGLISH) "Mobile Phone (for SMS reset) *" else "Κινητό Τηλέφωνο (για SMS) *") },
+                                label = { Text(if (lang == Localization.Language.ENGLISH) "Mobile Phone *" else "Κινητό Τηλέφωνο *") },
                                 placeholder = { Text("69XXXXXXXX") },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Phone, contentDescription = null, tint = Emerald700)
+                                    Box {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable { showCountryDropdown = true }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(
+                                                text = when (countryCode) {
+                                                    "+30" -> "🇬🇷 +30"
+                                                    "+357" -> "🇨🇾 +357"
+                                                    "+44" -> "🇬🇧 +44"
+                                                    "+49" -> "🇩🇪 +49"
+                                                    "+1" -> "🇺🇸 +1"
+                                                    else -> countryCode
+                                                },
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Emerald700
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDropDown,
+                                                contentDescription = "Select country prefix",
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = showCountryDropdown,
+                                            onDismissRequest = { showCountryDropdown = false }
+                                        ) {
+                                            listOf(
+                                                "+30" to "Ελλάδα 🇬🇷 (+30)",
+                                                "+357" to "Κύπρος 🇨🇾 (+357)",
+                                                "+44" to "UK 🇬🇧 (+44)",
+                                                "+49" to "Germany 🇩🇪 (+49)",
+                                                "+1" to "USA 🇺🇸 (+1)"
+                                            ).forEach { (code, label) ->
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            text = label,
+                                                            fontSize = 13.5.sp,
+                                                            fontWeight = if (code == countryCode) FontWeight.Bold else FontWeight.Normal,
+                                                            color = if (code == countryCode) Emerald700 else MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        countryCode = code
+                                                        showCountryDropdown = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
                                 },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Phone,
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("auth_phone_field")
+                            )
+                        } else {
+                            // Sign In Mode: Email & Password
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = {
+                                    email = it
+                                    errorMessage = null
+                                },
+                                label = { Text("Email *") },
+                                placeholder = { Text("example@gmail.com") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Email, contentDescription = null, tint = Emerald700)
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Email,
                                     imeAction = ImeAction.Next
                                 ),
                                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .testTag("auth_phone_field")
+                                    .testTag("auth_email_field")
                             )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Profession / Occupation & City
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = occupation,
-                                    onValueChange = { occupation = it },
-                                    label = { Text(if (lang == Localization.Language.ENGLISH) "Occupation" else "Επάγγελμα") },
-                                    placeholder = { Text("π.χ. Μηχανικός") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Work, contentDescription = null, tint = Emerald700)
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Right) }),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("auth_occupation_field")
-                                )
-
-                                OutlinedTextField(
-                                    value = city,
-                                    onValueChange = { city = it },
-                                    label = { Text(if (lang == Localization.Language.ENGLISH) "City" else "Πόλη") },
-                                    placeholder = { Text("π.χ. Αθήνα") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.LocationCity, contentDescription = null, tint = Emerald700)
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("auth_city_field")
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = {
+                                    password = it
+                                    errorMessage = null
+                                },
+                                label = { Text(if (lang == Localization.Language.ENGLISH) "Password *" else "Κωδικός πρόσβασης *") },
+                                placeholder = { Text(if (lang == Localization.Language.ENGLISH) "At least 6 characters" else "Τουλάχιστον 6 χαρακτήρες") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Lock, contentDescription = null, tint = Emerald700)
+                                },
+                                trailingIcon = {
+                                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                        Icon(
+                                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                            contentDescription = if (lang == Localization.Language.ENGLISH) "Show password" else "Εμφάνιση κωδικού"
+                                        )
+                                    }
+                                },
+                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Password,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("auth_password_field")
+                            )
                         }
-
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = {
-                                email = it
-                                errorMessage = null
-                            },
-                            label = { Text("Email *") },
-                            placeholder = { Text("example@gmail.com") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Email, contentDescription = null, tint = Emerald700)
-                            },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Email,
-                                imeAction = ImeAction.Next
-                            ),
-                            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("auth_email_field")
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = {
-                                password = it
-                                errorMessage = null
-                            },
-                            label = { Text(if (lang == Localization.Language.ENGLISH) "Password *" else "Κωδικός πρόσβασης *") },
-                            placeholder = { Text(if (lang == Localization.Language.ENGLISH) "At least 6 characters" else "Τουλάχιστον 6 χαρακτήρες") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Lock, contentDescription = null, tint = Emerald700)
-                            },
-                            trailingIcon = {
-                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Icon(
-                                        imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                        contentDescription = if (lang == Localization.Language.ENGLISH) "Show password" else "Εμφάνιση κωδικού"
-                                    )
-                                }
-                            },
-                            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
-                                imeAction = ImeAction.Done
-                            ),
-                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("auth_password_field")
-                        )
 
                         // Error message
                         if (errorMessage != null) {
@@ -1106,13 +1179,19 @@ fun AuthScreen(
                                 focusManager.clearFocus()
                                 errorMessage = null
                                 if (isSignUp) {
+                                    val cleanDigits = phoneNumber.trim().removePrefix("0")
+                                    val fullPhone = if (phoneNumber.trim().startsWith("+")) {
+                                        phoneNumber.trim()
+                                    } else {
+                                        "$countryCode$cleanDigits"
+                                    }
                                     viewModel.signUpWithEmail(
                                         firstName = firstName,
                                         lastName = lastName,
                                         birthDate = birthDate,
-                                        phoneNumber = phoneNumber,
-                                        occupation = occupation,
-                                        city = city,
+                                        phoneNumber = fullPhone,
+                                        occupation = "",
+                                        city = "",
                                         email = email,
                                         pass = password,
                                         onSuccess = {},

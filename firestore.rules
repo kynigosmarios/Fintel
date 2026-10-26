@@ -6,33 +6,59 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // User Profile & Private Personal User Database
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. User Profile & Private Personal User Database
     match /users/{userId} {
-      allow read, write: if true;
+      // Authenticated users can read profile (for household invitations and member name display)
+      allow read: if isAuthenticated();
+      // Only the authenticated account owner can modify or delete their own profile
+      allow create, update, delete: if isOwner(userId);
 
-      // Personal user collections (expenses, incomes, categories, members, savings, recurring)
+      // Personal user subcollections (expenses, incomes, categories, members, savings_goals, recurring_expenses)
+      // Strictly private: accessible only by the owner
       match /{document=**} {
-        allow read, write: if true;
+        allow read, write: if isOwner(userId);
       }
     }
 
-    // Phone password reset codes (6-digit verification)
-    match /phone_password_resets/{phone} {
-      allow read, write: if true;
-    }
-
-    // Shared Household Database (Multi-user sync)
+    // 2. Shared Household Database (Multi-user sync)
     match /households/{householdId} {
-      allow read, write: if true;
+      // Any authenticated user can create a household
+      allow create: if isAuthenticated();
 
-      // Household subcollections (shared expenses, incomes, members, categories, savings, recurring, sync)
+      // Read allowed if user is owner, member, invited by email, or finding by inviteCode
+      allow read: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        request.auth.uid in resource.data.get('memberUids', []) ||
+        (request.auth.token.email != null && request.auth.token.email in resource.data.get('invitedEmails', [])) ||
+        resource.data.get('inviteCode', '') != ''
+      );
+
+      // Update allowed if owner/member or self-joining member via invite code
+      allow update: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        request.auth.uid in resource.data.get('memberUids', []) ||
+        (request.auth.token.email != null && request.auth.token.email in resource.data.get('invitedEmails', [])) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+      );
+
+      // Delete allowed strictly by household owner
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+
+      // Household subcollections (shared expenses, incomes, members, categories, savings_goals, recurring_expenses, sync)
       match /{document=**} {
-        allow read, write: if true;
+        allow read, write: if isAuthenticated() && (
+          get(/databases/$(database)/documents/households/$(householdId)).data.ownerId == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.get('memberUids', [])
+        );
       }
     }
 
-    // Catch-all to prevent any unexpected permission errors
-    match /{document=**} {
+    // 3. Phone password reset codes (6-digit temporary verification)
+    match /phone_password_resets/{phone} {
       allow read, write: if true;
     }
   }

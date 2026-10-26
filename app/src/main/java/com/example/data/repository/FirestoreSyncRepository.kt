@@ -84,44 +84,12 @@ class FirestoreSyncRepository(
 
         val mariosHids = setOf(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
 
-        // 1. Direct fetch of all households in Firestore collection
-        try {
-            val allHouseholdsSnap = db.collection("households").get().await()
-            for (doc in allHouseholdsSnap.documents) {
-                // Critical: Marios's households belong ONLY to Marios. Other accounts cannot join or inherit them.
-                if (mariosHids.contains(doc.id) && !isMariosAccount) {
-                    continue
-                }
-
-                val owner = doc.getString("ownerId") ?: ""
-                val members = (doc.get("memberUids") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
-                val invited = (doc.get("invitedEmails") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
-
-                val isOwner = uid.isNotBlank() && owner == uid
-                val isMember = uid.isNotBlank() && members.contains(uid)
-                val isInvited = cleanEmail.isNotBlank() && invited.any { it.trim().equals(cleanEmail, ignoreCase = true) }
-                val isKnownMarios = isMariosAccount && mariosHids.contains(doc.id)
-
-                if (isOwner || isMember || isInvited || isKnownMarios) {
-                    foundIds.add(doc.id)
-                    if (uid.isNotBlank() && !members.contains(uid)) {
-                        try {
-                            doc.reference.update("memberUids", FieldValue.arrayUnion(uid)).await()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Auto-add memberUid to household ${doc.id}: ${e.message}")
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "discoverUserHouseholds all households error: ${e.message}")
-        }
-
-        // 2. Fallback specific queries
+        // 1. Indexed query for households where user is the owner
         if (uid.isNotBlank()) {
             try {
                 val qOwner = db.collection("households").whereEqualTo("ownerId", uid).get().await()
                 for (doc in qOwner.documents) {
+                    if (mariosHids.contains(doc.id) && !isMariosAccount) continue
                     foundIds.add(doc.id)
                 }
             } catch (e: Exception) {
@@ -131,12 +99,14 @@ class FirestoreSyncRepository(
             try {
                 val qMembers = db.collection("households").whereArrayContains("memberUids", uid).get().await()
                 for (doc in qMembers.documents) {
+                    if (mariosHids.contains(doc.id) && !isMariosAccount) continue
                     foundIds.add(doc.id)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "discoverUserHouseholds memberUids error: ${e.message}")
             }
         }
+
 
         // 3. Households where invitedEmails contains user's email
         if (cleanEmail.isNotBlank()) {
@@ -1920,6 +1890,46 @@ class FirestoreSyncRepository(
                     .thenByDescending { it.createdAt?.toDate()?.time ?: 0L }
                     .thenByDescending { it.id }
             )
+    }
+    suspend fun deleteUserEntireData(userId: String, householdIds: List<String> = emptyList()) {
+        if (userId.isBlank()) return
+        try {
+            // 1. Delete user profile subcollections
+            val subcollections = listOf("expenses", "incomes", "categories", "members", "savings_goals", "recurring_expenses")
+            for (sub in subcollections) {
+                try {
+                    val docs = db.collection("users").document(userId).collection(sub).get().await()
+                    for (d in docs.documents) {
+                        d.reference.delete().await()
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error cleaning user subcollection $sub: ${e.message}")
+                }
+            }
+            // 2. Delete user profile document
+            db.collection("users").document(userId).delete().await()
+
+            // 3. Remove user from household member lists
+            for (hId in householdIds.filter { it.isNotBlank() }.distinct()) {
+                try {
+                    val hRef = db.collection("households").document(hId)
+                    val hDoc = hRef.get().await()
+                    if (hDoc.exists()) {
+                        val ownerId = hDoc.getString("ownerId") ?: ""
+                        val members = (hDoc.get("memberUids") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                        if (ownerId == userId && (members.isEmpty() || members == listOf(userId))) {
+                            hRef.delete().await()
+                        } else {
+                            hRef.update("memberUids", FieldValue.arrayRemove(userId)).await()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error removing user from household $hId: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteUserEntireData error", e)
+        }
     }
 }
 
