@@ -503,6 +503,31 @@ fun PremiumPaywallDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // Price Badge
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Amber700.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, Amber700.copy(alpha = 0.35f)),
+                    modifier = Modifier.padding(bottom = 12.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "2.99€ / month" else "2,99€ / μήνα",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Amber700
+                        )
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "Google Play Subscription • Cancel anytime" else "Συνδρομή Google Play • Ακύρωση ανά πάσα στιγμή",
+                            fontSize = 10.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 // Benefit List Card with clear aligned items
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -515,35 +540,41 @@ fun PremiumPaywallDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
-                            text = if (lang == Localization.Language.ENGLISH) "What Pro includes:" else "Τι περιλαμβάνει η έκδοση Pro:",
+                            text = if (lang == Localization.Language.ENGLISH) "What Pro includes:" else "Τι προσφέρει η έκδοση Pro:",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        // Feature 1
+                        // Feature 1: Invite Member via Email
                         BenefitRowItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Unlimited households" else "Απεριόριστα εξοδολόγια",
-                            subtitle = if (lang == Localization.Language.ENGLISH) "Home, Work, Vacation, Trips" else "Σπίτι, Εργασία, Εξοχικό, Ταξίδια"
+                            title = if (lang == Localization.Language.ENGLISH) "Invite members via Email" else "Πρόσκληση μελών μέσω Email",
+                            subtitle = if (lang == Localization.Language.ENGLISH)
+                                "Invite anyone by email. The invited user doesn't need Pro to access the shared household!"
+                            else
+                                "Πρόσκληση μέσω email. Ο προσκεκλημένος έχει πλήρη πρόσβαση χωρίς να απαιτείται να έχει Pro!"
                         )
 
-                        // Feature 2
+                        // Feature 2: Multi-household creation
                         BenefitRowItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Add & manage members" else "Προσθήκη & διαχείριση μελών",
-                            subtitle = if (lang == Localization.Language.ENGLISH) "Real-time shared expense tracking" else "Κοινή παρακολούθηση εξόδων σε πραγματικό χρόνο"
+                            title = if (lang == Localization.Language.ENGLISH) "Create multiple households" else "Δημιουργία πολλαπλών εξοδολογίων",
+                            subtitle = if (lang == Localization.Language.ENGLISH)
+                                "Create, manage and invite members to more than 1 household (Home, Work, Vacation, Trips)"
+                            else
+                                "Δημιουργήστε πάνω από 1 εξοδολόγια (Σπίτι, Εργασία, Εξοχικό, Ταξίδια) και προσκαλέστε μέλη"
                         )
 
-                        // Feature 3
+                        // Feature 3: Realtime sync
                         BenefitRowItem(
                             title = if (lang == Localization.Language.ENGLISH) "Automatic cloud sync" else "Αυτόματος συγχρονισμός cloud",
-                            subtitle = if (lang == Localization.Language.ENGLISH) "Instant sync across all devices" else "Άμεση ενημέρωση σε όλες τις συσκευές"
+                            subtitle = if (lang == Localization.Language.ENGLISH) "Instant real-time sync across all devices" else "Άμεση ενημέρωση σε πραγματικό χρόνο σε όλες τις συσκευές"
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Upgrade Button
+                // Upgrade Button with Google Play subscription flow
                 Button(
                     onClick = {
                         onUnlockPro()
@@ -553,7 +584,7 @@ fun PremiumPaywallDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = Amber700),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(46.dp)
+                        .height(48.dp)
                         .testTag("unlock_pro_button")
                 ) {
                     Row(
@@ -563,7 +594,7 @@ fun PremiumPaywallDialog(
                         Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (lang == Localization.Language.ENGLISH) "Activate Pro for €2.99" else "Ενεργοποίηση Pro με 2,99€",
+                            text = if (lang == Localization.Language.ENGLISH) "Subscribe for 2.99€/mo on Google Play" else "Συνδρομή με 2,99€/μήνα στο Google Play",
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.5.sp
                         )

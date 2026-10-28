@@ -55,6 +55,12 @@ data class UserProfile(
     var isPremium: Boolean = false,
     var photoUrl: String = "",
     var authProvider: String = "password", // "password" or "google"
+    var appLanguage: String = "EL",
+    var themeMode: String = "SYSTEM",
+    var reminderEnabled: Boolean = false,
+    var reminderHour: Int = 21,
+    var reminderMinute: Int = 30,
+    var notificationConsentCompleted: Boolean = false,
     var createdAt: Timestamp? = null,
     var updatedAt: Timestamp? = null
 )

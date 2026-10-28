@@ -2,6 +2,8 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -143,6 +145,83 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 effectiveUid == "oA6smvWcC6QYCAKMvYdWEcmVCO43"
     }
 
+    fun getOrEnsureHouseholdId(user: FirebaseUser? = null): String {
+        val effectiveUser = user ?: _currentUser.value ?: auth.currentUser
+        if (effectiveUser == null) return ""
+        val isMarios = isMariosUser(effectiveUser)
+        val mariosHids = setOf(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
+
+        val currentHid = _currentHousehold.value?.id.orEmpty()
+        if (currentHid.isNotBlank()) {
+            if (isMarios || !mariosHids.contains(currentHid)) {
+                return currentHid
+            }
+        }
+
+        if (isMarios) {
+            val profileHid = _userProfile.value?.householdId.orEmpty()
+            if (profileHid.isNotBlank()) return profileHid
+            return com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
+        }
+
+        val profileHid = _userProfile.value?.householdId.orEmpty()
+        if (profileHid.isNotBlank() && !mariosHids.contains(profileHid)) {
+            return profileHid
+        }
+
+        val profileHids = _userProfile.value?.householdIds?.firstOrNull { it.isNotBlank() && !mariosHids.contains(it) }.orEmpty()
+        if (profileHids.isNotBlank()) {
+            return profileHids
+        }
+
+        val userHids = _userHouseholds.value.firstOrNull { !mariosHids.contains(it.id) }?.id.orEmpty()
+        if (userHids.isNotBlank()) {
+            return userHids
+        }
+
+        val userSpecificPrefHid = prefs.getString("user_household_${effectiveUser.uid}", "").orEmpty()
+        if (userSpecificPrefHid.isNotBlank() && !mariosHids.contains(userSpecificPrefHid)) {
+            return userSpecificPrefHid
+        }
+
+        val safeUserHid = "household_${effectiveUser.uid}"
+        prefs.edit().putString("user_household_${effectiveUser.uid}", safeUserHid).apply()
+
+        // Ensure _currentHousehold is non-null
+        if (_currentHousehold.value == null || mariosHids.contains(_currentHousehold.value?.id)) {
+            val defaultH = Household(
+                id = safeUserHid,
+                name = "Το Εξοδολόγιό μου",
+                ownerId = effectiveUser.uid,
+                memberUids = listOf(effectiveUser.uid)
+            )
+            _currentHousehold.value = defaultH
+            if (_userHouseholds.value.none { it.id == safeUserHid }) {
+                _userHouseholds.value = listOf(defaultH)
+            }
+        }
+        viewModelScope.launch {
+            try {
+                firestoreSyncRepo.ensureHouseholdExists(safeUserHid, effectiveUser.uid, "Το Εξοδολόγιό μου")
+            } catch (e: Exception) {
+                Log.w("OikoNomosVM", "ensureHouseholdExists background check: ${e.message}")
+            }
+        }
+        return safeUserHid
+    }
+
+    private val _allExpenses = MutableStateFlow<List<Expense>>(emptyList())
+    val allExpenses: StateFlow<List<Expense>> = _allExpenses.asStateFlow()
+
+    private val _allIncomes = MutableStateFlow<List<Income>>(emptyList())
+    val allIncomes: StateFlow<List<Income>> = _allIncomes.asStateFlow()
+
+    private val _allMembers = MutableStateFlow<List<FamilyMember>>(emptyList())
+    val allMembers: StateFlow<List<FamilyMember>> = _allMembers.asStateFlow()
+
+    private val _allCategories = MutableStateFlow<List<ExpenseCategory>>(emptyList())
+    val allCategories: StateFlow<List<ExpenseCategory>> = _allCategories.asStateFlow()
+
     private val _showOnboardingCarousel = MutableStateFlow(false)
     val showOnboardingCarousel = _showOnboardingCarousel.asStateFlow()
 
@@ -156,6 +235,12 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         prefs.edit().putBoolean("notification_consent_handled_$uid", true).apply()
         _notificationConsentCompleted.value = true
         toggleDailyReminder(true)
+        if (uid != "guest") {
+            _userProfile.value = _userProfile.value?.copy(notificationConsentCompleted = true, reminderEnabled = true)
+            viewModelScope.launch {
+                firestoreSyncRepo.updateUserProfilePreferences(uid, notificationConsentCompleted = true, reminderEnabled = true)
+            }
+        }
         val user = auth.currentUser ?: _currentUser.value
         if (user != null && isUserVerified(user)) {
             viewModelScope.launch {
@@ -168,6 +253,12 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         val uid = auth.currentUser?.uid ?: "guest"
         prefs.edit().putBoolean("notification_consent_handled_$uid", true).apply()
         _notificationConsentCompleted.value = true
+        if (uid != "guest") {
+            _userProfile.value = _userProfile.value?.copy(notificationConsentCompleted = true)
+            viewModelScope.launch {
+                firestoreSyncRepo.updateUserProfilePreferences(uid, notificationConsentCompleted = true)
+            }
+        }
         val user = auth.currentUser ?: _currentUser.value
         if (user != null && isUserVerified(user)) {
             viewModelScope.launch {
@@ -187,139 +278,20 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         val database = AppDatabase.getDatabase(application)
         repository = ExpenseRepository(database.expenseDao(), application)
 
-        // Immediate local Room pre-load & pre-warm if user is already authenticated
+        // Zero Local Persistence Policy: Always wipe local Room on startup.
+        // User data is fetched exclusively and live from Cloud Firestore.
         viewModelScope.launch(coroutineExceptionHandler) {
             try {
-                repository.seedInitialDataIfEmpty()
-                val currentUserNow = auth.currentUser
-                if (currentUserNow != null) {
-                    val isMarios = isMariosUser(currentUserNow)
-                    if (isMarios) {
-                        repository.seedMariosDataIfEmpty()
-                    }
-                    val localExpenses = repository.getAllExpensesList()
-                    if (localExpenses.isNotEmpty()) {
-                        if (isMarios) {
-                            // Sanitize local Room cache: remove phantom un-synced duplicates if count is bloated
-                            val sanitized = if (localExpenses.size > 140) {
-                                localExpenses.filterNot { it.cloudId.isBlank() && it.note.contains("Πάγια εντολή") }
-                            } else {
-                                localExpenses
-                            }
-                            if (sanitized.size != localExpenses.size) {
-                                repository.replaceAllExpenses(sanitized)
-                                _allExpenses.value = sanitized
-                            } else {
-                                _allExpenses.value = localExpenses
-                            }
-                            _isInitialExpensesLoading.value = false
-                            prefs.edit().putBoolean("has_entered_any_expense", true).apply()
-                        } else {
-                            // Non-Marios user: do not use cached Room expenses from another user
-                            _allExpenses.value = emptyList()
-                            _isInitialExpensesLoading.value = false
-                        }
-                    } else {
-                        _isInitialExpensesLoading.value = false
-                    }
-                    val localIncomes = repository.getAllIncomesList()
-                    if (localIncomes.isNotEmpty()) {
-                        _allIncomes.value = localIncomes
-                    }
-                    val localCategories = repository.getAllCategoriesList()
-                    if (localCategories.isNotEmpty()) {
-                        _allCategories.value = localCategories
-                    }
-                    val localMembers = repository.getAllMembersList()
-                    if (localMembers.isNotEmpty()) {
-                        _allMembers.value = localMembers
-                    }
-                    // Automatic check and execution of standing orders due today or this month
-                    checkAndProcessDueRecurringExpenses()
-                }
+                repository.clearAllData()
             } catch (e: Exception) {
-                Log.d("OikoNomosVM", "Room pre-warm: ${e.message}")
+                Log.d("OikoNomosVM", "Room clear on start: ${e.message}")
             }
         }
-
-        // Continuous Room observations so any inserted or updated items immediately reflect in StateFlows
-        viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                repository.allExpenses.collect { roomExpenses ->
-                    if (roomExpenses.isNotEmpty()) {
-                        val cloudCount = lastHouseholdExpenses.size
-                        // If cloud expenses are verified and loaded, ignore bloated Room emissions that contain duplicate phantoms
-                        if (cloudCount > 0 && roomExpenses.size > cloudCount + 5) {
-                            Log.w("OikoNomosVM", "Ignoring bloated Room expenses emission (${roomExpenses.size} items vs cloud $cloudCount)")
-                            return@collect
-                        }
-                        val current = _allExpenses.value
-                        val isSame = current.size == roomExpenses.size && current.zip(roomExpenses).all { (a, b) ->
-                            a.id == b.id && a.amount == b.amount && a.title == b.title && a.categoryId == b.categoryId && a.timestamp == b.timestamp
-                        }
-                        if (!isSame) {
-                            _allExpenses.value = roomExpenses
-                            _isInitialExpensesLoading.value = false
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("OikoNomosVM", "Room allExpenses error: ${e.message}")
-            }
-        }
-        viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                repository.allIncomes.collect { roomIncomes ->
-                    if (roomIncomes.isNotEmpty()) {
-                        val current = _allIncomes.value
-                        val isSame = current.size == roomIncomes.size && current.zip(roomIncomes).all { (a, b) ->
-                            a.id == b.id && a.amount == b.amount && a.title == b.title && a.timestamp == b.timestamp
-                        }
-                        if (!isSame) {
-                            _allIncomes.value = roomIncomes
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("OikoNomosVM", "Room allIncomes error: ${e.message}")
-            }
-        }
-        viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                repository.allCategories.collect { roomCategories ->
-                    if (categoryReorderJob?.isActive == true) return@collect
-                    if (roomCategories.isNotEmpty()) {
-                        val current = _allCategories.value
-                        val isSame = current.size == roomCategories.size && current.zip(roomCategories).all { (a, b) ->
-                            a.id == b.id && a.sortOrder == b.sortOrder && a.name == b.name && a.monthlyBudget == b.monthlyBudget && a.colorHex == b.colorHex
-                        }
-                        if (!isSame) {
-                            _allCategories.value = roomCategories
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("OikoNomosVM", "Room allCategories error: ${e.message}")
-            }
-        }
-        viewModelScope.launch(coroutineExceptionHandler) {
-            try {
-                repository.allMembers.collect { roomMembers ->
-                    if (memberReorderJob?.isActive == true) return@collect
-                    if (roomMembers.isNotEmpty()) {
-                        val current = _allMembers.value
-                        val isSame = current.size == roomMembers.size && current.zip(roomMembers).all { (a, b) ->
-                            a.id == b.id && a.sortOrder == b.sortOrder && a.name == b.name && a.role == b.role && a.avatarColorHex == b.avatarColorHex
-                        }
-                        if (!isSame) {
-                            _allMembers.value = roomMembers
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("OikoNomosVM", "Room allMembers error: ${e.message}")
-            }
-        }
+        _allExpenses.value = emptyList()
+        _allIncomes.value = emptyList()
+        _allMembers.value = emptyList()
+        _allCategories.value = emptyList()
+        _isInitialExpensesLoading.value = true
 
         // Fast pre-warm: Only load cached profile/data if user is already authenticated
         val existingUser = auth.currentUser
@@ -329,14 +301,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             if (cachedProfile != null && (cachedProfile.uid == existingUser.uid || cachedProfile.email.equals(existingUser.email, ignoreCase = true))) {
                 _userProfile.value = cachedProfile
             }
-            val cachedHouseholdId = prefs.getString("last_household_id", null)
-            val prewarmHid = when {
-                !cachedHouseholdId.isNullOrBlank() && cachedHouseholdId != "e1d4ae67-499" && (isMarios || cachedHouseholdId != com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) -> cachedHouseholdId
-                isMarios -> com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
-                cachedProfile != null && cachedProfile.householdId.isNotBlank() && (isMarios || cachedProfile.householdId != com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) -> cachedProfile.householdId
-                else -> null
-            }
-            if (!prewarmHid.isNullOrBlank()) {
+            val prewarmHid = getOrEnsureHouseholdId(existingUser)
+            if (prewarmHid.isNotBlank()) {
                 try {
                     observeHouseholdData(prewarmHid)
                 } catch (e: Exception) {
@@ -354,32 +320,46 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             val verified = isUserVerified(user)
             _isUserVerifiedState.value = verified
             _notificationConsentCompleted.value = prefs.getBoolean("notification_consent_handled_${currentUid ?: "guest"}", false)
-            if (user != null) {
-                if (lastObservedUid != null && lastObservedUid != currentUid) {
-                    // Account switch on device: clear in-memory state and Room cache
-                    _allExpenses.value = emptyList()
-                    _allIncomes.value = emptyList()
-                    _allMembers.value = emptyList()
-                    _allCategories.value = emptyList()
-                    clearUserProfileFromPrefs()
-                    prefs.edit()
-                        .remove("last_household_id")
-                        .remove("has_entered_any_expense")
-                        .apply()
-                    cancelAllSyncJobs()
-                    viewModelScope.launch(coroutineExceptionHandler) {
-                        try {
-                            repository.clearAllData()
-                            if (isMariosUser(user)) {
-                                repository.seedMariosDataIfEmpty()
-                            } else {
-                                repository.seedInitialDataIfEmpty()
-                            }
-                        } catch (e: Exception) {
-                            Log.w("OikoNomosVM", "Clear on user switch: ${e.message}")
+            val activeUidInPrefs = prefs.getString("cached_active_uid", null)
+            val isUserSwitch = (user == null) || (activeUidInPrefs != currentUid)
+            if (isUserSwitch) {
+                // Account switch or logout: wipe all in-memory lists, cache and cancel jobs immediately
+                _allExpenses.value = emptyList()
+                _allIncomes.value = emptyList()
+                _allMembers.value = emptyList()
+                _allCategories.value = emptyList()
+                _currentHousehold.value = null
+                _userHouseholds.value = emptyList()
+                _userProfile.value = null
+                lastHouseholdExpenses = emptyList()
+                lastUserExpenses = emptyList()
+                lastHouseholdIncomes = emptyList()
+                lastUserIncomes = emptyList()
+                lastHouseholdMembers = emptyList()
+                lastUserMembers = emptyList()
+                lastHouseholdCategories = emptyList()
+                lastUserCategories = emptyList()
+                clearUserProfileFromPrefs()
+                prefs.edit()
+                    .remove("last_household_id")
+                    .remove("has_entered_any_expense")
+                    .putString("cached_active_uid", currentUid ?: "")
+                    .apply()
+                cancelAllSyncJobs()
+                lastObservedHouseholdId = null
+                viewModelScope.launch(coroutineExceptionHandler) {
+                    try {
+                        repository.clearAllData()
+                        if (user != null && isMariosUser(user)) {
+                            repository.seedMariosDataIfEmpty()
                         }
+                    } catch (e: Exception) {
+                        Log.w("OikoNomosVM", "Clear on user switch: ${e.message}")
                     }
                 }
+            }
+
+            if (user != null) {
                 _currentUser.value = user
                 lastObservedUid = currentUid
                 val isMarios = isMariosUser(user)
@@ -400,6 +380,16 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                     _currentHousehold.value = mariosHousehold
                     _userHouseholds.value = listOf(mariosHousehold, epixeirisiHousehold)
+                } else {
+                    val safeUserHid = getOrEnsureHouseholdId(user)
+                    val defaultH = Household(
+                        id = safeUserHid,
+                        name = "Το Εξοδολόγιό μου",
+                        ownerId = user.uid,
+                        memberUids = listOf(user.uid)
+                    )
+                    _currentHousehold.value = defaultH
+                    _userHouseholds.value = listOf(defaultH)
                 }
                 if (verified) {
                     viewModelScope.launch(coroutineExceptionHandler) {
@@ -421,19 +411,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 _allIncomes.value = emptyList()
                 _allMembers.value = emptyList()
                 _allCategories.value = emptyList()
-                if (lastObservedUid != null) {
-                    // User explicitly logged out
-                    lastObservedUid = null
-                    clearUserProfileFromPrefs()
-                    prefs.edit()
-                        .remove("last_household_id")
-                        .remove("has_entered_any_expense")
-                        .apply()
-                    cancelAllSyncJobs()
-                    viewModelScope.launch {
-                        repository.clearAllData()
-                    }
-                }
+                lastObservedUid = null
             }
         }
     }
@@ -476,6 +454,28 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
             _userProfile.value = profile
             saveUserProfileToPrefs(profile)
+
+            // Apply Cloud User Preferences to App State
+            if (profile.appLanguage.isNotBlank() && profile.appLanguage != _appLanguage.value) {
+                setAppLanguage(profile.appLanguage, syncToCloud = false)
+            }
+            if (profile.themeMode.isNotBlank() && profile.themeMode != _themeMode.value) {
+                setThemeMode(profile.themeMode, syncToCloud = false)
+            }
+            if (profile.notificationConsentCompleted) {
+                _notificationConsentCompleted.value = true
+                prefs.edit().putBoolean("notification_consent_handled_${user.uid}", true).apply()
+            }
+            if (profile.reminderEnabled || profile.reminderHour != _dailyReminderHour.value || profile.reminderMinute != _dailyReminderMinute.value) {
+                _dailyReminderEnabled.value = profile.reminderEnabled
+                _dailyReminderHour.value = profile.reminderHour
+                _dailyReminderMinute.value = profile.reminderMinute
+                DailyReminderManager.setReminderEnabled(getApplication(), profile.reminderEnabled)
+                DailyReminderManager.setReminderTime(getApplication(), profile.reminderHour, profile.reminderMinute)
+                if (profile.reminderEnabled) {
+                    DailyReminderManager.scheduleDailyReminder(getApplication(), profile.reminderHour, profile.reminderMinute)
+                }
+            }
 
             var households = firestoreSyncRepo.fetchUserHouseholds(profile.householdIds)
             if (isMarios) {
@@ -538,22 +538,18 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             val hidWithExp = if (savedHasExpenses) savedHid else firestoreSyncRepo.findHouseholdWithExpenses(userHouseholdIds)
 
             val activeHouseholdId = when {
-                // 1. If user is Marios and default household has expenses, prioritize the household with the user's actual expenses ("3e9a25a0-2e7")
-                isMarios && defaultHasExpenses && (!savedHasExpenses || savedHid == "e1d4ae67-499") -> com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
-                // 2. If saved household belongs to this user and actually has expenses, keep it!
-                savedBelongsToUser && savedHasExpenses -> savedHid
-                // 3. If any of THIS user's households has expenses, select that one!
-                !hidWithExp.isNullOrBlank() -> hidWithExp
-                // 4. If Marios, always default to DEFAULT_HOUSEHOLD_ID
-                isMarios && households.any { it.id == com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID } -> com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
-                // 5. User profile householdId if it exists in this user's households
-                profile.householdId.isNotBlank() && households.any { it.id == profile.householdId } -> profile.householdId
-                // 6. Saved household ID fallback if it belongs to this user
+                // 1. If saved household belongs to this user, respect the user's active choice
                 savedBelongsToUser -> savedHid
-                // 7. First household of this user
+                // 2. User profile householdId if it exists in this user's households
+                profile.householdId.isNotBlank() && households.any { it.id == profile.householdId } -> profile.householdId
+                // 3. If user is Marios and default household has expenses
+                isMarios && defaultHasExpenses -> com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
+                // 4. If any of THIS user's households has expenses, select that one
+                !hidWithExp.isNullOrBlank() -> hidWithExp
+                // 5. First household of this user
                 households.isNotEmpty() -> households.first().id
                 isMarios -> com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
-                else -> ""
+                else -> getOrEnsureHouseholdId(user)
             }
 
             if (activeHouseholdId.isNotBlank()) {
@@ -561,20 +557,27 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 if (current != null) {
                     _currentHousehold.value = current
                 }
-                prefs.edit().putString("last_household_id", activeHouseholdId).apply()
+                prefs.edit()
+                    .putString("user_household_${user.uid}", activeHouseholdId)
+                    .putString("last_household_id", activeHouseholdId)
+                    .apply()
                 _userProfile.value = _userProfile.value?.copy(householdId = activeHouseholdId)
                 firestoreSyncRepo.switchActiveHousehold(user.uid, activeHouseholdId)
                 observeHouseholdData(activeHouseholdId)
             } else if (households.isNotEmpty()) {
                 val fallbackH = households.first()
                 _currentHousehold.value = fallbackH
-                prefs.edit().putString("last_household_id", fallbackH.id).apply()
+                prefs.edit()
+                    .putString("user_household_${user.uid}", fallbackH.id)
+                    .putString("last_household_id", fallbackH.id)
+                    .apply()
                 _userProfile.value = _userProfile.value?.copy(householdId = fallbackH.id)
                 observeHouseholdData(fallbackH.id)
             }
             observeUserData(user.uid)
 
-
+            // Strict Account Sanitization: Purge any foreign data that leaked from another account
+            sanitizeAccountIsolation(user, activeHouseholdId)
 
             // Auto-recovery / Synchronization of Members, Categories, Goals, and Recurring
             recoverAndSyncUserData(user, profile, activeHouseholdId)
@@ -601,6 +604,130 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    private fun isMariosFamilyMember(name: String): Boolean = false
+
+    private fun isMariosSeedCategory(catName: String): Boolean = false
+
+    private suspend fun sanitizeAccountIsolation(user: FirebaseUser, activeHouseholdId: String) {
+        val isMarios = isMariosUser(user)
+        val mariosHids = setOf(
+            com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID,
+            "e1d4ae67-499"
+        )
+        val mariosUids = setOf(
+            com.example.data.seed.FirestoreDataSeed.DEFAULT_USER_UID,
+            "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63",
+            "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"
+        )
+        if (isMarios) {
+            // Actively purge any foreign incomes or expenses that leaked into Marios's default household
+            try {
+                val hIncomes = firestoreSyncRepo.getIncomesOnce(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID)
+                for (inc in hIncomes) {
+                    if (inc.createdByUid.isNotBlank() && !mariosUids.contains(inc.createdByUid)) {
+                        firestoreSyncRepo.deleteIncome(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, inc.id)
+                    }
+                }
+                val hExpenses = firestoreSyncRepo.getExpensesOnce(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID)
+                for (exp in hExpenses) {
+                    if (exp.createdByUid.isNotBlank() && !mariosUids.contains(exp.createdByUid)) {
+                        firestoreSyncRepo.deleteExpense(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, exp.id)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("OikoNomosVM", "Sanitize Marios household warning: ${e.message}")
+            }
+            return
+        }
+
+        val userUid = user.uid
+
+        // 1. Members: Ensure the active household has at least one member (the user) in Firestore
+        try {
+            val hMembers = if (activeHouseholdId.isNotBlank()) firestoreSyncRepo.getMembersOnce(activeHouseholdId) else emptyList()
+            val validMembers = hMembers.filter { !isInvalidOrCombinationMember(it.name) }
+            if (validMembers.isEmpty()) {
+                val myName = user.displayName?.ifBlank { null }
+                    ?: (if (user.email.isNullOrBlank()) "Εγώ" else user.email!!.substringBefore("@"))
+                val defaultFbMember = FirebaseMember(
+                    id = "1",
+                    householdId = activeHouseholdId,
+                    userId = userUid,
+                    name = myName,
+                    role = "Γονέας",
+                    avatarColorHex = 0xFF059669,
+                    voiceKeywords = myName.lowercase(),
+                    isDefault = true,
+                    sortOrder = 0
+                )
+                if (activeHouseholdId.isNotBlank()) firestoreSyncRepo.syncMember(activeHouseholdId, defaultFbMember)
+                val domainMember = FamilyMember(
+                    id = 1L,
+                    name = myName,
+                    role = "Γονέας",
+                    avatarColorHex = 0xFF059669,
+                    voiceKeywords = myName.lowercase(),
+                    isDefault = true,
+                    sortOrder = 0
+                )
+                _allMembers.value = listOf(domainMember)
+                repository.replaceAllMembers(listOf(domainMember))
+            }
+        } catch (e: Exception) {
+            Log.w("OikoNomosVM", "Sanitize members warning: ${e.message}")
+        }
+
+        // 2. Categories: Ensure standard categories exist for the active household if none exist yet
+        try {
+            val hCats = if (activeHouseholdId.isNotBlank()) firestoreSyncRepo.getCategoriesOnce(activeHouseholdId) else emptyList()
+            if (hCats.isEmpty()) {
+                STANDARD_DEFAULT_CATEGORIES.forEach { cat ->
+                    val fbCat = FirebaseCategory(
+                        id = cat.id.toString(),
+                        householdId = activeHouseholdId,
+                        userId = userUid,
+                        name = cat.name,
+                        iconKey = cat.iconKey,
+                        monthlyBudget = 0.0,
+                        colorHex = cat.colorHex,
+                        voiceKeywords = cat.voiceKeywords,
+                        sortOrder = cat.sortOrder,
+                        fontColorHex = cat.fontColorHex
+                    )
+                    if (activeHouseholdId.isNotBlank()) firestoreSyncRepo.syncCategory(activeHouseholdId, fbCat)
+                }
+                _allCategories.value = STANDARD_DEFAULT_CATEGORIES
+                repository.replaceAllCategories(STANDARD_DEFAULT_CATEGORIES)
+            }
+        } catch (e: Exception) {
+            Log.w("OikoNomosVM", "Sanitize categories warning: ${e.message}")
+        }
+
+        // 3. Incomes: Only purge leaked Marios seed household incomes
+        try {
+            val uIncomes = firestoreSyncRepo.getUserIncomesOnce(userUid)
+            for (inc in uIncomes) {
+                if (mariosHids.contains(inc.householdId) || (inc.createdByUid.isNotBlank() && mariosUids.contains(inc.createdByUid))) {
+                    firestoreSyncRepo.deleteUserIncome(userUid, inc.id)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("OikoNomosVM", "Sanitize incomes warning: ${e.message}")
+        }
+
+        // 4. Expenses: Only purge leaked Marios seed household expenses
+        try {
+            val uExpenses = firestoreSyncRepo.getUserExpensesOnce(userUid)
+            for (exp in uExpenses) {
+                if (mariosHids.contains(exp.householdId) || (exp.createdByUid.isNotBlank() && mariosUids.contains(exp.createdByUid))) {
+                    firestoreSyncRepo.deleteUserExpense(userUid, exp.id)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("OikoNomosVM", "Sanitize expenses warning: ${e.message}")
+        }
+    }
+
     private fun isInvalidOrCombinationMember(name: String): Boolean {
         return DataSafetyGuard.isCombinationOrInvalidMemberName(name)
     }
@@ -612,24 +739,23 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         explicitHouseholdId: String? = null
     ) {
         val currentLocal = repository.getAllMembersList()
-        val validRemote = incomingMembers.filter { it.name.isNotBlank() && !isInvalidOrCombinationMember(it.name) }
-
-        val householdId = explicitHouseholdId ?: _currentHousehold.value?.id.orEmpty()
         val user = explicitUser ?: _currentUser.value
         val profile = explicitProfile ?: _userProfile.value
+        val isMarios = isMariosUser(user)
         val uid = user?.uid.orEmpty()
+        val userDisplay = GreekVoiceParser.normalizeGreek((user?.displayName ?: profile?.displayName ?: "").trim().lowercase())
+
+        val validRemote = incomingMembers
+            .filter { it.name.isNotBlank() && !isInvalidOrCombinationMember(it.name) }
+
+        val householdId = explicitHouseholdId ?: _currentHousehold.value?.id.orEmpty()
 
         if (validRemote.isEmpty()) {
-            val isMarios = isMariosUser(user)
-            if (currentLocal.isEmpty() || !isMarios) {
-                // Non-Marios with empty remote members: starts with 0 members
-                if (!isMarios && currentLocal.isNotEmpty()) {
-                    repository.deleteAllMembers()
-                    _allMembers.value = emptyList()
-                }
-                return
-            } else {
-                currentLocal.forEach { m ->
+            if (isMarios && householdId == FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) {
+                val seedMembers = FirestoreDataSeed.members
+                repository.replaceAllMembers(seedMembers)
+                _allMembers.value = seedMembers
+                seedMembers.forEach { m ->
                     val fb = FirebaseMember(
                         id = m.id.toString(),
                         householdId = householdId,
@@ -641,14 +767,38 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                         isDefault = m.isDefault,
                         sortOrder = m.sortOrder
                     )
-                    if (householdId.isNotBlank()) {
-                        firestoreSyncRepo.syncMember(householdId, fb)
-                    }
-                    if (uid.isNotBlank()) {
-                        firestoreSyncRepo.syncUserMember(uid, fb)
-                    }
+                    firestoreSyncRepo.syncMember(householdId, fb)
                 }
+                return
             }
+
+            // Every other household starts with its own distinct single member (the creator)
+            val myName = user?.displayName?.ifBlank { null }
+                ?: profile?.displayName?.ifBlank { null }
+                ?: (if (user?.email.isNullOrBlank()) "Εγώ" else user!!.email!!.substringBefore("@"))
+            val defaultMember = FamilyMember(
+                id = 1L,
+                name = myName,
+                role = "Γονέας",
+                avatarColorHex = 0xFF059669,
+                voiceKeywords = myName.lowercase(),
+                isDefault = true,
+                sortOrder = 0
+            )
+            repository.replaceAllMembers(listOf(defaultMember))
+            _allMembers.value = listOf(defaultMember)
+            val fb = FirebaseMember(
+                id = "1",
+                householdId = householdId,
+                userId = uid,
+                name = myName,
+                role = "Γονέας",
+                avatarColorHex = 0xFF059669,
+                voiceKeywords = myName.lowercase(),
+                isDefault = true,
+                sortOrder = 0
+            )
+            if (householdId.isNotBlank()) firestoreSyncRepo.syncMember(householdId, fb)
             return
         }
 
@@ -706,10 +856,29 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
 
-        val finalMembers = cleanMembers
+        val baseFinalMembers = cleanMembers
             .distinctBy { it.id }
             .sortedWith(compareBy<FamilyMember> { it.sortOrder }.thenBy { it.id })
             .mapIndexed { idx, m -> m.copy(sortOrder = idx) }
+
+        val finalMembers = if (baseFinalMembers.isEmpty()) {
+            val myName = user?.displayName?.ifBlank { null }
+                ?: profile?.displayName?.ifBlank { null }
+                ?: (if (user?.email.isNullOrBlank()) "Εγώ" else user!!.email!!.substringBefore("@"))
+            listOf(
+                FamilyMember(
+                    id = 1L,
+                    name = myName,
+                    role = "Γονέας",
+                    avatarColorHex = 0xFF059669,
+                    voiceKeywords = myName.lowercase(),
+                    isDefault = true,
+                    sortOrder = 0
+                )
+            )
+        } else {
+            baseFinalMembers
+        }
 
         if (hasCustomLocalSort && !hasCustomRemoteSort) {
             syncUpdatedMembersToCloud(finalMembers)
@@ -729,8 +898,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         if (areDifferent) {
             repository.replaceAllMembers(finalMembers)
-            _allMembers.value = finalMembers
         }
+        _allMembers.value = finalMembers
     }
 
     private suspend fun syncAndMergeCategories(
@@ -741,44 +910,48 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         val currentLocal = repository.getAllCategoriesList()
         val householdId = explicitHouseholdId ?: _currentHousehold.value?.id.orEmpty()
         val uid = explicitUserId ?: _currentUser.value?.uid.orEmpty()
+        val isMarios = isMariosUser(_currentUser.value, uid = uid)
 
-        val canonicalMap = com.example.data.seed.FirestoreDataSeed.categories.associateBy {
+        val canonicalList = if (isMarios && householdId == FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) {
+            FirestoreDataSeed.categories
+        } else {
+            STANDARD_DEFAULT_CATEGORIES
+        }
+
+        val canonicalMap = canonicalList.associateBy {
             GreekVoiceParser.normalizeGreek(it.name.trim().lowercase())
         }
 
-        if (incomingCats.isEmpty()) {
-            if (currentLocal.isNotEmpty()) {
-                currentLocal.forEach { cat ->
-                    val fbCat = FirebaseCategory(
-                        id = cat.id.toString(),
-                        householdId = householdId,
-                        userId = uid,
-                        name = cat.name,
-                        iconKey = cat.iconKey,
-                        monthlyBudget = cat.monthlyBudget,
-                        colorHex = cat.colorHex,
-                        voiceKeywords = cat.voiceKeywords,
-                        sortOrder = cat.sortOrder,
-                        fontColorHex = cat.fontColorHex
-                    )
-                    if (householdId.isNotBlank()) {
-                        firestoreSyncRepo.syncCategory(householdId, fbCat)
-                    }
-                    if (uid.isNotBlank()) {
-                        firestoreSyncRepo.syncUserCategory(uid, fbCat)
-                    }
+        val validIncomingCats = incomingCats.filter { it.name.isNotBlank() }
+
+        if (validIncomingCats.isEmpty()) {
+            repository.replaceAllCategories(canonicalList)
+            _allCategories.value = canonicalList
+            canonicalList.forEach { cat ->
+                val fbCat = FirebaseCategory(
+                    id = cat.id.toString(),
+                    householdId = householdId,
+                    userId = uid,
+                    name = cat.name,
+                    iconKey = cat.iconKey,
+                    monthlyBudget = cat.monthlyBudget,
+                    colorHex = cat.colorHex,
+                    voiceKeywords = cat.voiceKeywords,
+                    sortOrder = cat.sortOrder,
+                    fontColorHex = cat.fontColorHex
+                )
+                if (householdId.isNotBlank()) {
+                    firestoreSyncRepo.syncCategory(householdId, fbCat)
                 }
-            } else {
-                repository.replaceAllCategories(com.example.data.seed.FirestoreDataSeed.categories)
             }
             return
         }
 
-        val hasCustomRemoteSort = incomingCats.any { it.sortOrder > 0 }
+        val hasCustomRemoteSort = validIncomingCats.any { it.sortOrder > 0 }
         val hasCustomLocalSort = currentLocal.any { it.sortOrder > 0 }
 
         // Group incoming by normalized Greek name to prevent duplicate categories and ID shifting
-        val grouped = incomingCats
+        val grouped = validIncomingCats
             .filter { it.name.isNotBlank() }
             .groupBy { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) }
 
@@ -806,7 +979,15 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
 
-            val finalBudget = if (chosen.monthlyBudget > 0.0) chosen.monthlyBudget else (canonical?.monthlyBudget ?: 100.0)
+            // For standard non-Marios users: ensure default budgets are 0.0 unless explicitly created/modified by user
+            val finalBudget = if (isMarios) {
+                if (chosen.monthlyBudget > 0.0) chosen.monthlyBudget else (canonical?.monthlyBudget ?: 0.0)
+            } else {
+                // If it came from Marios seed budget (e.g. 450.0, 120.0, etc.), reset to 0.0
+                if (canonical != null && (chosen.monthlyBudget == 450.0 || chosen.monthlyBudget == 120.0 || chosen.monthlyBudget == 80.0 || chosen.monthlyBudget == 150.0 || chosen.monthlyBudget == 300.0)) {
+                    0.0
+                } else chosen.monthlyBudget
+            }
             val finalIcon = chosen.iconKey.ifBlank { canonical?.iconKey ?: "cart" }
             val finalColor = if (chosen.colorHex != 0L) chosen.colorHex else (canonical?.colorHex ?: 0xFF059669)
             val finalKeywords = chosen.voiceKeywords.ifBlank { canonical?.voiceKeywords ?: "" }
@@ -844,9 +1025,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-        val finalCategories = cleanCategories
+        val baseFinalCats = cleanCategories
             .sortedWith(compareBy<ExpenseCategory> { it.sortOrder }.thenBy { it.id })
             .mapIndexed { idx, cat -> cat.copy(sortOrder = idx) }
+
+        val finalCategories = if (baseFinalCats.isEmpty()) STANDARD_DEFAULT_CATEGORIES else baseFinalCats
 
         if (hasCustomLocalSort && !hasCustomRemoteSort) {
             syncUpdatedCategoriesToCloud(finalCategories)
@@ -866,8 +1049,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         if (areDifferent) {
             repository.replaceAllCategories(finalCategories)
-            _allCategories.value = finalCategories
         }
+        _allCategories.value = finalCategories
     }
 
     private suspend fun recoverAndSyncUserData(
@@ -879,37 +1062,27 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 val allHouseholdIds = (profile.householdIds + listOf(activeHouseholdId)).filter { it.isNotBlank() }.distinct()
 
-                // 1. RECOVER / RESTORE MEMBERS (Guarantee primary member and preserve all valid members)
+                // 1. RECOVER / RESTORE MEMBERS (Isolate strictly to active household)
                 val targetMembers = if (activeHouseholdId.isNotBlank()) {
-                    val hMembers = firestoreSyncRepo.getMembersOnce(activeHouseholdId)
-                    if (hMembers.isNotEmpty()) hMembers else firestoreSyncRepo.getAllMembersAcrossAllScopes(allHouseholdIds, user.uid)
+                    firestoreSyncRepo.getMembersOnce(activeHouseholdId)
                 } else {
-                    firestoreSyncRepo.getAllMembersAcrossAllScopes(allHouseholdIds, user.uid)
-                }
-                // Purge bad combination member names from remote
-                targetMembers.filter { isInvalidOrCombinationMember(it.name) }.forEach { badMember ->
-                    firestoreSyncRepo.deleteMemberFromAllScopes(badMember.id, allHouseholdIds, user.uid)
+                    emptyList()
                 }
                 syncAndMergeMembers(targetMembers, profile, user, activeHouseholdId)
 
-                // 2. RECOVER / RESTORE CATEGORIES (Guarantee standard categories + any custom categories)
+                // 2. RECOVER / RESTORE CATEGORIES (Isolate strictly to active household)
                 val targetCats = if (activeHouseholdId.isNotBlank()) {
-                    val hCats = firestoreSyncRepo.getCategoriesOnce(activeHouseholdId)
-                    if (hCats.isNotEmpty()) hCats else firestoreSyncRepo.getAllCategoriesAcrossAllScopes(allHouseholdIds, user.uid)
+                    firestoreSyncRepo.getCategoriesOnce(activeHouseholdId)
                 } else {
-                    firestoreSyncRepo.getAllCategoriesAcrossAllScopes(allHouseholdIds, user.uid)
+                    emptyList()
                 }
                 syncAndMergeCategories(targetCats, activeHouseholdId, user.uid)
 
-                // 3. RECOVER / SYNC SAVINGS GOALS
-                var remoteGoals = if (activeHouseholdId.isNotBlank()) {
+                // 3. RECOVER / SYNC SAVINGS GOALS (Isolate strictly to active household)
+                val remoteGoals = if (activeHouseholdId.isNotBlank()) {
                     firestoreSyncRepo.getSavingsGoalsOnce(activeHouseholdId)
-                } else emptyList()
-                if (remoteGoals.isEmpty()) {
-                    remoteGoals = firestoreSyncRepo.getUserSavingsGoalsOnce(user.uid)
-                }
-                if (remoteGoals.isEmpty() && profile.householdIds.isNotEmpty()) {
-                    remoteGoals = firestoreSyncRepo.fetchAllHouseholdSavingsGoals(profile.householdIds)
+                } else {
+                    firestoreSyncRepo.getUserSavingsGoalsOnce(user.uid)
                 }
 
                 if (remoteGoals.isNotEmpty()) {
@@ -926,38 +1099,16 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                             note = rg.note
                         )
                     }
-                    repository.insertSavingsGoals(domainGoals)
+                    repository.replaceAllSavingsGoals(domainGoals)
                 } else {
-                    val localGoals = repository.getAllSavingsGoalsList()
-                    localGoals.forEach { goal ->
-                        val fbGoal = FirebaseSavingsGoal(
-                            id = goal.id.toString(),
-                            householdId = activeHouseholdId,
-                            userId = user.uid,
-                            title = goal.title,
-                            targetAmount = goal.targetAmount,
-                            currentAmount = goal.currentAmount,
-                            deadlineDate = goal.deadlineDate,
-                            iconKey = goal.iconKey,
-                            colorHex = goal.colorHex,
-                            note = goal.note
-                        )
-                        if (activeHouseholdId.isNotBlank()) {
-                            firestoreSyncRepo.syncSavingsGoal(activeHouseholdId, fbGoal)
-                        }
-                        firestoreSyncRepo.syncUserSavingsGoal(user.uid, fbGoal)
-                    }
+                    repository.replaceAllSavingsGoals(emptyList())
                 }
 
-                // 4. RECOVER / SYNC RECURRING EXPENSES
-                var remoteRecurring = if (activeHouseholdId.isNotBlank()) {
+                // 4. RECOVER / SYNC RECURRING EXPENSES (Isolate strictly to active household)
+                val remoteRecurring = if (activeHouseholdId.isNotBlank()) {
                     firestoreSyncRepo.getRecurringExpensesOnce(activeHouseholdId)
-                } else emptyList()
-                if (remoteRecurring.isEmpty()) {
-                    remoteRecurring = firestoreSyncRepo.getUserRecurringExpensesOnce(user.uid)
-                }
-                if (remoteRecurring.isEmpty() && profile.householdIds.isNotEmpty()) {
-                    remoteRecurring = firestoreSyncRepo.fetchAllHouseholdRecurringExpenses(profile.householdIds)
+                } else {
+                    firestoreSyncRepo.getUserRecurringExpensesOnce(user.uid)
                 }
 
                 if (remoteRecurring.isNotEmpty()) {
@@ -983,75 +1134,59 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                             payerAmountsCsv = rr.payerAmountsCsv
                         )
                     }
-                    repository.insertRecurringExpenses(domainRecurring)
+                    repository.replaceAllRecurringExpenses(domainRecurring)
                 } else {
-                    val localRecurring = repository.getAllRecurringExpensesList()
-                    localRecurring.forEach { rr ->
-                        val fbRec = FirebaseRecurringExpense(
-                            id = rr.id.toString(),
-                            householdId = activeHouseholdId,
-                            userId = user.uid,
-                            title = rr.title,
-                            amount = rr.amount,
-                            categoryId = rr.categoryId,
-                            categoryName = rr.categoryName,
-                            frequency = rr.frequency,
-                            dayOfMonth = rr.dayOfMonth,
-                            splitType = rr.splitType,
-                            memberIdsCsv = rr.memberIdsCsv,
-                            memberNamesDisplay = rr.memberNamesDisplay,
-                            note = rr.note,
-                            isActive = rr.isActive,
-                            lastGeneratedMonth = rr.lastGeneratedMonth,
-                            payerMemberId = rr.payerMemberId,
-                            payerMemberName = rr.payerMemberName,
-                            payerMemberIdsCsv = rr.payerMemberIdsCsv,
-                            payerAmountsCsv = rr.payerAmountsCsv
-                        )
-                        if (activeHouseholdId.isNotBlank()) {
-                            firestoreSyncRepo.syncRecurringExpense(activeHouseholdId, fbRec)
-                        }
-                        firestoreSyncRepo.syncUserRecurringExpense(user.uid, fbRec)
-                    }
+                    repository.replaceAllRecurringExpenses(emptyList())
                 }
 
-                // 5. RECOVER / RESTORE EXPENSES (Zero Data Loss across all household IDs & user mirror)
+                // 5. RECOVER / RESTORE EXPENSES (Zero Data Loss across household scope)
                 val allCloudExpenses = firestoreSyncRepo.getAllExpensesAcrossAllScopes(allHouseholdIds, user.uid)
-                if (allCloudExpenses.isNotEmpty()) {
-                    val activeHouseholdExpenses = allCloudExpenses.filter { it.householdId == activeHouseholdId }
-                    val expensesToShow = if (activeHouseholdExpenses.isNotEmpty()) activeHouseholdExpenses else allCloudExpenses
-                    updateCombinedExpenses(householdList = expensesToShow, userList = allCloudExpenses, targetHid = activeHouseholdId)
+                val isMarios = isMariosUser(user)
+                val userUid = user.uid
+                val mariosUids = setOf(
+                    com.example.data.seed.FirestoreDataSeed.DEFAULT_USER_UID,
+                    "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63",
+                    "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"
+                )
+                val filteredCloudExpenses = if (!isMarios) {
+                    allCloudExpenses.filter { exp ->
+                        exp.householdId == activeHouseholdId && (exp.createdByUid.isBlank() || exp.createdByUid == userUid)
+                    }
+                } else {
+                    allCloudExpenses.filter { exp ->
+                        (exp.householdId == activeHouseholdId || (exp.householdId.isBlank() && _userHouseholds.value.size <= 1)) &&
+                        (exp.createdByUid.isBlank() || mariosUids.contains(exp.createdByUid))
+                    }
                 }
 
-                // 6. RECOVER / RESTORE INCOMES (Zero Data Loss across all household IDs & user mirror)
-                val allCloudIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHouseholdIds, user.uid)
-                if (allCloudIncomes.isNotEmpty()) {
-                    updateCombinedIncomes(householdList = allCloudIncomes, userList = allCloudIncomes, targetHid = activeHouseholdId)
+                if (filteredCloudExpenses.isNotEmpty()) {
+                    updateCombinedExpenses(householdList = filteredCloudExpenses, userList = filteredCloudExpenses, targetHid = activeHouseholdId)
                 } else {
-                    val localIncomes = repository.getAllIncomesList()
-                    if (localIncomes.isNotEmpty()) {
-                        localIncomes.forEach { inc ->
-                            val docId = inc.cloudId.ifBlank { "inc_${inc.id}_${java.util.UUID.randomUUID()}" }
-                            val isMarios = isMariosUser(user)
-                            val fbInc = FirebaseIncome(
-                                id = docId,
-                                householdId = activeHouseholdId.ifBlank { if (isMarios) com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID else "" },
-                                title = inc.title,
-                                amount = inc.amount,
-                                memberId = inc.memberId,
-                                memberName = inc.memberName,
-                                category = inc.category,
-                                timestamp = inc.timestamp,
-                                note = inc.note,
-                                createdByUid = user.uid,
-                                createdByName = user.displayName ?: "Χρήστης"
-                            )
-                            if (activeHouseholdId.isNotBlank()) {
-                                firestoreSyncRepo.syncIncome(fbInc)
-                            }
-                            firestoreSyncRepo.syncUserIncome(user.uid, fbInc)
-                        }
+                    _allExpenses.value = emptyList()
+                    repository.replaceAllExpenses(emptyList())
+                }
+
+                // 6. RECOVER / RESTORE INCOMES (Zero Data Loss across household scope)
+                val allCloudIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHouseholdIds, user.uid)
+                val mariosHids = setOf(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
+                val filteredCloudIncomes = if (!isMarios) {
+                    allCloudIncomes.filter { inc ->
+                        !mariosHids.contains(inc.householdId) &&
+                        (inc.createdByUid.isBlank() || inc.createdByUid == userUid) &&
+                        inc.householdId == activeHouseholdId
                     }
+                } else {
+                    allCloudIncomes.filter { inc ->
+                        (inc.householdId == activeHouseholdId || (inc.householdId.isBlank() && _userHouseholds.value.size <= 1)) &&
+                        (inc.createdByUid.isBlank() || mariosUids.contains(inc.createdByUid))
+                    }
+                }
+
+                if (filteredCloudIncomes.isNotEmpty()) {
+                    updateCombinedIncomes(householdList = filteredCloudIncomes, userList = filteredCloudIncomes, targetHid = activeHouseholdId)
+                } else {
+                    _allIncomes.value = emptyList()
+                    repository.replaceAllIncomes(emptyList())
                 }
 
                 // Check and execute any due standing orders
@@ -1195,7 +1330,33 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             lastUserExpenses
         }
 
-        val combined = (lastHouseholdExpenses + relevantUserExpenses)
+        val user = _currentUser.value
+        val isMarios = isMariosUser(user)
+        val userUid = user?.uid.orEmpty()
+        val mariosHids = setOf(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
+        val mariosUids = setOf(
+            com.example.data.seed.FirestoreDataSeed.DEFAULT_USER_UID,
+            "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63",
+            "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"
+        )
+
+        val rawList = (lastHouseholdExpenses + relevantUserExpenses).filter { exp ->
+            if (currentHid.isNotBlank()) {
+                exp.householdId == currentHid || (exp.householdId.isBlank() && _userHouseholds.value.size <= 1)
+            } else true
+        }
+        val filteredExpenses = if (!isMarios) {
+            rawList.filter { exp ->
+                !mariosHids.contains(exp.householdId) &&
+                (exp.createdByUid.isBlank() || exp.createdByUid == userUid)
+            }
+        } else {
+            rawList.filter { exp ->
+                exp.createdByUid.isBlank() || mariosUids.contains(exp.createdByUid)
+            }
+        }
+
+        val combined = filteredExpenses
             .distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
             .sortedWith(
                 compareByDescending<FirebaseExpense> { it.timestamp }
@@ -1203,19 +1364,27 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     .thenByDescending { it.id }
             )
 
-        if (combined.isNotEmpty()) {
-            val domain = mapFirebaseExpensesToDomain(combined)
+        val domain = mapFirebaseExpensesToDomain(combined)
+        val recentLocal = _allExpenses.value.filter { local ->
+            local.cloudId.isNotBlank() && (System.currentTimeMillis() - local.timestamp < 120_000L) &&
+            domain.none { it.cloudId == local.cloudId || (it.title == local.title && Math.abs(it.timestamp - local.timestamp) < 5000 && Math.abs(it.amount - local.amount) < 0.01) }
+        }
+        val finalExpenses = (domain + recentLocal).sortedWith(
+            compareByDescending<Expense> { it.timestamp }.thenByDescending { it.id }
+        )
+
+        if (finalExpenses.isNotEmpty()) {
             val current = _allExpenses.value
-            val isSame = current.size == domain.size && current.zip(domain).all { (a, b) ->
+            val isSame = current.size == finalExpenses.size && current.zip(finalExpenses).all { (a, b) ->
                 a.id == b.id && a.amount == b.amount && a.title == b.title && a.categoryId == b.categoryId && a.timestamp == b.timestamp
             }
             if (!isSame) {
-                _allExpenses.value = domain
+                _allExpenses.value = finalExpenses
                 _isInitialExpensesLoading.value = false
                 prefs.edit().putBoolean("has_entered_any_expense", true).apply()
                 viewModelScope.launch {
                     try {
-                        repository.replaceAllExpenses(domain)
+                        repository.replaceAllExpenses(finalExpenses)
                     } catch (e: Exception) {
                         Log.d("OikoNomosVM", "Room cache combined expenses: ${e.message}")
                     }
@@ -1242,9 +1411,18 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         if (householdList != null) lastHouseholdIncomes = householdList
         if (userList != null) lastUserIncomes = userList
 
-        val relevantUserIncomes = lastUserIncomes
+        val relevantUserIncomes = if (currentHid.isNotBlank()) {
+            lastUserIncomes.filter { it.householdId == currentHid || (it.householdId.isBlank() && _userHouseholds.value.size <= 1) }
+        } else {
+            lastUserIncomes
+        }
 
         val combinedRemote = (lastHouseholdIncomes + relevantUserIncomes)
+            .filter { inc ->
+                if (currentHid.isNotBlank()) {
+                    inc.householdId == currentHid || (inc.householdId.isBlank() && _userHouseholds.value.size <= 1)
+                } else true
+            }
             .distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
             .sortedWith(
                 compareByDescending<FirebaseIncome> { it.timestamp }
@@ -1252,49 +1430,34 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     .thenByDescending { it.id }
             )
 
-        val domainRemote = mapFirebaseIncomesToDomain(combinedRemote)
+        val user = _currentUser.value
+        val isMarios = isMariosUser(user)
+        val userUid = user?.uid.orEmpty()
+        val mariosHids = setOf(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
+        val mariosUids = setOf(
+            com.example.data.seed.FirestoreDataSeed.DEFAULT_USER_UID,
+            "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63",
+            "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"
+        )
 
-        // ZERO DATA LOSS GUARANTEE:
-        // Merge with local Room / in-memory incomes so any incomes entered locally or yesterday are NEVER lost or wiped!
-        val currentLocal = if (_allIncomes.value.isNotEmpty()) _allIncomes.value else emptyList()
-        val mergedList = domainRemote.toMutableList()
-
-        for (local in currentLocal) {
-            val existsInRemote = mergedList.any {
-                (it.cloudId.isNotBlank() && local.cloudId.isNotBlank() && it.cloudId == local.cloudId) ||
-                (it.id > 0 && local.id > 0 && it.id == local.id) ||
-                (it.title == local.title && Math.abs(it.timestamp - local.timestamp) < 5000 && Math.abs(it.amount - local.amount) < 0.01)
+        val filteredRemote = if (!isMarios) {
+            combinedRemote.filter { inc ->
+                !mariosHids.contains(inc.householdId) &&
+                (inc.createdByUid.isBlank() || inc.createdByUid == userUid)
             }
-            if (!existsInRemote) {
-                mergedList.add(local)
-                // Mirror local income to cloud in background
-                viewModelScope.launch {
-                    val user = _currentUser.value
-                    val isMarios = isMariosUser(user)
-                    val fallbackHid = if (isMarios) com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID else ""
-                    val docId = local.cloudId.ifBlank { "inc_${local.id}_${java.util.UUID.randomUUID()}" }
-                    val fbInc = FirebaseIncome(
-                        id = docId,
-                        householdId = currentHid.ifBlank { fallbackHid },
-                        title = local.title,
-                        amount = local.amount,
-                        memberId = local.memberId,
-                        memberName = local.memberName,
-                        category = local.category,
-                        timestamp = local.timestamp,
-                        note = local.note,
-                        createdByUid = user?.uid ?: "",
-                        createdByName = user?.displayName ?: "Χρήστης"
-                    )
-                    if (currentHid.isNotBlank()) {
-                        firestoreSyncRepo.syncIncome(fbInc)
-                    }
-                    if (user != null) {
-                        firestoreSyncRepo.syncUserIncome(user.uid, fbInc)
-                    }
-                }
+        } else {
+            combinedRemote.filter { inc ->
+                inc.createdByUid.isBlank() || mariosUids.contains(inc.createdByUid)
             }
         }
+
+        val domainRemote = mapFirebaseIncomesToDomain(filteredRemote)
+        val recentLocalIncomes = _allIncomes.value.filter { local ->
+            local.cloudId.isNotBlank() && (System.currentTimeMillis() - local.timestamp < 120_000L) &&
+            domainRemote.none { it.cloudId == local.cloudId || (it.title == local.title && Math.abs(it.timestamp - local.timestamp) < 5000 && Math.abs(it.amount - local.amount) < 0.01) }
+        }
+
+        val mergedList = (domainRemote + recentLocalIncomes).toMutableList()
 
         val dedupedList = mergedList
             .distinctBy { it.cloudId.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
@@ -1334,9 +1497,61 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
         } else {
-            if (householdList != null && userList != null && currentLocal.isEmpty()) {
-                _allIncomes.value = emptyList()
+            val safeRecent = _allIncomes.value.filter { local ->
+                local.cloudId.isNotBlank() && (System.currentTimeMillis() - local.timestamp < 120_000L)
             }
+            if (safeRecent.isNotEmpty()) {
+                _allIncomes.value = safeRecent
+            } else if (householdList != null && (userList != null || lastUserIncomes.isEmpty())) {
+                _allIncomes.value = emptyList()
+                viewModelScope.launch {
+                    try {
+                        repository.replaceAllIncomes(emptyList())
+                    } catch (e: Exception) {
+                        Log.d("OikoNomosVM", "Room clear incomes: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    private var lastHouseholdMembers = listOf<FirebaseMember>()
+    private var lastUserMembers = listOf<FirebaseMember>()
+
+    @Synchronized
+    private fun updateCombinedMembers(
+        householdList: List<FirebaseMember>? = null,
+        userList: List<FirebaseMember>? = null,
+        targetHid: String? = null
+    ) {
+        val currentHid = targetHid ?: _currentHousehold.value?.id.orEmpty()
+        if (householdList != null) lastHouseholdMembers = householdList
+
+        val combined = lastHouseholdMembers.distinctBy {
+            it.id.ifBlank { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) }
+        }
+        viewModelScope.launch {
+            syncAndMergeMembers(combined, explicitHouseholdId = currentHid)
+        }
+    }
+
+    private var lastHouseholdCategories = listOf<FirebaseCategory>()
+    private var lastUserCategories = listOf<FirebaseCategory>()
+
+    @Synchronized
+    private fun updateCombinedCategories(
+        householdList: List<FirebaseCategory>? = null,
+        userList: List<FirebaseCategory>? = null,
+        targetHid: String? = null
+    ) {
+        val currentHid = targetHid ?: _currentHousehold.value?.id.orEmpty()
+        if (householdList != null) lastHouseholdCategories = householdList
+
+        val combined = lastHouseholdCategories.distinctBy {
+            it.id.ifBlank { GreekVoiceParser.normalizeGreek(it.name.trim().lowercase()) }
+        }
+        viewModelScope.launch {
+            syncAndMergeCategories(combined, explicitHouseholdId = currentHid)
         }
     }
 
@@ -1361,10 +1576,38 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                                 householdId = remoteProfile.householdId.ifBlank { current?.householdId ?: "" },
                                 householdIds = if (remoteProfile.householdIds.isNotEmpty()) remoteProfile.householdIds else current?.householdIds.orEmpty(),
                                 photoUrl = remoteProfile.photoUrl.ifBlank { current?.photoUrl ?: "" },
-                                isPremium = remoteProfile.isPremium || (current?.isPremium == true)
+                                isPremium = if (isMariosUser(uid = userId)) true else remoteProfile.isPremium,
+                                appLanguage = remoteProfile.appLanguage.ifBlank { current?.appLanguage ?: "EL" },
+                                themeMode = remoteProfile.themeMode.ifBlank { current?.themeMode ?: "SYSTEM" },
+                                reminderEnabled = remoteProfile.reminderEnabled,
+                                reminderHour = remoteProfile.reminderHour,
+                                reminderMinute = remoteProfile.reminderMinute,
+                                notificationConsentCompleted = remoteProfile.notificationConsentCompleted || (current?.notificationConsentCompleted ?: false)
                             )
                             _userProfile.value = merged
                             saveUserProfileToPrefs(merged)
+                            if (remoteProfile.appLanguage.isNotBlank() && remoteProfile.appLanguage != _appLanguage.value) {
+                                setAppLanguage(remoteProfile.appLanguage, syncToCloud = false)
+                            }
+                            if (remoteProfile.themeMode.isNotBlank() && remoteProfile.themeMode != _themeMode.value) {
+                                setThemeMode(remoteProfile.themeMode, syncToCloud = false)
+                            }
+                            if (remoteProfile.notificationConsentCompleted && !_notificationConsentCompleted.value) {
+                                _notificationConsentCompleted.value = true
+                                prefs.edit().putBoolean("notification_consent_handled_$userId", true).apply()
+                            }
+                            if (remoteProfile.reminderEnabled != _dailyReminderEnabled.value ||
+                                remoteProfile.reminderHour != _dailyReminderHour.value ||
+                                remoteProfile.reminderMinute != _dailyReminderMinute.value) {
+                                _dailyReminderEnabled.value = remoteProfile.reminderEnabled
+                                _dailyReminderHour.value = remoteProfile.reminderHour
+                                _dailyReminderMinute.value = remoteProfile.reminderMinute
+                                DailyReminderManager.setReminderEnabled(getApplication(), remoteProfile.reminderEnabled)
+                                DailyReminderManager.setReminderTime(getApplication(), remoteProfile.reminderHour, remoteProfile.reminderMinute)
+                                if (remoteProfile.reminderEnabled) {
+                                    DailyReminderManager.scheduleDailyReminder(getApplication(), remoteProfile.reminderHour, remoteProfile.reminderMinute)
+                                }
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -1403,32 +1646,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         userMembersSyncJob?.cancel()
-        userMembersSyncJob = viewModelScope.launch(coroutineExceptionHandler) {
-            while (isActive) {
-                try {
-                    firestoreSyncRepo.observeUserMembers(userId).collect { remoteMembers ->
-                        syncAndMergeMembers(remoteMembers)
-                    }
-                } catch (e: Exception) {
-                    Log.w("OikoNomosVM", "UserMembers listener reconnecting: ${e.message}")
-                    delay(3000)
-                }
-            }
-        }
-
         userCategoriesSyncJob?.cancel()
-        userCategoriesSyncJob = viewModelScope.launch(coroutineExceptionHandler) {
-            while (isActive) {
-                try {
-                    firestoreSyncRepo.observeUserCategories(userId).collect { remoteCats ->
-                        syncAndMergeCategories(remoteCats)
-                    }
-                } catch (e: Exception) {
-                    Log.w("OikoNomosVM", "UserCategories listener reconnecting: ${e.message}")
-                    delay(3000)
-                }
-            }
-        }
 
         userSavingsGoalsSyncJob?.cancel()
         userSavingsGoalsSyncJob = viewModelScope.launch(coroutineExceptionHandler) {
@@ -1551,6 +1769,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                         updateCombinedExpenses(householdList = matching, targetHid = householdId)
                     } else if (allExpenses.isNotEmpty() && isMarios && householdId == com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) {
                         updateCombinedExpenses(householdList = allExpenses, targetHid = householdId)
+                    } else {
+                        updateCombinedExpenses(householdList = emptyList(), targetHid = householdId)
                     }
                 }
             } catch (e: Exception) {
@@ -1585,13 +1805,21 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
             try {
                 val direct = firestoreSyncRepo.getIncomesOnce(householdId)
-                val isMarios = isMariosUser()
-                val extraHids = if (isMarios) listOf("3e9a25a0-2e7", "e1d4ae67-499") else emptyList()
-                val allHids = (_userProfile.value?.householdIds.orEmpty() + listOf(householdId) + extraHids).filter { it.isNotBlank() }.distinct()
-                val allIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHids, _currentUser.value?.uid.orEmpty())
-                val combinedDirect = (direct + allIncomes).distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
-                if (combinedDirect.isNotEmpty()) {
-                    updateCombinedIncomes(householdList = combinedDirect, userList = allIncomes, targetHid = householdId)
+                if (direct.isNotEmpty()) {
+                    updateCombinedIncomes(householdList = direct, targetHid = householdId)
+                } else {
+                    val isMarios = isMariosUser()
+                    val extraHids = if (isMarios) listOf("3e9a25a0-2e7", "e1d4ae67-499") else emptyList()
+                    val allHids = (_userProfile.value?.householdIds.orEmpty() + listOf(householdId) + extraHids).filter { it.isNotBlank() }.distinct()
+                    val allIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHids, _currentUser.value?.uid.orEmpty())
+                    val matching = allIncomes.filter { it.householdId == householdId }
+                    if (matching.isNotEmpty()) {
+                        updateCombinedIncomes(householdList = matching, targetHid = householdId)
+                    } else if (allIncomes.isNotEmpty() && isMarios && householdId == com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) {
+                        updateCombinedIncomes(householdList = allIncomes, targetHid = householdId)
+                    } else {
+                        updateCombinedIncomes(householdList = emptyList(), targetHid = householdId)
+                    }
                 }
             } catch (e: Exception) {
                 Log.w("OikoNomosVM", "Initial direct incomes fetch: ${e.message}")
@@ -1614,7 +1842,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             while (isActive) {
                 try {
                     firestoreSyncRepo.observeMembers(householdId).collect { remoteMembers ->
-                        syncAndMergeMembers(remoteMembers, explicitHouseholdId = householdId)
+                        updateCombinedMembers(householdList = remoteMembers, targetHid = householdId)
                     }
                 } catch (e: Exception) {
                     Log.w("OikoNomosVM", "Members listener reconnecting: ${e.message}")
@@ -1628,7 +1856,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             while (isActive) {
                 try {
                     firestoreSyncRepo.observeCategories(householdId).collect { remoteCats ->
-                        syncAndMergeCategories(remoteCats, explicitHouseholdId = householdId)
+                        updateCombinedCategories(householdList = remoteCats, targetHid = householdId)
                     }
                 } catch (e: Exception) {
                     Log.w("OikoNomosVM", "Categories listener reconnecting: ${e.message}")
@@ -1731,14 +1959,16 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 firestoreSyncRepo.enableNetwork()
                 val household = _currentHousehold.value
-                val allHids = (_userProfile.value?.householdIds.orEmpty() + listOfNotNull(household?.id)).filter { it.isNotBlank() }.distinct()
-                val freshExpenses = firestoreSyncRepo.getAllExpensesAcrossAllScopes(allHids, user.uid)
-                if (freshExpenses.isNotEmpty()) {
-                    updateCombinedExpenses(householdList = freshExpenses, userList = freshExpenses)
-                }
-                val freshIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHids, user.uid)
-                if (freshIncomes.isNotEmpty()) {
-                    updateCombinedIncomes(householdList = freshIncomes, userList = freshIncomes)
+                val activeHid = household?.id.orEmpty()
+                if (activeHid.isNotBlank()) {
+                    val freshExpenses = firestoreSyncRepo.getExpensesOnce(activeHid)
+                    if (freshExpenses.isNotEmpty()) {
+                        updateCombinedExpenses(householdList = freshExpenses, targetHid = activeHid)
+                    }
+                    val freshIncomes = firestoreSyncRepo.getIncomesOnce(activeHid)
+                    if (freshIncomes.isNotEmpty()) {
+                        updateCombinedIncomes(householdList = freshIncomes, targetHid = activeHid)
+                    }
                 }
                 if (household != null && household.id.isNotBlank()) {
                     if (expensesSyncJob?.isActive != true || incomesSyncJob?.isActive != true) {
@@ -1765,7 +1995,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 val household = firestoreSyncRepo.createHousehold(user.uid, familyName)
                 _currentHousehold.value = household
                 observeHouseholdData(household.id)
-                showSnackbar("Δημιουργήθηκε: ${household.name}! Κωδικός: ${household.inviteCode}")
+                showSnackbar("Δημιουργήθηκε το εξοδολόγιο: ${household.name}!")
             } catch (e: Exception) {
                 showSnackbar("Σφάλμα δημιουργίας: ${e.message}")
             } finally {
@@ -1795,12 +2025,108 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun inviteMemberByEmail(email: String) {
+    fun inviteMemberByEmail(email: String, context: Context? = null) {
         val hid = _currentHousehold.value?.id ?: return
+        val cleanEmail = email.trim()
+        val isEn = _appLanguage.value == "EN"
+
+        if (cleanEmail.isBlank() || !cleanEmail.contains("@") || !cleanEmail.contains(".")) {
+            showSnackbar(if (isEn) "Please enter a valid email address" else "Παρακαλώ εισάγετε έγκυρη διεύθυνση email")
+            return
+        }
+
+        // Pro check: inviting a member to an existing household is a Pro feature
+        val isUserPro = _userProfile.value?.isPremium == true || isMariosUser() || _currentHousehold.value?.isPremium == true
+        if (!isUserPro) {
+            showPremiumPaywall("invite_member")
+            return
+        }
+
         viewModelScope.launch {
             try {
-                firestoreSyncRepo.inviteMemberToHousehold(hid, email.trim())
-                showSnackbar("Η πρόσκληση στάλθηκε επιτυχώς")
+                firestoreSyncRepo.inviteMemberToHousehold(hid, cleanEmail)
+
+                // Update current household state immediately
+                val currentH = _currentHousehold.value
+                if (currentH != null && currentH.id == hid) {
+                    val updated = (currentH.invitedEmails + cleanEmail).distinct()
+                    _currentHousehold.value = currentH.copy(invitedEmails = updated)
+                }
+
+                // Refresh user households list from cloud
+                val user = _currentUser.value
+                if (user != null) {
+                    val hids = firestoreSyncRepo.discoverUserHouseholds(user.uid, user.email ?: "")
+                    val loaded = firestoreSyncRepo.fetchUserHouseholds(hids)
+                    if (loaded.isNotEmpty()) {
+                        _userHouseholds.value = loaded
+                    }
+                }
+
+                // Dispatch Email Invitation Intent to notify the invited user
+                if (context != null) {
+                    val inviterName = _currentUser.value?.displayName?.ifBlank { _userProfile.value?.displayName }?.ifBlank { null }
+                        ?: (if (isEn) "A family member" else "Ένα μέλος")
+                    val householdName = _currentHousehold.value?.name ?: (if (isEn) "Household" else "Εξοδολόγιο")
+                    val playStoreLink = "https://play.google.com/store/apps/details?id=com.aistudio.oikonomos.app"
+
+                    val subject = if (isEn)
+                        "Invitation to household \"$householdName\" on Fintel"
+                    else
+                        "Πρόσκληση στο εξοδολόγιο «$householdName» στην εφαρμογή Fintel"
+
+                    val body = if (isEn) """
+                        Hello!
+
+                        $inviterName has invited you to join the household "$householdName" on the Fintel expense tracker app.
+
+                        Download Fintel on Google Play Store here:
+                        $playStoreLink
+
+                        Sign in with this email address ($cleanEmail) and "$householdName" will automatically appear in your available households!
+                    """.trimIndent() else """
+                        Γεια σας!
+
+                        Ο/Η $inviterName σας πρόσθεσε στο εξοδολόγιο «$householdName» στην εφαρμογή διαχείρισης εξόδων Fintel.
+
+                        Κατεβάστε την εφαρμογή Fintel από το Google Play Store εδώ:
+                        $playStoreLink
+
+                        Συνδεθείτε στην εφαρμογή με αυτό το email ($cleanEmail) και το εξοδολόγιο «$householdName» θα εμφανιστεί αυτόματα στα διαθέσιμα εξοδολόγιά σας!
+                    """.trimIndent()
+
+                    val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:$cleanEmail")
+                        putExtra(Intent.EXTRA_EMAIL, arrayOf(cleanEmail))
+                        putExtra(Intent.EXTRA_SUBJECT, subject)
+                        putExtra(Intent.EXTRA_TEXT, body)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+
+                    try {
+                        context.startActivity(emailIntent)
+                    } catch (_: Exception) {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_EMAIL, arrayOf(cleanEmail))
+                            putExtra(Intent.EXTRA_SUBJECT, subject)
+                            putExtra(Intent.EXTRA_TEXT, body)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        try {
+                            context.startActivity(Intent.createChooser(shareIntent, if (isEn) "Send Invitation" else "Αποστολή Πρόσκλησης").apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            })
+                        } catch (_: Exception) {}
+                    }
+                }
+
+                showSnackbar(
+                    if (isEn)
+                        "Invitation saved for $cleanEmail and email prepared!"
+                    else
+                        "Η πρόσκληση για $cleanEmail καταχωρήθηκε στη βάση και ετοιμάστηκε το email!"
+                )
             } catch (e: Exception) {
                 showSnackbar("Σφάλμα πρόσκλησης: ${e.message}")
             }
@@ -1924,49 +2250,28 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     fun sendPasswordResetEmail(email: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val clean = email.trim()
         if (clean.isBlank()) {
-            onError("Παρακαλώ εισάγετε το email σας")
+            onError(if (_appLanguage.value == "EN") "Please enter your email" else "Παρακαλώ εισάγετε το email σας")
             return
         }
         _isAuthLoading.value = true
-        viewModelScope.launch {
-            try {
-                val registeredUser = firestoreSyncRepo.findUserByEmail(clean)
-                if (registeredUser == null) {
-                    _isAuthLoading.value = false
-                    onError("Δεν βρέθηκε εγγεγραμμένος λογαριασμός με το email «$clean». Βεβαιωθείτε ότι το πληκτρολογήσατε σωστά ή αν είχατε συνδεθεί με Google Sign-In.")
-                    return@launch
-                }
-                val targetEmail = registeredUser.email.ifBlank { clean }
-                auth.setLanguageCode(if (_appLanguage.value == "EN") "en" else "el")
-                auth.sendPasswordResetEmail(targetEmail)
-                    .addOnSuccessListener {
-                        _isAuthLoading.value = false
-                        showSnackbar("Στάλθηκε email επαναφοράς κωδικού στο $targetEmail!")
-                        onSuccess()
-                    }
-                    .addOnFailureListener { exc ->
-                        _isAuthLoading.value = false
-                        val msg = when {
-                            exc.message?.contains("user-not-found") == true -> "Δεν βρέθηκε λογαριασμός με αυτό το email"
-                            exc.message?.contains("invalid-email") == true -> "Μη έγκυρη μορφή email"
-                            else -> exc.localizedMessage ?: "Σφάλμα αποστολής email"
-                        }
-                        onError(msg)
-                    }
-            } catch (e: Exception) {
-                auth.setLanguageCode(if (_appLanguage.value == "EN") "en" else "el")
-                auth.sendPasswordResetEmail(clean)
-                    .addOnSuccessListener {
-                        _isAuthLoading.value = false
-                        showSnackbar("Στάλθηκε email επαναφοράς κωδικού!")
-                        onSuccess()
-                    }
-                    .addOnFailureListener { exc ->
-                        _isAuthLoading.value = false
-                        onError(exc.localizedMessage ?: "Σφάλμα αποστολής email")
-                    }
+        auth.setLanguageCode(if (_appLanguage.value == "EN") "en" else "el")
+        auth.sendPasswordResetEmail(clean)
+            .addOnSuccessListener {
+                _isAuthLoading.value = false
+                showSnackbar(if (_appLanguage.value == "EN") "Password reset link sent to $clean!" else "Στάλθηκε σύνδεσμος επαναφοράς κωδικού στο $clean!")
+                onSuccess()
             }
-        }
+            .addOnFailureListener { exc ->
+                _isAuthLoading.value = false
+                val msg = when {
+                    exc.message?.contains("user-not-found") == true ->
+                        if (_appLanguage.value == "EN") "No account found with this email" else "Δεν βρέθηκε λογαριασμός με αυτό το email"
+                    exc.message?.contains("invalid-email") == true ->
+                        if (_appLanguage.value == "EN") "Invalid email address" else "Μη έγκυρη μορφή email"
+                    else -> exc.localizedMessage ?: (if (_appLanguage.value == "EN") "Error sending reset email" else "Σφάλμα αποστολής email")
+                }
+                onError(msg)
+            }
     }
 
     /**
@@ -2168,19 +2473,38 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                                     city = city.trim()
                                 )
                                 _userProfile.value = createdProfile
+                                saveUserProfileToPrefs(createdProfile)
+
+                                val initialHid = createdProfile.householdId.ifBlank { "household_${user.uid}" }
+                                val safeHousehold = Household(
+                                    id = initialHid,
+                                    name = "Το Εξοδολόγιό μου",
+                                    ownerId = user.uid,
+                                    memberUids = listOf(user.uid)
+                                )
+                                _currentHousehold.value = safeHousehold
+                                _userHouseholds.value = listOf(safeHousehold)
+                                prefs.edit()
+                                    .putString("user_household_${user.uid}", initialHid)
+                                    .putString("last_household_id", initialHid)
+                                    .apply()
+
+                                // Fully load profile, setup listeners & sanitization
+                                loadUserProfileAndHousehold(user)
                             } catch (e: Exception) {
                                 Log.e("OikoNomosVM", "Error storing profile during sign up", e)
+                            } finally {
+                                try {
+                                    auth.setLanguageCode(if (_appLanguage.value == "EN") "en" else "el")
+                                    user.sendEmailVerification()
+                                } catch (_: Exception) {}
+                                _isAuthLoading.value = false
+                                _currentUser.value = user
+                                _isUserVerifiedState.value = true
+                                showSnackbar("Καλώς ήρθατε!")
+                                onSuccess()
                             }
                         }
-
-                        // Send verification email
-                        auth.setLanguageCode(if (_appLanguage.value == "EN") "en" else "el")
-                        user.sendEmailVerification()
-                        _isAuthLoading.value = false
-                        _currentUser.value = user
-                        _isUserVerifiedState.value = true
-                        showSnackbar("Καλώς ήρθατε!")
-                        onSuccess()
                     }
                 } else {
                     _isAuthLoading.value = false
@@ -2228,19 +2552,28 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         clearUserProfileFromPrefs()
         prefs.edit()
             .remove("last_household_id")
+            .remove("cached_active_uid")
             .remove("has_entered_any_expense")
             .apply()
         cancelAllSyncJobs()
         lastObservedHouseholdId = null
+        lastHouseholdExpenses = emptyList()
+        lastUserExpenses = emptyList()
+        lastHouseholdIncomes = emptyList()
+        lastUserIncomes = emptyList()
+        lastHouseholdMembers = emptyList()
+        lastUserMembers = emptyList()
+        lastHouseholdCategories = emptyList()
+        lastUserCategories = emptyList()
         _allExpenses.value = emptyList()
         _allIncomes.value = emptyList()
         _allMembers.value = emptyList()
         _allCategories.value = emptyList()
         viewModelScope.launch {
-            if (com.example.data.safety.DataSafetyGuard.validateDestructiveOperation(
-                    com.example.data.safety.DataSafetyGuard.DestructionReason.EXPLICIT_SIGN_OUT
-                )) {
+            try {
                 repository.clearAllData() // Clean wipe Room so next user starts 100% clean
+            } catch (e: Exception) {
+                Log.w("OikoNomosVM", "Error clearing Room on signOut: ${e.message}")
             }
         }
         showSnackbar("Αποσυνδεθήκατε επιτυχώς")
@@ -2256,13 +2589,16 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         _showOnboardingCarousel.value = false
         _notificationConsentCompleted.value = false
         prefs.edit().clear().apply()
-        householdJob?.cancel()
-        expensesSyncJob?.cancel()
-        userExpensesSyncJob?.cancel()
-        incomesSyncJob?.cancel()
-        userIncomesSyncJob?.cancel()
-        membersSyncJob?.cancel()
-        categoriesSyncJob?.cancel()
+        cancelAllSyncJobs()
+        lastObservedHouseholdId = null
+        lastHouseholdExpenses = emptyList()
+        lastUserExpenses = emptyList()
+        lastHouseholdIncomes = emptyList()
+        lastUserIncomes = emptyList()
+        lastHouseholdMembers = emptyList()
+        lastUserMembers = emptyList()
+        lastHouseholdCategories = emptyList()
+        lastUserCategories = emptyList()
         _allExpenses.value = emptyList()
         _allIncomes.value = emptyList()
         _allMembers.value = emptyList()
@@ -2277,17 +2613,6 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private val _allExpenses = MutableStateFlow<List<Expense>>(emptyList())
-    val allExpenses: StateFlow<List<Expense>> = _allExpenses.asStateFlow()
-
-    private val _allIncomes = MutableStateFlow<List<Income>>(emptyList())
-    val allIncomes: StateFlow<List<Income>> = _allIncomes.asStateFlow()
-
-    private val _allMembers = MutableStateFlow<List<FamilyMember>>(emptyList())
-    val allMembers: StateFlow<List<FamilyMember>> = _allMembers.asStateFlow()
-
-    private val _allCategories = MutableStateFlow<List<ExpenseCategory>>(emptyList())
-    val allCategories: StateFlow<List<ExpenseCategory>> = _allCategories.asStateFlow()
 
     val allRecurringExpenses: StateFlow<List<RecurringExpense>> = repository.allRecurringExpenses
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -2516,7 +2841,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         val household = _currentHousehold.value
             ?: _userHouseholds.value.firstOrNull()
-            ?: Household(id = prefs.getString("last_household_id", "") ?: "", name = "Το Εξοδολόγιό μου")
+            ?: Household(id = getOrEnsureHouseholdId(_currentUser.value), name = "Το Εξοδολόγιό μου", ownerId = _currentUser.value?.uid ?: "", memberUids = listOf(_currentUser.value?.uid ?: ""))
 
         val updated = household.copy(name = trimmed)
         _currentHousehold.value = updated
@@ -2672,6 +2997,12 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 .putString("cached_user_photo_url", profile.photoUrl)
                 .putBoolean("cached_user_is_premium", profile.isPremium)
                 .putString("cached_user_household_id", profile.householdId)
+                .putString("cached_user_app_language", profile.appLanguage)
+                .putString("cached_user_theme_mode", profile.themeMode)
+                .putBoolean("cached_user_reminder_enabled", profile.reminderEnabled)
+                .putInt("cached_user_reminder_hour", profile.reminderHour)
+                .putInt("cached_user_reminder_minute", profile.reminderMinute)
+                .putBoolean("cached_user_notification_consent_completed", profile.notificationConsentCompleted)
                 .apply()
         } catch (e: Exception) {
             Log.w("OikoNomosVM", "Failed to cache user profile to prefs: ${e.message}")
@@ -2693,7 +3024,13 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             city = prefs.getString("cached_user_city", "").orEmpty(),
             photoUrl = prefs.getString("cached_user_photo_url", "").orEmpty(),
             isPremium = prefs.getBoolean("cached_user_is_premium", false),
-            householdId = prefs.getString("cached_user_household_id", "").orEmpty()
+            householdId = prefs.getString("cached_user_household_id", "").orEmpty(),
+            appLanguage = prefs.getString("cached_user_app_language", "EL").orEmpty(),
+            themeMode = prefs.getString("cached_user_theme_mode", "SYSTEM").orEmpty(),
+            reminderEnabled = prefs.getBoolean("cached_user_reminder_enabled", false),
+            reminderHour = prefs.getInt("cached_user_reminder_hour", 21),
+            reminderMinute = prefs.getInt("cached_user_reminder_minute", 30),
+            notificationConsentCompleted = prefs.getBoolean("cached_user_notification_consent_completed", false)
         )
     }
 
@@ -2711,6 +3048,12 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             .remove("cached_user_photo_url")
             .remove("cached_user_is_premium")
             .remove("cached_user_household_id")
+            .remove("cached_user_app_language")
+            .remove("cached_user_theme_mode")
+            .remove("cached_user_reminder_enabled")
+            .remove("cached_user_reminder_hour")
+            .remove("cached_user_reminder_minute")
+            .remove("cached_user_notification_consent_completed")
             .apply()
     }
 
@@ -2793,22 +3136,20 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     isDefault = true
                 )
                 firestoreSyncRepo.syncMember(newHousehold.id, defaultMember)
-                val currentCats = repository.getAllCategoriesList()
-                if (currentCats.isNotEmpty()) {
-                    currentCats.forEach { cat ->
-                        val fbCat = FirebaseCategory(
-                            id = cat.id.toString(),
-                            householdId = newHousehold.id,
-                            userId = user.uid,
-                            name = cat.name,
-                            iconKey = cat.iconKey,
-                            monthlyBudget = cat.monthlyBudget,
-                            colorHex = cat.colorHex,
-                            voiceKeywords = cat.voiceKeywords,
-                            fontColorHex = cat.fontColorHex
-                        )
-                        firestoreSyncRepo.syncCategory(newHousehold.id, fbCat)
-                    }
+                STANDARD_DEFAULT_CATEGORIES.forEach { cat ->
+                    val fbCat = FirebaseCategory(
+                        id = cat.id.toString(),
+                        householdId = newHousehold.id,
+                        userId = user.uid,
+                        name = cat.name,
+                        iconKey = cat.iconKey,
+                        monthlyBudget = 0.0,
+                        colorHex = cat.colorHex,
+                        voiceKeywords = cat.voiceKeywords,
+                        sortOrder = cat.sortOrder,
+                        fontColorHex = cat.fontColorHex
+                    )
+                    firestoreSyncRepo.syncCategory(newHousehold.id, fbCat)
                 }
 
                 switchExodologio(newHousehold)
@@ -2830,10 +3171,22 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 _userProfile.value = _userProfile.value?.copy(householdId = household.id)
                 lastHouseholdExpenses = emptyList()
                 lastHouseholdIncomes = emptyList()
+                lastHouseholdMembers = emptyList()
+                lastHouseholdCategories = emptyList()
+                lastUserExpenses = emptyList()
+                lastUserIncomes = emptyList()
+                lastUserMembers = emptyList()
+                lastUserCategories = emptyList()
                 _allExpenses.value = emptyList()
                 _allIncomes.value = emptyList()
+                _allMembers.value = emptyList()
+                _allCategories.value = emptyList()
                 repository.deleteAllExpenses()
                 repository.deleteAllIncomes()
+                repository.replaceAllMembers(emptyList())
+                repository.replaceAllCategories(emptyList())
+                repository.replaceAllSavingsGoals(emptyList())
+                repository.replaceAllRecurringExpenses(emptyList())
                 observeHouseholdData(household.id)
                 if (profile != null) {
                     recoverAndSyncUserData(user, profile, household.id)
@@ -2890,8 +3243,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 id
             }
 
-            val householdId = _currentHousehold.value?.id ?: ""
             val user = _currentUser.value
+            val householdId = getOrEnsureHouseholdId(user)
             val fbGoal = FirebaseSavingsGoal(
                 id = generatedId.toString(),
                 householdId = householdId,
@@ -3014,8 +3367,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
             recurring = recurring.copy(id = generatedId)
 
-            val householdId = _currentHousehold.value?.id ?: ""
             val user = _currentUser.value
+            val householdId = getOrEnsureHouseholdId(user)
 
             val calendar = Calendar.getInstance()
             val currentYear = calendar.get(Calendar.YEAR)
@@ -3352,9 +3705,18 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         _showSettingsDialog.value = false
     }
 
-    fun setThemeMode(mode: String) {
+    fun setThemeMode(mode: String, syncToCloud: Boolean = true) {
         _themeMode.value = mode
         prefs.edit().putString("theme_mode", mode).apply()
+        if (syncToCloud) {
+            val uid = _currentUser.value?.uid ?: auth.currentUser?.uid
+            if (!uid.isNullOrBlank()) {
+                _userProfile.value = _userProfile.value?.copy(themeMode = mode)
+                viewModelScope.launch {
+                    firestoreSyncRepo.updateUserProfilePreferences(uid, themeMode = mode)
+                }
+            }
+        }
     }
 
     fun setUiStyle(style: String) {
@@ -3362,13 +3724,22 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         prefs.edit().putString("ui_style", style).apply()
     }
 
-    fun setAppLanguage(lang: String) {
+    fun setAppLanguage(lang: String, syncToCloud: Boolean = true) {
         _appLanguage.value = lang
         prefs.edit()
             .putString("app_language", lang)
             .putBoolean("user_explicitly_set_language_v2", true)
             .apply()
         auth.setLanguageCode(if (lang == "EN") "en" else "el")
+        if (syncToCloud) {
+            val uid = _currentUser.value?.uid ?: auth.currentUser?.uid
+            if (!uid.isNullOrBlank()) {
+                _userProfile.value = _userProfile.value?.copy(appLanguage = lang)
+                viewModelScope.launch {
+                    firestoreSyncRepo.updateUserProfilePreferences(uid, appLanguage = lang)
+                }
+            }
+        }
     }
 
     fun setCurrencySymbol(symbol: String) {
@@ -3454,10 +3825,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val docId = java.util.UUID.randomUUID().toString()
             val user = _currentUser.value
-            val household = _currentHousehold.value
-            val targetHouseholdId = household?.id?.ifBlank { null }
-                ?: _userProfile.value?.householdId?.ifBlank { null }
-                ?: prefs.getString("last_household_id", "") ?: ""
+            val targetHouseholdId = getOrEnsureHouseholdId(user)
             val targetUserId = user?.uid ?: ""
 
             val memberCount = if (splitType == "ALL_FAMILY") {
@@ -3608,11 +3976,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         viewModelScope.launch {
             val user = _currentUser.value
-            val household = _currentHousehold.value
-            val targetHouseholdId = household?.id?.ifBlank { null }
-                ?: _userProfile.value?.householdId?.ifBlank { null }
-                ?: _userProfile.value?.householdIds?.firstOrNull()?.ifBlank { null }
-                ?: prefs.getString("last_household_id", "") ?: ""
+            val targetHouseholdId = getOrEnsureHouseholdId(user)
             val targetUserId = user?.uid ?: ""
 
             val existingDocId = existing?.cloudId?.ifBlank { null }
@@ -3725,10 +4089,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
             // 3. Cloud deletion
             val user = _currentUser.value
-            val household = _currentHousehold.value
-            val targetHouseholdId = household?.id?.ifBlank { null }
-                ?: _userProfile.value?.householdId?.ifBlank { null }
-                ?: prefs.getString("last_household_id", "") ?: ""
+            val targetHouseholdId = getOrEnsureHouseholdId(user)
             val docId = if (expense.cloudId.isNotBlank()) expense.cloudId else if (expense.id > 0) "exp_${expense.id}" else expense.originalVoicePrompt
 
             try {
@@ -3780,14 +4141,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         viewModelScope.launch {
             val user = _currentUser.value
-            val isMarios = isMariosUser(user)
-            val household = _currentHousehold.value
-            val fallbackHid = _userHouseholds.value.firstOrNull()?.id
-                ?: if (isMarios) com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID else ""
-            val targetHouseholdId = household?.id?.ifBlank { null }
-                ?: _userProfile.value?.householdId?.ifBlank { null }
-                ?: prefs.getString("last_household_id", "")?.ifBlank { null }
-                ?: fallbackHid
+            val targetHouseholdId = getOrEnsureHouseholdId(user)
             val targetUserId = user?.uid ?: ""
 
             val existingDocId = existing?.cloudId?.ifBlank { null }
@@ -3895,10 +4249,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
             // 3. Cloud deletion
             val user = _currentUser.value
-            val household = _currentHousehold.value
-            val targetHouseholdId = household?.id?.ifBlank { null }
-                ?: _userProfile.value?.householdId?.ifBlank { null }
-                ?: prefs.getString("last_household_id", "") ?: ""
+            val targetHouseholdId = getOrEnsureHouseholdId(user)
             val docId = if (income.cloudId.isNotBlank()) income.cloudId else if (income.id > 0) "inc_${income.id}" else ""
 
             try {
@@ -4008,12 +4359,23 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 id
             }
 
+            // Optimistic in-memory update so the UI reflects the new/edited member immediately
+            val savedMember = member.copy(id = generatedId)
+            val currentMemberList = _allMembers.value.toMutableList()
+            val existingIdx = currentMemberList.indexOfFirst { it.id == generatedId || (id != 0L && it.id == id) }
+            if (existingIdx >= 0) {
+                currentMemberList[existingIdx] = savedMember
+            } else {
+                currentMemberList.add(savedMember)
+            }
+            _allMembers.value = currentMemberList.sortedWith(compareBy<FamilyMember> { it.sortOrder }.thenBy { it.id })
+
             if (isDef || id == 1L) {
                 _userProfile.value = _userProfile.value?.copy(displayName = cleanName)
             }
 
-            val householdId = _currentHousehold.value?.id ?: ""
             val user = _currentUser.value
+            val householdId = getOrEnsureHouseholdId(user)
             val cloudMemberId = generatedId.toString()
             val fbMember = FirebaseMember(
                 id = cloudMemberId,
@@ -4029,7 +4391,6 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             if (householdId.isNotBlank()) {
                 firestoreSyncRepo.syncMember(householdId, fbMember)
             }
-            firestoreSyncRepo.syncAndCleanMember(allHouseholdIds, user?.uid.orEmpty(), fbMember, oldName)
 
             // Cascade Member Rename: Update all existing expenses & incomes with new member name
             if (oldName.isNotBlank() && !oldName.equals(cleanName, ignoreCase = true)) {
@@ -4128,8 +4489,10 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun updateMemberColor(member: FamilyMember, newColorHex: Long) {
+        val updatedMember = member.copy(avatarColorHex = newColorHex)
+        _allMembers.value = _allMembers.value.map { if (it.id == member.id) updatedMember else it }
         viewModelScope.launch {
-            repository.updateMember(member.copy(avatarColorHex = newColorHex))
+            repository.updateMember(updatedMember)
             val householdId = _currentHousehold.value?.id ?: ""
             val user = _currentUser.value
             val fbMember = FirebaseMember(
@@ -4146,15 +4509,6 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             if (householdId.isNotBlank()) {
                 firestoreSyncRepo.syncMember(householdId, fbMember)
             }
-            val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(_currentHousehold.value?.id.orEmpty())).filter { it.isNotBlank() }.distinct()
-            allHouseholdIds.forEach { hhId ->
-                if (hhId != householdId) {
-                    firestoreSyncRepo.syncMember(hhId, fbMember.copy(householdId = hhId))
-                }
-            }
-            if (user != null) {
-                firestoreSyncRepo.syncUserMember(user.uid, fbMember)
-            }
             showSnackbar("Το χρώμα για ${member.name} ενημερώθηκε")
         }
     }
@@ -4163,10 +4517,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         _allMembers.value = _allMembers.value.filter { it.id != member.id }
         viewModelScope.launch {
             repository.deleteMember(member)
-            val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(_currentHousehold.value?.id.orEmpty())).filter { it.isNotBlank() }.distinct()
-            val householdId = _currentHousehold.value?.id ?: ""
             val user = _currentUser.value
-            firestoreSyncRepo.deleteMemberFromAllScopes(member.id.toString(), allHouseholdIds, user?.uid ?: "", member.name)
+            val householdId = getOrEnsureHouseholdId(user)
+            if (householdId.isNotBlank()) {
+                firestoreSyncRepo.deleteMember(householdId, member.id.toString())
+            }
 
             val remainingMembers = repository.getAllMembersList().filter { it.id != member.id }
             if (member.isDefault && remainingMembers.isNotEmpty()) {
@@ -4184,7 +4539,6 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     sortOrder = newDefault.sortOrder
                 )
                 if (householdId.isNotBlank()) firestoreSyncRepo.syncMember(householdId, fbNewDefault)
-                if (user != null) firestoreSyncRepo.syncUserMember(user.uid, fbNewDefault)
             }
 
             // Cascade Member Deletion: Clear member field if deleted!
@@ -4330,8 +4684,19 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 id
             }
 
-            val householdId = _currentHousehold.value?.id ?: ""
+            // Optimistic in-memory update so category changes show immediately
+            val savedCategory = category.copy(id = effectiveId)
+            val currentCatList = _allCategories.value.toMutableList()
+            val existingIdx = currentCatList.indexOfFirst { it.id == effectiveId || (id != 0L && it.id == id) }
+            if (existingIdx >= 0) {
+                currentCatList[existingIdx] = savedCategory
+            } else {
+                currentCatList.add(savedCategory)
+            }
+            _allCategories.value = currentCatList.sortedWith(compareBy<ExpenseCategory> { it.sortOrder }.thenBy { it.id })
+
             val user = _currentUser.value
+            val householdId = getOrEnsureHouseholdId(user)
             val cloudCatId = effectiveId.toString()
             val fbCat = FirebaseCategory(
                 id = cloudCatId,
@@ -4347,15 +4712,6 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             )
             if (householdId.isNotBlank()) {
                 firestoreSyncRepo.syncCategory(householdId, fbCat)
-            }
-            val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(_currentHousehold.value?.id.orEmpty())).filter { it.isNotBlank() }.distinct()
-            allHouseholdIds.forEach { hhId ->
-                if (hhId != householdId) {
-                    firestoreSyncRepo.syncCategory(hhId, fbCat.copy(householdId = hhId))
-                }
-            }
-            if (user != null) {
-                firestoreSyncRepo.syncUserCategory(user.uid, fbCat)
             }
 
             // Cascade Category Rename: Update all existing expenses & incomes with new category name
@@ -4438,10 +4794,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         _allCategories.value = _allCategories.value.filter { it.id != category.id }
         viewModelScope.launch {
             repository.deleteCategory(category)
-            val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(_currentHousehold.value?.id.orEmpty())).filter { it.isNotBlank() }.distinct()
-            val householdId = _currentHousehold.value?.id ?: ""
             val user = _currentUser.value
-            firestoreSyncRepo.deleteCategoryFromAllScopes(category.id.toString(), allHouseholdIds, user?.uid ?: "")
+            val householdId = getOrEnsureHouseholdId(user)
+            if (householdId.isNotBlank()) {
+                firestoreSyncRepo.deleteCategory(householdId, category.id.toString())
+            }
 
             // Cascade Category Deletion: Clear category field (categoryId = 0L, categoryName = "")
             val previousExpenses = _allExpenses.value
@@ -4578,8 +4935,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         val effectiveUid = uid.ifBlank {
             auth.currentUser?.uid?.ifBlank { mariosFallbackUid } ?: mariosFallbackUid
         }
-        val extraHids = if (isMarios) listOf(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) else emptyList()
-        val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(effectiveHouseholdId) + extraHids).filter { it.isNotBlank() }.distinct()
+        val targetHouseholdIds = if (effectiveHouseholdId.isNotBlank()) listOf(effectiveHouseholdId) else emptyList()
         val fbMembers = members.map { m ->
             FirebaseMember(
                 id = m.id.toString(),
@@ -4593,7 +4949,9 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 sortOrder = m.sortOrder
             )
         }
-        firestoreSyncRepo.batchUpdateMemberSortOrder(allHouseholdIds, effectiveUid, fbMembers)
+        if (targetHouseholdIds.isNotEmpty()) {
+            firestoreSyncRepo.batchUpdateMemberSortOrder(targetHouseholdIds, effectiveUid, fbMembers)
+        }
     }
 
     fun moveCategoryUp(category: ExpenseCategory) {
@@ -4651,8 +5009,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         val effectiveUid = uid.ifBlank {
             auth.currentUser?.uid?.ifBlank { mariosFallbackUid } ?: mariosFallbackUid
         }
-        val extraHids = if (isMarios) listOf(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID) else emptyList()
-        val allHouseholdIds = (_userProfile.value?.householdIds.orEmpty() + listOf(effectiveHouseholdId) + extraHids).filter { it.isNotBlank() }.distinct()
+        val targetHouseholdIds = if (effectiveHouseholdId.isNotBlank()) listOf(effectiveHouseholdId) else emptyList()
         val fbCategories = categories.map { c ->
             FirebaseCategory(
                 id = c.id.toString(),
@@ -4667,7 +5024,9 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 fontColorHex = c.fontColorHex
             )
         }
-        firestoreSyncRepo.batchUpdateCategorySortOrder(allHouseholdIds, effectiveUid, fbCategories)
+        if (targetHouseholdIds.isNotEmpty()) {
+            firestoreSyncRepo.batchUpdateCategorySortOrder(targetHouseholdIds, effectiveUid, fbCategories)
+        }
     }
 
     // =========================================================================
@@ -4685,6 +5044,13 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleDailyReminder(enabled: Boolean) {
         _dailyReminderEnabled.value = enabled
         DailyReminderManager.setReminderEnabled(getApplication(), enabled)
+        val uid = _currentUser.value?.uid ?: auth.currentUser?.uid
+        if (!uid.isNullOrBlank()) {
+            _userProfile.value = _userProfile.value?.copy(reminderEnabled = enabled)
+            viewModelScope.launch {
+                firestoreSyncRepo.updateUserProfilePreferences(uid, reminderEnabled = enabled)
+            }
+        }
         if (enabled) {
             showSnackbar("Η βραδινή υπενθύμιση ενεργοποιήθηκε για τις %02d:%02d".format(_dailyReminderHour.value, _dailyReminderMinute.value))
         } else {
@@ -4696,6 +5062,13 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         _dailyReminderHour.value = hour
         _dailyReminderMinute.value = minute
         DailyReminderManager.setReminderTime(getApplication(), hour, minute)
+        val uid = _currentUser.value?.uid ?: auth.currentUser?.uid
+        if (!uid.isNullOrBlank()) {
+            _userProfile.value = _userProfile.value?.copy(reminderHour = hour, reminderMinute = minute)
+            viewModelScope.launch {
+                firestoreSyncRepo.updateUserProfilePreferences(uid, reminderHour = hour, reminderMinute = minute)
+            }
+        }
         showSnackbar("Η ώρα υπενθύμισης ορίστηκε στις %02d:%02d".format(hour, minute))
     }
 
@@ -4743,5 +5116,80 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun dismissPrivacyConsentDialog() {
         _showPrivacyConsentDialog.value = false
+    }
+
+    companion object {
+        val STANDARD_DEFAULT_CATEGORIES: List<ExpenseCategory> = listOf(
+            ExpenseCategory(
+                id = 1L,
+                name = "Σούπερ μάρκετ",
+                iconKey = "cart",
+                monthlyBudget = 0.0,
+                colorHex = 4278556265L,
+                voiceKeywords = "σούπερ μάρκετ, σουπερμάρκετ, lidl, σκλαβενίτης, βασιλόπουλος, μάρκετ, ψώνια",
+                sortOrder = 0,
+                fontColorHex = 0L
+            ),
+            ExpenseCategory(
+                id = 2L,
+                name = "Φαγητό & Καφές",
+                iconKey = "food",
+                monthlyBudget = 0.0,
+                colorHex = 4278556265L,
+                voiceKeywords = "φαγητό, καφές, delivery, σουβλάκια, πίτσα, εστιατόριο",
+                sortOrder = 1,
+                fontColorHex = 0L
+            ),
+            ExpenseCategory(
+                id = 3L,
+                name = "Λογαριασμοί & Σπίτι",
+                iconKey = "house",
+                monthlyBudget = 0.0,
+                colorHex = 4279080072L,
+                voiceKeywords = "λογαριασμός, ρεύμα, νερό, ενοίκιο, κοινόχρηστα, ιντερνετ, τηλέφωνο",
+                sortOrder = 2,
+                fontColorHex = 0L
+            ),
+            ExpenseCategory(
+                id = 4L,
+                name = "Μετακινήσεις & Καύσιμα",
+                iconKey = "gas_station",
+                monthlyBudget = 0.0,
+                colorHex = 4293548044L,
+                voiceKeywords = "βενζίνη, καύσιμα, διόδια, πάρκινγκ, λεωφορείο, μετρό, ταξί",
+                sortOrder = 3,
+                fontColorHex = 0L
+            ),
+            ExpenseCategory(
+                id = 5L,
+                name = "Υγεία & Φαρμακείο",
+                iconKey = "medical",
+                monthlyBudget = 0.0,
+                colorHex = 4293675161L,
+                voiceKeywords = "γιατρός, φαρμακείο, φάρμακα, εξετάσεις",
+                sortOrder = 4,
+                fontColorHex = 0L
+            ),
+            ExpenseCategory(
+                id = 6L,
+                name = "Διασκέδαση & Ψυχαγωγία",
+                iconKey = "entertainment",
+                monthlyBudget = 0.0,
+                colorHex = 4287323382L,
+                voiceKeywords = "διασκέδαση, έξοδος, ποτό, σινεμά",
+                sortOrder = 5,
+                fontColorHex = 0L
+            ),
+            ExpenseCategory(
+                id = 7L,
+                name = "Άλλο",
+                iconKey = "other",
+                monthlyBudget = 0.0,
+                colorHex = 4283124564L,
+                voiceKeywords = "άλλο, διάφορα",
+                sortOrder = 6,
+                fontColorHex = 0L
+            )
+        )
     }
 }

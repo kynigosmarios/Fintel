@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -514,7 +515,26 @@ fun AppSettingsDialog(
                                             )
                                         }
 
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .clickable {
+                                                    focusManager.clearFocus()
+                                                    keyboardController?.hide()
+                                                    TimePickerDialog(
+                                                        context,
+                                                        { _, pickedHour, pickedMinute ->
+                                                            onSetReminderTime(pickedHour, pickedMinute)
+                                                            timeInput = "%02d:%02d".format(pickedHour, pickedMinute)
+                                                        },
+                                                        reminderHour,
+                                                        reminderMinute,
+                                                        true
+                                                    ).show()
+                                                }
+                                                .testTag("reminder_time_picker_button")
+                                        ) {
                                             Surface(
                                                 shape = RoundedCornerShape(10.dp),
                                                 color = MaterialTheme.colorScheme.surface,
@@ -527,35 +547,13 @@ fun AppSettingsDialog(
                                                     contentAlignment = Alignment.Center,
                                                     modifier = Modifier.padding(horizontal = 6.dp)
                                                 ) {
-                                                    BasicTextField(
-                                                        value = timeInput,
-                                                        onValueChange = { newVal ->
-                                                            if (newVal.length <= 5) {
-                                                                timeInput = newVal
-                                                                commitTime(newVal)
-                                                            }
-                                                        },
-                                                        keyboardOptions = KeyboardOptions(
-                                                            keyboardType = KeyboardType.Number,
-                                                            imeAction = ImeAction.Done
-                                                        ),
-                                                        keyboardActions = KeyboardActions(
-                                                            onDone = {
-                                                                commitTime(timeInput)
-                                                                focusManager.clearFocus()
-                                                                keyboardController?.hide()
-                                                            }
-                                                        ),
-                                                        singleLine = true,
-                                                        textStyle = androidx.compose.ui.text.TextStyle(
-                                                            fontSize = 15.sp,
-                                                            fontWeight = FontWeight.Bold,
-                                                            color = Emerald700,
-                                                            textAlign = TextAlign.Center
-                                                        ),
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .testTag("reminder_time_input")
+                                                    Text(
+                                                        text = "%02d:%02d".format(reminderHour, reminderMinute),
+                                                        fontSize = 15.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Emerald700,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.testTag("reminder_time_input")
                                                     )
                                                 }
                                             }
@@ -565,23 +563,7 @@ fun AppSettingsDialog(
                                             Surface(
                                                 shape = CircleShape,
                                                 color = Emerald700.copy(alpha = 0.12f),
-                                                modifier = Modifier
-                                                    .size(36.dp)
-                                                    .clickable {
-                                                        focusManager.clearFocus()
-                                                        keyboardController?.hide()
-                                                        TimePickerDialog(
-                                                            context,
-                                                            { _, pickedHour, pickedMinute ->
-                                                                onSetReminderTime(pickedHour, pickedMinute)
-                                                                timeInput = "%02d:%02d".format(pickedHour, pickedMinute)
-                                                            },
-                                                            reminderHour,
-                                                            reminderMinute,
-                                                            true
-                                                        ).show()
-                                                    }
-                                                    .testTag("reminder_time_picker_button")
+                                                modifier = Modifier.size(36.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(

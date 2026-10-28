@@ -103,11 +103,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import java.util.Calendar
 
-enum class ResetMethod {
-    EMAIL,
-    PHONE_SMS
-}
-
 @Composable
 fun AuthScreen(
     viewModel: OikoNomosViewModel,
@@ -136,14 +131,6 @@ fun AuthScreen(
     var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
     var isGoogleSigningIn by remember { mutableStateOf(false) }
 
-    // Password Reset via SMS Phone Option (Requirement 2)
-    var resetMethod by remember { mutableStateOf<ResetMethod>(ResetMethod.EMAIL) }
-    var resetPhone by remember { mutableStateOf("") }
-    var resetPhoneStep by remember { mutableStateOf(1) } // 1: Enter phone, 2: Enter 6-digit code
-    var enteredSixDigitCode by remember { mutableStateOf("") }
-    var maskedPhoneDisplay by remember { mutableStateOf("") }
-    var phoneDemoCodeNotice by remember { mutableStateOf<String?>(null) }
-
     // Date Picker state
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
@@ -152,9 +139,6 @@ fun AuthScreen(
         isForgotPassword = false
         errorMessage = null
         resetSuccessMessage = null
-        resetPhoneStep = 1
-        enteredSixDigitCode = ""
-        phoneDemoCodeNotice = null
     }
 
     Scaffold(
@@ -202,7 +186,7 @@ fun AuthScreen(
                 ) {
                     if (isForgotPassword) {
                         // ============================================
-                        // Password Reset Mode (Email or Mobile Phone 6-digit SMS)
+                        // Password Reset Mode (Direct Firebase Auth Email Link)
                         // ============================================
                         Surface(
                             shape = CircleShape,
@@ -211,7 +195,7 @@ fun AuthScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = if (resetMethod == ResetMethod.PHONE_SMS) Icons.Default.Phone else Icons.Default.Lock,
+                                    imageVector = Icons.Default.Lock,
                                     contentDescription = null,
                                     tint = Emerald700,
                                     modifier = Modifier.size(26.dp)
@@ -232,70 +216,14 @@ fun AuthScreen(
 
                         Text(
                             text = if (lang == Localization.Language.ENGLISH)
-                                "Choose how you want to recover your password: via email link or via a 6-digit code sent to your mobile."
+                                "Enter your registered email address to receive a secure password reset link."
                             else
-                                "Επιλέξτε τρόπο ανάκτησης: μέσω συνδέσμου στο email ή με 6ψήφιο κωδικό στο κινητό σας τηλέφωνο.",
+                                "Εισάγετε το email του λογαριασμού σας για να λάβετε σύνδεσμο επαναφοράς κωδικού.",
                             fontSize = 12.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             lineHeight = 17.sp
                         )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Selector: Via Email vs Via Mobile Phone (6-digit code)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .padding(4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (resetMethod == ResetMethod.EMAIL) Emerald700 else Color.Transparent,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
-                                    .clickable {
-                                        resetMethod = ResetMethod.EMAIL
-                                        errorMessage = null
-                                        resetSuccessMessage = null
-                                    }
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Via Email" else "Μέσω Email",
-                                        fontSize = 13.sp,
-                                        fontWeight = if (resetMethod == ResetMethod.EMAIL) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (resetMethod == ResetMethod.EMAIL) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (resetMethod == ResetMethod.PHONE_SMS) Emerald700 else Color.Transparent,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
-                                    .clickable {
-                                        resetMethod = ResetMethod.PHONE_SMS
-                                        errorMessage = null
-                                        resetSuccessMessage = null
-                                    }
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Via Mobile (SMS)" else "Κινητό (SMS)",
-                                        fontSize = 13.sp,
-                                        fontWeight = if (resetMethod == ResetMethod.PHONE_SMS) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (resetMethod == ResetMethod.PHONE_SMS) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
 
                         Spacer(modifier = Modifier.height(16.dp))
 
@@ -326,39 +254,13 @@ fun AuthScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            if (resetMethod == ResetMethod.EMAIL) {
-                                OutlinedButton(
-                                    onClick = {
-                                        resetSuccessMessage = null
-                                        errorMessage = null
-                                        resetMethod = ResetMethod.PHONE_SMS
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(44.dp)
-                                ) {
-                                    Icon(Icons.Default.Phone, contentDescription = null, tint = Emerald700, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Try Mobile (SMS) 6-digit Code" else "Δοκιμή με 6ψήφιο Κωδικό SMS",
-                                        fontSize = 13.5.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Emerald700
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
+                            Spacer(modifier = Modifier.height(16.dp))
 
                             Button(
                                 onClick = {
                                     isForgotPassword = false
                                     errorMessage = null
                                     resetSuccessMessage = null
-                                    resetPhoneStep = 1
-                                    enteredSixDigitCode = ""
                                 },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
@@ -373,8 +275,7 @@ fun AuthScreen(
                                     color = Color.White
                                 )
                             }
-                        } else if (resetMethod == ResetMethod.EMAIL) {
-                            // Method 1: Email Reset Link
+                        } else {
                             OutlinedTextField(
                                 value = email,
                                 onValueChange = {
@@ -435,9 +336,9 @@ fun AuthScreen(
                                         email = email,
                                         onSuccess = {
                                             resetSuccessMessage = if (lang == Localization.Language.ENGLISH)
-                                                "A password reset link has been dispatched to $email.\n\n⚠️ IMPORTANT:\n• Check both your Inbox and Spam / Junk folders.\n• Check the Promotions tab if using Gmail.\n• If not received, you can also use the Mobile (SMS) recovery option."
+                                                "A password reset link has been dispatched to $email.\n\n⚠️ IMPORTANT:\n• Check both your Inbox and Spam / Junk folders.\n• Check the Promotions tab if using Gmail."
                                             else
-                                                "Στάλθηκε σύνδεσμος επαναφοράς στο $email.\n\n⚠️ ΣΗΜΑΝΤΙΚΟ:\n• Ελέγξτε οπωσδήποτε τον φάκελο Ανεπιθύμητα (Spam / Junk).\n• Ελέγξτε την καρτέλα «Προσφορές» (Promotions) στο Gmail.\n• Αν δεν το βρίσκετε, μπορείτε να χρησιμοποιήσετε την επαναφορά μέσω Κινητού (SMS) παραπάνω!"
+                                                "Στάλθηκε σύνδεσμος επαναφοράς στο $email.\n\n⚠️ ΣΗΜΑΝΤΙΚΟ:\n• Ελέγξτε οπωσδήποτε τον φάκελο Ανεπιθύμητα (Spam / Junk).\n• Ελέγξτε την καρτέλα «Προσφορές» (Promotions) στο Gmail."
                                         },
                                         onError = { errorMessage = it }
                                     )
@@ -459,234 +360,6 @@ fun AuthScreen(
                                     color = Color.White
                                 )
                             }
-                        } else {
-                            // Method 2: Mobile Phone SMS with 6-digit Code (Requirement 2)
-                            if (resetPhoneStep == 1) {
-                                OutlinedTextField(
-                                    value = resetPhone,
-                                    onValueChange = {
-                                        resetPhone = it
-                                        errorMessage = null
-                                    },
-                                    label = { Text(if (lang == Localization.Language.ENGLISH) "Mobile Phone Number" else "Κινητό Τηλέφωνο") },
-                                    placeholder = { Text("69XXXXXXXX") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Phone, contentDescription = null, tint = Emerald700)
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Phone,
-                                        imeAction = ImeAction.Done
-                                    ),
-                                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("reset_phone_field")
-                                )
-
-                                if (errorMessage != null) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = MaterialTheme.colorScheme.errorContainer,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Error,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.error,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = errorMessage ?: "",
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.onErrorContainer
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Button(
-                                    onClick = {
-                                        focusManager.clearFocus()
-                                        errorMessage = null
-                                        phoneDemoCodeNotice = null
-                                        viewModel.sendPasswordResetPhoneCode(
-                                            phone = resetPhone,
-                                            onSuccess = { generatedCode, maskedPhone, _ ->
-                                                maskedPhoneDisplay = maskedPhone
-                                                phoneDemoCodeNotice = "📱 SMS Demo: Ο 6ψήφιος κωδικός σας είναι $generatedCode"
-                                                resetPhoneStep = 2
-                                            },
-                                            onError = { errorMessage = it }
-                                        )
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Emerald700,
-                                        contentColor = Color.White
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp)
-                                        .testTag("reset_phone_submit_button")
-                                ) {
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Send 6-Digit Code (SMS)" else "Αποστολή 6ψήφιου Κωδικού (SMS)",
-                                        fontSize = 14.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                            } else {
-                                // Step 2: Enter the 6-digit code received
-                                if (phoneDemoCodeNotice != null) {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = Emerald100.copy(alpha = 0.7f),
-                                        border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(Icons.Default.Phone, contentDescription = null, tint = Emerald700, modifier = Modifier.size(20.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = phoneDemoCodeNotice ?: "",
-                                                fontSize = 12.5.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color(0xFF065F46)
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                }
-
-                                Text(
-                                    text = if (lang == Localization.Language.ENGLISH)
-                                        "Enter the 6-digit code sent to $maskedPhoneDisplay"
-                                    else
-                                        "Εισάγετε τον 6ψήφιο κωδικό που λάβατε στο $maskedPhoneDisplay",
-                                    fontSize = 12.5.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                OutlinedTextField(
-                                    value = enteredSixDigitCode,
-                                    onValueChange = {
-                                        if (it.length <= 6) {
-                                            enteredSixDigitCode = it
-                                            errorMessage = null
-                                        }
-                                    },
-                                    label = { Text(if (lang == Localization.Language.ENGLISH) "6-Digit Code" else "6ψήφιος Κωδικός") },
-                                    placeholder = { Text("123456") },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Key, contentDescription = null, tint = Emerald700)
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Number,
-                                        imeAction = ImeAction.Done
-                                    ),
-                                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("reset_six_digit_code_field")
-                                )
-
-                                if (errorMessage != null) {
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = MaterialTheme.colorScheme.errorContainer,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Error,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.error,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = errorMessage ?: "",
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.onErrorContainer
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Button(
-                                    onClick = {
-                                        focusManager.clearFocus()
-                                        errorMessage = null
-                                        viewModel.verifyPasswordResetPhoneCode(
-                                            phone = resetPhone,
-                                            enteredCode = enteredSixDigitCode,
-                                            onSuccess = { userEmail ->
-                                                resetSuccessMessage = if (lang == Localization.Language.ENGLISH)
-                                                    "Code verified! A secure password reset link has been dispatched to your linked account ($userEmail)."
-                                                else
-                                                    "Ο κωδικός επαληθεύτηκε! Στάλθηκε σύνδεσμος επαναφοράς στο συνδεδεμένο email σας ($userEmail)."
-                                            },
-                                            onError = { errorMessage = it }
-                                        )
-                                    },
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Emerald700,
-                                        contentColor = Color.White
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp)
-                                        .testTag("verify_code_submit_button")
-                                ) {
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Verify Code & Send Link" else "Επαλήθευση & Αποστολή Συνδέσμου",
-                                        fontSize = 14.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                TextButton(
-                                    onClick = {
-                                        resetPhoneStep = 1
-                                        errorMessage = null
-                                    }
-                                ) {
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "← Change Phone Number" else "← Αλλαγή Τηλεφώνου",
-                                        color = Emerald700,
-                                        fontSize = 12.5.sp
-                                    )
-                                }
-                            }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -696,8 +369,6 @@ fun AuthScreen(
                                 isForgotPassword = false
                                 errorMessage = null
                                 resetSuccessMessage = null
-                                resetPhoneStep = 1
-                                enteredSixDigitCode = ""
                             },
                             modifier = Modifier.testTag("back_to_login_button")
                         ) {

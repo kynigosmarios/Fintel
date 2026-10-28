@@ -1,49 +1,20 @@
 package com.example.ui.components
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,14 +31,13 @@ import com.example.R
 import com.example.data.model.Household
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
+import com.example.util.Localization
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-import com.example.util.Localization
 import com.google.firebase.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -78,19 +48,18 @@ fun FamilyCloudSyncCard(
     household: Household?,
     isSyncing: Boolean,
     onCreateHousehold: (String) -> Unit,
-    onJoinHousehold: (String) -> Unit,
+    onJoinHousehold: (String) -> Unit = {},
     onSignOut: () -> Unit,
     onMessage: (String) -> Unit,
     appLanguage: String = "EL"
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
+    val isGreek = appLanguage != "EN"
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var isSigningIn by remember { mutableStateOf(false) }
 
     var familyNameInput by remember { mutableStateOf("") }
-    var joinCodeInput by remember { mutableStateOf("") }
-    var showJoinDialog by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Surface(
@@ -133,7 +102,7 @@ fun FamilyCloudSyncCard(
                             text = if (currentUser != null) {
                                 if (lang == Localization.Language.ENGLISH) "Connected account" else "Συνδεδεμένος λογαριασμός"
                             } else {
-                                if (lang == Localization.Language.ENGLISH) "Shared tracking with family" else "Κοινό εξοδολόγιο με τη σύζυγο"
+                                if (lang == Localization.Language.ENGLISH) "Shared tracking with family" else "Κοινό εξοδολόγιο με την οικογένεια"
                             },
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -148,9 +117,9 @@ fun FamilyCloudSyncCard(
             if (currentUser == null) {
                 Text(
                     text = if (lang == Localization.Language.ENGLISH)
-                        "Sign in with your Google account to share the household ledger in real time."
+                        "Sign in with your Google account to access your personal expenses and shared households in real time."
                     else
-                        "Συνδεθείτε με το Google λογαριασμό σας για να μοιράζεστε το εξοδολόγιο σε πραγματικό χρόνο.",
+                        "Συνδεθείτε με το Google λογαριασμό σας για πρόσβαση στα προσωπικά σας έξοδα και στα κοινά εξοδολόγια σε πραγματικό χρόνο.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
@@ -260,7 +229,6 @@ fun FamilyCloudSyncCard(
 
                 // Household status
                 if (household != null && household.id.isNotBlank()) {
-                    // Joined in a Household!
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = Emerald100.copy(alpha = 0.4f),
@@ -284,7 +252,10 @@ fun FamilyCloudSyncCard(
                                     )
                                 }
                                 Text(
-                                    text = if (lang == Localization.Language.ENGLISH) "${household.memberUids.size} members connected" else "${household.memberUids.size} μέλη συνδεδεμένα",
+                                    text = if (lang == Localization.Language.ENGLISH)
+                                        "${household.memberUids.size} members connected"
+                                    else
+                                        "${household.memberUids.size} μέλη συνδεδεμένα",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -293,99 +264,59 @@ fun FamilyCloudSyncCard(
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Text(
-                                text = if (lang == Localization.Language.ENGLISH) "Invite code for partner / family:" else "Κωδικός Πρόσκλησης για τη σύζυγο:",
+                                text = if (isGreek)
+                                    "Η κοινή πρόσβαση στο εξοδολόγιο γίνεται αποκλειστικά μέσω email. Κάθε χρήστης που προσκαλείται, συνδέεται με το email του και αποκτά άμεσα πρόσβαση στα κοινά έξοδα."
+                                else
+                                    "Shared access is managed strictly via email invitations. Any invited member gains immediate access upon signing in with their email.",
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                lineHeight = 15.sp
                             )
 
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                            if (household.invitedEmails.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    text = household.inviteCode,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Emerald700,
-                                    letterSpacing = 2.sp
+                                    text = if (isGreek) "Προσκλήσεις μέσω Email:" else "Invited Emails:",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Emerald700
                                 )
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = ClipData.newPlainText("Fintel Invite Code", household.inviteCode)
-                                            clipboard.setPrimaryClip(clip)
-                                            onMessage(if (lang == Localization.Language.ENGLISH) "Code ${household.inviteCode} copied!" else "Ο κωδικός ${household.inviteCode} αντιγράφηκε!")
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                household.invitedEmails.distinct().filter { it.isNotBlank() }.forEach { invited ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(vertical = 2.dp)
                                     ) {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp), tint = Emerald700)
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(if (lang == Localization.Language.ENGLISH) "Copy" else "Αντιγραφή", fontSize = 11.sp, color = Emerald700)
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            val sendIntent = Intent().apply {
-                                                action = Intent.ACTION_SEND
-                                                putExtra(
-                                                    Intent.EXTRA_TEXT,
-                                                    if (lang == Localization.Language.ENGLISH)
-                                                        "Join me in tracking our expenses on Fintel! Use invite code: ${household.inviteCode}"
-                                                    else
-                                                        "Ελάτε να μοιραστούμε τα έξοδά μας στο Fintel! Εισάγετε τον κωδικό: ${household.inviteCode}"
-                                                )
-                                                type = "text/plain"
-                                            }
-                                            val shareIntent = Intent.createChooser(sendIntent, if (lang == Localization.Language.ENGLISH) "Share invite code" else "Κοινοποίηση κωδικού")
-                                            context.startActivity(shareIntent)
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700)
-                                    ) {
-                                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(if (lang == Localization.Language.ENGLISH) "Share" else "Κοινοποίηση", fontSize = 11.sp)
+                                        Icon(Icons.Default.Email, contentDescription = null, tint = Emerald700, modifier = Modifier.size(12.dp))
+                                        Text(text = invited, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
                                     }
                                 }
                             }
                         }
                     }
                 } else {
-                    // Not in household yet: options to Create or Join
+                    // Not in household yet: option to Create
                     Text(
-                        text = if (lang == Localization.Language.ENGLISH) "You are not part of a shared household yet:" else "Δεν ανήκετε ακόμα σε κοινό εξοδολόγιο:",
+                        text = if (isGreek)
+                            "Δεν ανήκετε ακόμα σε κοινό εξοδολόγιο. Μπορείτε να δημιουργήσετε νέο εξοδολόγιο ή να ζητήσετε να σας προσκαλέσουν με το email σας:"
+                        else
+                            "You are not part of a shared household yet. Create a new one or ask to be invited via your email:",
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 15.sp
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    if (!showCreateDialog && !showJoinDialog) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    if (!showCreateDialog) {
+                        Button(
+                            onClick = { showCreateDialog = true },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Button(
-                                onClick = { showCreateDialog = true },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(if (lang == Localization.Language.ENGLISH) "Create" else "Δημιουργία", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            }
-
-                            OutlinedButton(
-                                onClick = { showJoinDialog = true },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(if (lang == Localization.Language.ENGLISH) "Connect with code" else "Σύνδεση με κωδικό", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            }
+                            Text(if (lang == Localization.Language.ENGLISH) "Create Household" else "Δημιουργία Εξοδολογίου", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
@@ -417,45 +348,6 @@ fun FamilyCloudSyncCard(
                                 }
                                 OutlinedButton(
                                     onClick = { showCreateDialog = false },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(0.7f)
-                                ) {
-                                    Text(Localization.cancel(lang), fontSize = 12.sp)
-                                }
-                            }
-                        }
-                    }
-
-                    if (showJoinDialog) {
-                        Column {
-                            OutlinedTextField(
-                                value = joinCodeInput,
-                                onValueChange = { joinCodeInput = it.uppercase() },
-                                label = { Text(if (lang == Localization.Language.ENGLISH) "Partner code (e.g. OIKO-1234)" else "Κωδικός συζύγου (π.χ. OIKO-1234)", fontSize = 11.sp) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Button(
-                                    onClick = {
-                                        if (joinCodeInput.isNotBlank()) {
-                                            onJoinHousehold(joinCodeInput)
-                                            showJoinDialog = false
-                                        }
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(if (lang == Localization.Language.ENGLISH) "Connect" else "Σύνδεση", fontSize = 12.sp, color = Color.White)
-                                }
-                                OutlinedButton(
-                                    onClick = { showJoinDialog = false },
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(0.7f)
                                 ) {

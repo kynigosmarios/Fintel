@@ -46,8 +46,8 @@ class SpeechRecognitionHelper(
                 lower.contains(m.name.lowercase()) || keywords.any { lower.contains(it) }
             } ?: members.firstOrNull()
 
-            val payerId = matchedPayer?.id ?: 1L
-            val payerName = matchedPayer?.name ?: "Μάριος"
+            val payerId = matchedPayer?.id ?: (members.firstOrNull()?.id ?: 1L)
+            val payerName = matchedPayer?.name ?: members.firstOrNull()?.name ?: "Εγώ"
 
             // Construct title
             val cleanTitle = text.replace(amountMatch.value, "")

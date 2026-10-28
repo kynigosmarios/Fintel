@@ -23,6 +23,7 @@ import com.example.ui.screens.EmailVerificationScreen
 import com.example.ui.screens.MainScreen
 import com.example.ui.screens.NotificationConsentScreen
 import android.util.Log
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.example.ui.theme.Emerald700
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.OikoNomosViewModel
@@ -50,7 +51,13 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MyApplicationTheme {
+            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            val isDarkTheme = when {
+                themeMode.equals("DARK", ignoreCase = true) -> true
+                themeMode.equals("LIGHT", ignoreCase = true) -> false
+                else -> isSystemInDarkTheme()
+            }
+            MyApplicationTheme(darkTheme = isDarkTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

@@ -51,8 +51,10 @@ service cloud.firestore {
       // Household subcollections (shared expenses, incomes, members, categories, savings_goals, recurring_expenses, sync)
       match /{document=**} {
         allow read, write: if isAuthenticated() && (
+          !exists(/databases/$(database)/documents/households/$(householdId)) ||
           get(/databases/$(database)/documents/households/$(householdId)).data.ownerId == request.auth.uid ||
-          request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.get('memberUids', [])
+          request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.get('memberUids', []) ||
+          (request.auth.token.email != null && request.auth.token.email in get(/databases/$(database)/documents/households/$(householdId)).data.get('invitedEmails', []))
         );
       }
     }

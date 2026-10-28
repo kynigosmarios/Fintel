@@ -115,7 +115,14 @@ class FirestoreSyncRepository(
                 try {
                     val qInvited = db.collection("households").whereArrayContains("invitedEmails", ev).get().await()
                     for (doc in qInvited.documents) {
+                        if (mariosHids.contains(doc.id) && !isMariosAccount) continue
                         foundIds.add(doc.id)
+                        // Auto-add invited user to memberUids so they immediately have access to subcollections
+                        if (uid.isNotBlank()) {
+                            try {
+                                doc.reference.update("memberUids", FieldValue.arrayUnion(uid)).await()
+                            } catch (_: Exception) {}
+                        }
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "discoverUserHouseholds invited error: ${e.message}")
@@ -128,9 +135,9 @@ class FirestoreSyncRepository(
                     val qUsers = db.collection("users").whereEqualTo("email", ev).get().await()
                     for (uDoc in qUsers.documents) {
                         val hid = uDoc.getString("householdId")
-                        if (!hid.isNullOrBlank()) foundIds.add(hid)
+                        if (!hid.isNullOrBlank() && (isMariosAccount || !mariosHids.contains(hid))) foundIds.add(hid)
                         val hids = uDoc.get("householdIds") as? List<*>
-                        hids?.mapNotNull { it as? String }?.filter { it.isNotBlank() }?.let {
+                        hids?.mapNotNull { it as? String }?.filter { it.isNotBlank() && (isMariosAccount || !mariosHids.contains(it)) }?.let {
                             foundIds.addAll(it)
                         }
                     }
@@ -145,7 +152,7 @@ class FirestoreSyncRepository(
     }
 
     suspend fun seedFirestoreIfEmpty(householdId: String, userId: String, isMarios: Boolean) {
-        if (!isMarios && householdId.isBlank()) return
+        if (!isMarios) return
         val targetHid = if (householdId.isNotBlank()) householdId else FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
         val targetUid = if (userId.isNotBlank()) userId else FirestoreDataSeed.DEFAULT_USER_UID
 
@@ -487,6 +494,47 @@ class FirestoreSyncRepository(
         return household
     }
 
+    suspend fun ensureHouseholdExists(householdId: String, ownerUid: String, householdName: String = "Το Εξοδολόγιό μου"): Household {
+        if (householdId.isBlank() || ownerUid.isBlank()) {
+            return Household(id = householdId, name = householdName, ownerId = ownerUid, memberUids = listOf(ownerUid))
+        }
+        val docRef = db.collection("households").document(householdId)
+        val snapshot = try { docRef.get().await() } catch (e: Exception) { null }
+        if (snapshot != null && snapshot.exists()) {
+            val existing = snapshot.toObject(Household::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                ?: Household(id = householdId, name = householdName, ownerId = ownerUid, memberUids = listOf(ownerUid))
+            if (!existing.memberUids.contains(ownerUid)) {
+                try {
+                    docRef.update("memberUids", FieldValue.arrayUnion(ownerUid)).await()
+                } catch (_: Exception) {}
+            }
+            return existing
+        }
+
+        val newHousehold = Household(
+            id = householdId,
+            name = householdName.ifBlank { "Το Εξοδολόγιό μου" },
+            ownerId = ownerUid,
+            inviteCode = "OIKO-" + Random.nextInt(1000, 9999).toString(),
+            memberUids = listOf(ownerUid),
+            createdAt = Timestamp.now()
+        )
+        try {
+            docRef.set(newHousehold, SetOptions.merge()).await()
+            val userRef = db.collection("users").document(ownerUid)
+            userRef.set(
+                mapOf(
+                    "householdId" to householdId,
+                    "householdIds" to FieldValue.arrayUnion(householdId)
+                ),
+                SetOptions.merge()
+            ).await()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error ensuring household in Firestore: ${e.message}")
+        }
+        return newHousehold
+    }
+
     suspend fun fetchUserHouseholds(householdIds: List<String>): List<Household> {
         if (householdIds.isEmpty()) return emptyList()
         val list = mutableListOf<Household>()
@@ -541,6 +589,31 @@ class FirestoreSyncRepository(
             mapOf("photoUrl" to photoUrl),
             SetOptions.merge()
         ).await()
+    }
+
+    suspend fun updateUserProfilePreferences(
+        uid: String,
+        appLanguage: String? = null,
+        themeMode: String? = null,
+        reminderEnabled: Boolean? = null,
+        reminderHour: Int? = null,
+        reminderMinute: Int? = null,
+        notificationConsentCompleted: Boolean? = null
+    ) {
+        if (uid.isBlank()) return
+        val updates = mutableMapOf<String, Any>()
+        if (appLanguage != null) updates["appLanguage"] = appLanguage
+        if (themeMode != null) updates["themeMode"] = themeMode
+        if (reminderEnabled != null) updates["reminderEnabled"] = reminderEnabled
+        if (reminderHour != null) updates["reminderHour"] = reminderHour
+        if (reminderMinute != null) updates["reminderMinute"] = reminderMinute
+        if (notificationConsentCompleted != null) updates["notificationConsentCompleted"] = notificationConsentCompleted
+        updates["updatedAt"] = Timestamp.now()
+        try {
+            db.collection("users").document(uid).set(updates, SetOptions.merge()).await()
+        } catch (e: Exception) {
+            Log.w("FirestoreSyncRepo", "Error updating profile preferences: ${e.message}")
+        }
     }
 
     fun observeUserProfile(userId: String): Flow<UserProfile?> {
@@ -743,6 +816,9 @@ class FirestoreSyncRepository(
 
     suspend fun syncExpense(expense: FirebaseExpense) {
         if (expense.householdId.isBlank()) return
+        if (expense.createdByUid.isNotBlank()) {
+            try { ensureHouseholdExists(expense.householdId, expense.createdByUid) } catch (_: Exception) {}
+        }
 
         val docId = if (expense.id.isNotBlank()) expense.id else UUID.randomUUID().toString()
         val expenseToSave = expense.copy(id = docId, createdAt = expense.createdAt ?: Timestamp.now())
@@ -846,6 +922,9 @@ class FirestoreSyncRepository(
 
     suspend fun syncIncome(income: FirebaseIncome) {
         if (income.householdId.isBlank()) return
+        if (income.createdByUid.isNotBlank()) {
+            try { ensureHouseholdExists(income.householdId, income.createdByUid) } catch (_: Exception) {}
+        }
 
         val docId = if (income.id.isNotBlank()) income.id else UUID.randomUUID().toString()
         val incomeToSave = income.copy(id = docId, createdAt = income.createdAt ?: Timestamp.now())
@@ -1074,6 +1153,9 @@ class FirestoreSyncRepository(
 
     suspend fun syncMember(householdId: String, member: FirebaseMember) {
         if (householdId.isBlank()) return
+        if (member.userId.isNotBlank()) {
+            try { ensureHouseholdExists(householdId, member.userId) } catch (_: Exception) {}
+        }
         val docId = if (member.id.isNotBlank()) member.id else UUID.randomUUID().toString()
         val toSave = member.copy(id = docId, householdId = householdId, createdAt = Timestamp.now())
         db.collection("households").document(householdId)
@@ -1110,6 +1192,9 @@ class FirestoreSyncRepository(
 
     suspend fun syncCategory(householdId: String, category: FirebaseCategory) {
         if (householdId.isBlank()) return
+        if (category.userId.isNotBlank()) {
+            try { ensureHouseholdExists(householdId, category.userId) } catch (_: Exception) {}
+        }
         val docId = if (category.id.isNotBlank()) category.id else UUID.randomUUID().toString()
         val toSave = category.copy(id = docId, householdId = householdId, createdAt = Timestamp.now())
         db.collection("households").document(householdId)
@@ -1847,12 +1932,42 @@ class FirestoreSyncRepository(
 
     suspend fun inviteMemberToHousehold(householdId: String, email: String) {
         if (householdId.isBlank() || email.isBlank()) return
-        val doc = db.collection("households").document(householdId).get().await()
-        val currentInvited = doc.get("invitedEmails") as? List<String> ?: emptyList()
-        if (!currentInvited.contains(email)) {
-            db.collection("households").document(householdId)
-                .update("invitedEmails", currentInvited + email)
-                .await()
+        val cleanEmail = email.trim()
+        val lowerEmail = cleanEmail.lowercase()
+        val emailsToAdd = listOf(cleanEmail, lowerEmail).distinct()
+
+        val hDocRef = db.collection("households").document(householdId)
+        val doc = hDocRef.get().await()
+        val currentInvited = (doc.get("invitedEmails") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+        val updatedInvited = (currentInvited + emailsToAdd).distinct()
+
+        hDocRef.update(
+            mapOf(
+                "invitedEmails" to updatedInvited,
+                "updatedAt" to Timestamp.now()
+            )
+        ).await()
+
+        // Cross-account resolution: If user is already registered in users collection, link them immediately
+        try {
+            for (ev in emailsToAdd) {
+                val qUsers = db.collection("users").whereEqualTo("email", ev).get().await()
+                for (uDoc in qUsers.documents) {
+                    val uid = uDoc.id
+                    if (uid.isNotBlank()) {
+                        hDocRef.update("memberUids", FieldValue.arrayUnion(uid)).await()
+                        uDoc.reference.set(
+                            mapOf(
+                                "householdId" to householdId,
+                                "householdIds" to FieldValue.arrayUnion(householdId)
+                            ),
+                            SetOptions.merge()
+                        ).await()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Cross-account invite auto-link notice: ${e.message}")
         }
     }
 

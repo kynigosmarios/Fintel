@@ -87,6 +87,16 @@ object DataSafetyGuard {
         return false
     }
 
+    fun isMariosUser(user: FirebaseUser?): Boolean {
+        val email = user?.email.orEmpty().trim()
+        val uid = user?.uid.orEmpty()
+        return email.equals("kynigosmarios@gmail.com", ignoreCase = true) ||
+                uid == "t5kN4RvPRugIxXUz18Fep2khSrC2" ||
+                uid == "tSLWmkXZ0MTqIKGoX3wd6HdhDw63" ||
+                uid == "jllDLLQl7VgFzOQpVIHi0wo8B013" ||
+                uid == "oA6smvWcC6QYCAKMvYdWEcmVCO43"
+    }
+
     /**
      * Bi-directional Safety Sync:
      * Audits and guarantees that all local categories, members, savings goals, and recurring
@@ -101,6 +111,7 @@ object DataSafetyGuard {
     ) {
         try {
             val userId = user.uid
+            val isMarios = isMariosUser(user)
 
             // 1. Audit & Secure Members (skip combination names and deduplicate by ID)
             val localMembers = repository.getAllMembersList()
@@ -112,28 +123,6 @@ object DataSafetyGuard {
                 if (cleanLocal.size != localMembers.size) {
                     repository.replaceAllMembers(cleanLocal)
                 }
-
-                val remoteMembers = if (activeHouseholdId.isNotBlank()) firestoreSyncRepo.getMembersOnce(activeHouseholdId) else emptyList()
-                if (remoteMembers.isEmpty()) {
-                    cleanLocal.forEach { member ->
-                        val fbMember = FirebaseMember(
-                            id = member.id.toString(),
-                            householdId = activeHouseholdId,
-                            userId = userId,
-                            name = member.name.trim(),
-                            role = member.role,
-                            avatarColorHex = member.avatarColorHex,
-                            voiceKeywords = member.voiceKeywords,
-                            isDefault = member.isDefault,
-                            sortOrder = member.sortOrder
-                        )
-                        if (activeHouseholdId.isNotBlank()) {
-                            firestoreSyncRepo.syncMember(activeHouseholdId, fbMember)
-                        }
-                        firestoreSyncRepo.syncUserMember(userId, fbMember)
-                    }
-                    Log.d(TAG, "Secured ${cleanLocal.size} members to cloud.")
-                }
             }
 
             // 2. Audit & Secure Categories (each category is a unique entity by ID)
@@ -144,32 +133,16 @@ object DataSafetyGuard {
                 if (cleanCategories.size != localCategories.size) {
                     repository.replaceAllCategories(cleanCategories)
                 }
-
-                val remoteCategories = if (activeHouseholdId.isNotBlank()) firestoreSyncRepo.getCategoriesOnce(activeHouseholdId) else emptyList()
-                if (remoteCategories.isEmpty()) {
-                    cleanCategories.forEach { cat ->
-                        val fbCat = FirebaseCategory(
-                            id = cat.id.toString(),
-                            householdId = activeHouseholdId,
-                            userId = userId,
-                            name = cat.name,
-                            iconKey = cat.iconKey,
-                            monthlyBudget = cat.monthlyBudget,
-                            colorHex = cat.colorHex,
-                            voiceKeywords = cat.voiceKeywords,
-                            sortOrder = cat.sortOrder,
-                            fontColorHex = cat.fontColorHex
-                        )
-                        if (activeHouseholdId.isNotBlank()) {
-                            firestoreSyncRepo.syncCategory(activeHouseholdId, fbCat)
-                        }
-                        firestoreSyncRepo.syncUserCategory(userId, fbCat)
-                    }
-                    Log.d(TAG, "Secured ${cleanCategories.size} categories to cloud.")
-                }
             }
 
-            // 3. Audit & Secure Savings Goals
+            // For non-Marios users, DO NOT push local cache up to cloud during audit!
+            // Cloud is the single source of truth for all users.
+            if (!isMarios) {
+                Log.i(TAG, "Audit complete for standard user $userId. Local data clean.")
+                return
+            }
+
+            // 3. Audit & Secure Savings Goals (Marios only)
             val localGoals = repository.getAllSavingsGoalsList()
             if (localGoals.isNotEmpty()) {
                 localGoals.forEach { goal ->
@@ -193,7 +166,7 @@ object DataSafetyGuard {
                 Log.d(TAG, "Secured ${localGoals.size} savings goals to cloud.")
             }
 
-            // 4. Audit & Secure Recurring Expenses
+            // 4. Audit & Secure Recurring Expenses (Marios only)
             val localRecurring = repository.getAllRecurringExpensesList()
             if (localRecurring.isNotEmpty()) {
                 val uniqueRecurring = localRecurring.distinctBy {
@@ -229,10 +202,9 @@ object DataSafetyGuard {
                 Log.d(TAG, "Secured ${uniqueRecurring.size} recurring expenses to cloud.")
             }
 
-            // 5. Audit & Secure Expenses (ensure any genuine local expenses not yet in cloud are mirrored)
+            // 5. Audit & Secure Expenses (Marios only)
             val localExpenses = repository.getAllExpensesList()
             if (localExpenses.isNotEmpty()) {
-                // Filter out any unsynced expenses that are duplicate recurring auto-generated phantoms
                 val unsynced = localExpenses.filter { exp ->
                     exp.cloudId.isBlank() && !exp.note.contains("Πάγια εντολή")
                 }
@@ -252,7 +224,7 @@ object DataSafetyGuard {
                 }
             }
 
-            // 6. Audit & Secure Incomes (ensure all local incomes are mirrored to cloud)
+            // 6. Audit & Secure Incomes (Marios only)
             val localIncomes = repository.getAllIncomesList()
             if (localIncomes.isNotEmpty()) {
                 localIncomes.forEach { inc ->

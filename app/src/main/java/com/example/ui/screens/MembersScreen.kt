@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Star
@@ -175,7 +176,13 @@ fun MembersScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp)
-                .clickable { onShareInviteCode() }
+                .clickable {
+                    if (!isPremium) {
+                        onShowPremiumPaywall("invite_member")
+                    } else {
+                        onShareInviteCode()
+                    }
+                }
                 .testTag("invite_member_pro_button")
         ) {
             Row(
@@ -206,16 +213,16 @@ fun MembersScreen(
                     }
                     Column {
                         Text(
-                            text = if (lang == Localization.Language.ENGLISH) "Invite" else "Πρόσκληση",
+                            text = if (lang == Localization.Language.ENGLISH) "Invite Member via Email" else "Πρόσκληση Μέλους μέσω Email",
                             fontSize = 14.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = if (lang == Localization.Language.ENGLISH)
-                                "additional user to household"
+                                "Shared access • No Pro needed for invited user"
                             else
-                                "επιπλέον χρήστη στο εξοδολόγιο",
+                                "Κοινή πρόσβαση • Χωρίς απαίτηση Pro για τον προσκεκλημένο",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -499,6 +506,69 @@ fun MembersScreen(
                                         modifier = Modifier.size(16.dp),
                                         tint = Color(0xFFEF4444)
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!currentHousehold?.invitedEmails.isNullOrEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "INVITED EMAILS (PENDING ACCESS)" else "ΠΡΟΣΚΕΚΛΗΜΕΝΑ EMAILS (ΚΟΙΝΗ ΠΡΟΣΒΑΣΗ)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                letterSpacing = 0.5.sp
+                            )
+                            currentHousehold!!.invitedEmails.distinct().filter { it.isNotBlank() }.forEach { email ->
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Emerald700.copy(alpha = 0.08f),
+                                    border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.2f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Email,
+                                                contentDescription = null,
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = email,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Emerald700.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = if (lang == Localization.Language.ENGLISH) "INVITED" else "ΠΡΟΣΚΕΚΛΗΜΕΝΟΣ",
+                                                color = Emerald700,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

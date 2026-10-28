@@ -1,7 +1,10 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -300,6 +303,7 @@ fun MainScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
@@ -737,7 +741,7 @@ fun MainScreen(
             household = activeHouseholdForInvite,
             isPro = userProfile?.isPremium == true || activeHouseholdForInvite.isPremium,
             appLanguage = appLanguage,
-            onInviteEmail = { email -> viewModel.inviteMemberByEmail(email) },
+            onInviteEmail = { email -> viewModel.inviteMemberByEmail(email, context) },
             onMessage = { msg -> viewModel.showSnackbar(msg) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall("invite_member") },
             onDismiss = { showInviteDialog = false }
@@ -789,6 +793,14 @@ fun MainScreen(
                 val act = context as? android.app.Activity
                 val launched = if (act != null) onLaunchBilling(act) else false
                 if (!launched) {
+                    try {
+                        val playIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.aistudio.oikonomos.app")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(playIntent)
+                    } catch (e: Exception) {
+                        Log.w("MainScreen", "Could not open Google Play Store: ${e.message}")
+                    }
                     viewModel.unlockPro()
                 }
             },
