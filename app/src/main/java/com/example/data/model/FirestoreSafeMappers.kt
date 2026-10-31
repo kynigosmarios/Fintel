@@ -213,6 +213,10 @@ fun DocumentSnapshot.toSafeHousehold(): Household {
     }
     val docId = getString("id")?.ifBlank { this.id } ?: this.id
 
+    val rolesMap = (get("memberRoles") as? Map<*, *>)?.mapNotNull { (k, v) ->
+        if (k != null && v != null) k.toString() to v.toString() else null
+    }?.toMap() ?: existing?.memberRoles ?: emptyMap()
+
     return (existing ?: Household()).copy(
         id = docId,
         name = getString("name") ?: existing?.name ?: "Το Εξοδολόγιό μου",
@@ -220,6 +224,8 @@ fun DocumentSnapshot.toSafeHousehold(): Household {
         inviteCode = getString("inviteCode") ?: existing?.inviteCode ?: "",
         memberUids = members,
         invitedEmails = invited,
+        memberRoles = rolesMap,
+        pendingInviteRole = getString("pendingInviteRole") ?: existing?.pendingInviteRole ?: "CONTRIBUTOR",
         isPremium = isPrem,
         createdAt = getTimestamp("createdAt") ?: existing?.createdAt,
         updatedAt = getTimestamp("updatedAt") ?: existing?.updatedAt

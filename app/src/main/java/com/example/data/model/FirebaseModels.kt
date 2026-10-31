@@ -12,6 +12,8 @@ data class Household(
     var inviteCode: String = "",
     var memberUids: List<String> = emptyList(),
     var invitedEmails: List<String> = emptyList(),
+    var memberRoles: Map<String, String> = emptyMap(), // uid -> "OWNER" or "CONTRIBUTOR"
+    var pendingInviteRole: String = "CONTRIBUTOR",
     var isPremium: Boolean = false,
     var createdAt: Timestamp? = null,
     var updatedAt: Timestamp? = null

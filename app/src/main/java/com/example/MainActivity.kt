@@ -92,8 +92,9 @@ class MainActivity : ComponentActivity() {
             val data = intent.data
             if (data != null) {
                 val inviteCode = data.getQueryParameter("code")
+                val role = data.getQueryParameter("role")
                 if (!inviteCode.isNullOrBlank()) {
-                    viewModel.joinHousehold(inviteCode)
+                    viewModel.joinHousehold(inviteCode, role)
                 }
             }
         } catch (e: Exception) {

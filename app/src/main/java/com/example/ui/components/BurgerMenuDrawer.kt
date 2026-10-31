@@ -378,7 +378,6 @@ fun BurgerMenuDrawer(
                     // 1. Ρυθμίσεις Εφαρμογής
                     BurgerNavigationItem(
                         title = Localization.appSettings(lang),
-                        subtitle = Localization.appSettingsSubtitle(lang),
                         icon = Icons.Default.Settings,
                         iconTint = Color(0xFF475569),
                         iconBg = Color(0xFF475569).copy(alpha = 0.12f),
@@ -394,7 +393,6 @@ fun BurgerMenuDrawer(
                     // 2. Διαχείριση Εξοδολογίων
                     BurgerNavigationItem(
                         title = Localization.householdManager(lang),
-                        subtitle = currentHousehold?.name ?: (if (lang == Localization.Language.ENGLISH) "Active Household" else "Ενεργό εξοδολόγιο"),
                         icon = Icons.Default.MenuBook,
                         iconTint = Color(0xFF0284C7),
                         iconBg = Color(0xFF0284C7).copy(alpha = 0.12f),
@@ -410,10 +408,6 @@ fun BurgerMenuDrawer(
                     // 3. Το Προφίλ μου
                     BurgerNavigationItem(
                         title = Localization.myProfile(lang),
-                        subtitle = if (userProfile?.isPremium == true)
-                            (if (lang == Localization.Language.ENGLISH) "Fintel Pro Subscriber" else "Fintel Pro συνδρομητής")
-                        else
-                            (if (lang == Localization.Language.ENGLISH) "Account details & Pro" else "Στοιχεία λογαριασμού & Pro"),
                         icon = Icons.Default.Person,
                         iconTint = Emerald700,
                         iconBg = Emerald700.copy(alpha = 0.12f),
@@ -428,7 +422,6 @@ fun BurgerMenuDrawer(
                         Spacer(modifier = Modifier.height(6.dp))
                         BurgerNavigationItem(
                             title = if (lang == Localization.Language.ENGLISH) "Instructions" else "Οδηγίες",
-                            subtitle = if (lang == Localization.Language.ENGLISH) "6-step tutorial for new users" else "Οδηγός 6 βημάτων για νέα μέλη",
                             icon = Icons.Default.Info,
                             iconTint = Color(0xFFD97706),
                             iconBg = Color(0xFFD97706).copy(alpha = 0.12f),
@@ -541,11 +534,11 @@ fun BurgerMenuDrawer(
 @Composable
 private fun BurgerNavigationItem(
     title: String,
-    subtitle: String,
     icon: ImageVector,
     iconTint: Color,
     iconBg: Color,
     testTag: String,
+    subtitle: String? = null,
     onClick: () -> Unit
 ) {
     Surface(
@@ -558,7 +551,7 @@ private fun BurgerNavigationItem(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = if (subtitle != null) 12.dp else 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
@@ -581,18 +574,20 @@ private fun BurgerNavigationItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    fontSize = 14.sp,
+                    fontSize = 14.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = 11.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (subtitle != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             Icon(

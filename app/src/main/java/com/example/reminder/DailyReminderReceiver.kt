@@ -11,8 +11,8 @@ class DailyReminderReceiver : BroadcastReceiver() {
         if (DailyReminderManager.isReminderEnabled(context)) {
             DailyReminderManager.showNotification(
                 context,
-                "Fintel - Βραδινή Υπενθύμιση 🌙",
-                "Είχατε κάποιο έξοδο σήμερα; Πείτε το με τη φωνή σας σε 3 δευτερόλεπτα! 🎙️"
+                "Πέρασες τα σημερινά σου έξοδα;",
+                "Γράψε τα ή πες τα με τη φωνή σου για να μη τα ξεχάσεις 🎙️"
             )
         }
         val hour = DailyReminderManager.getReminderHour(context)

@@ -136,8 +136,8 @@ object DailyReminderManager {
 
     fun showNotification(
         context: Context,
-        title: String = "Fintel - Βραδινή Υπενθύμιση 🌙",
-        message: String = "Είχατε κάποιο έξοδο σήμερα; Πείτε το με τη φωνή σας σε 3 δευτερόλεπτα! 🎙️"
+        title: String = "Πέρασες τα σημερινά σου έξοδα;",
+        message: String = "Γράψε τα ή πες τα με τη φωνή σου για να μη τα ξεχάσεις 🎙️"
     ) {
         createNotificationChannel(context)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&

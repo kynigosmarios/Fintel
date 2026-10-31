@@ -68,9 +68,12 @@ fun MembersScreen(
     currentHousehold: Household?,
     isPremium: Boolean,
     appLanguage: String,
+    canManage: Boolean = true,
+    currentUserEmail: String = "",
     onAddMember: () -> Unit,
     onEditMember: (FamilyMember) -> Unit,
     onDeleteMember: (FamilyMember) -> Unit,
+    onRemoveInvitedEmail: ((String) -> Unit)? = null,
     onUpdateMemberColor: (FamilyMember, Long) -> Unit,
     onMoveMemberUp: (FamilyMember) -> Unit,
     onMoveMemberDown: (FamilyMember) -> Unit,
@@ -80,6 +83,7 @@ fun MembersScreen(
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
     var memberToDelete by remember { mutableStateOf<FamilyMember?>(null) }
+    var invitedEmailToDelete by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = modifier
@@ -130,129 +134,146 @@ fun MembersScreen(
                         )
                     }
 
-                    // Primary Add Member Button (Modern Pill)
-                    Button(
-                        onClick = {
-                            if (!isPremium && members.size >= 4) {
-                                onShowPremiumPaywall("members_limit")
-                            } else {
-                                onAddMember()
-                            }
-                        },
-                        modifier = Modifier
-                            .height(38.dp)
-                            .testTag("add_member_button"),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Emerald700,
-                            contentColor = Color.White
-                        ),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (lang == Localization.Language.ENGLISH) "Add" else "Προσθήκη",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                    if (canManage) {
+                        // Primary Add Member Button (Modern Pill)
+                        Button(
+                            onClick = {
+                                if (!isPremium && members.size >= 4) {
+                                    onShowPremiumPaywall("members_limit")
+                                } else {
+                                    onAddMember()
+                                }
+                            },
+                            modifier = Modifier
+                                .height(38.dp)
+                                .testTag("add_member_button"),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Emerald700,
+                                contentColor = Color.White
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "Add" else "Προσθήκη",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "View Only" else "Προβολή Μόνο",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
                     }
                 }
             }
         }
 
         // Invite Member (* Pro) Button below active members and above the manual member list
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = Amber700.copy(alpha = 0.08f),
-            border = BorderStroke(1.dp, Amber700.copy(alpha = 0.45f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .clickable {
-                    if (!isPremium) {
-                        onShowPremiumPaywall("invite_member")
-                    } else {
-                        onShareInviteCode()
-                    }
-                }
-                .testTag("invite_member_pro_button")
-        ) {
-            Row(
+        if (canManage) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = Amber700.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, Amber700.copy(alpha = 0.45f)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .clickable {
+                        if (!isPremium) {
+                            onShowPremiumPaywall("invite_member")
+                        } else {
+                            onShareInviteCode()
+                        }
+                    }
+                    .testTag("invite_member_pro_button")
             ) {
                 Row(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Amber700.copy(alpha = 0.15f),
-                        modifier = Modifier.size(34.dp)
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.PersonAdd,
-                                contentDescription = null,
-                                tint = Amber700,
-                                modifier = Modifier.size(17.dp)
+                        Surface(
+                            shape = CircleShape,
+                            color = Amber700.copy(alpha = 0.15f),
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.PersonAdd,
+                                    contentDescription = null,
+                                    tint = Amber700,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "Invite Member" else "Πρόσκληση Μέλους",
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH)
+                                    "Shared access • Choose Owner or Contributor"
+                                else
+                                    "Κοινή πρόσβαση • Επιλογή Ιδιοκτήτη ή Καταχωρητή",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    Column {
-                        Text(
-                            text = if (lang == Localization.Language.ENGLISH) "Invite Member via Email" else "Πρόσκληση Μέλους μέσω Email",
-                            fontSize = 14.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = if (lang == Localization.Language.ENGLISH)
-                                "Shared access • No Pro needed for invited user"
-                            else
-                                "Κοινή πρόσβαση • Χωρίς απαίτηση Pro για τον προσκεκλημένο",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
 
-                Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Amber700.copy(alpha = 0.18f),
-                    border = BorderStroke(1.dp, Amber700.copy(alpha = 0.45f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Amber700.copy(alpha = 0.18f),
+                        border = BorderStroke(1.dp, Amber700.copy(alpha = 0.45f))
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = Amber700,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Pro",
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Amber700
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Amber700,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Pro",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Amber700
+                            )
+                        }
                     }
                 }
             }
@@ -358,7 +379,7 @@ fun MembersScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .clickable { onEditMember(member) }
+                                    .clickable(enabled = canManage) { onEditMember(member) }
                                     .padding(vertical = 4.dp, horizontal = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -366,34 +387,34 @@ fun MembersScreen(
                                 Surface(
                                     shape = CircleShape,
                                     color = color,
-                                    modifier = Modifier.size(46.dp)
+                                    modifier = Modifier.size(38.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Text(
                                             text = member.name.take(1).uppercase(Locale.getDefault()),
                                             color = Color.White,
-                                            fontSize = 19.sp,
+                                            fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 // Details (Name + Role + Default badge)
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = member.name,
-                                        fontSize = 16.sp,
+                                        fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Spacer(modifier = Modifier.height(3.dp))
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         Surface(
                                             shape = RoundedCornerShape(6.dp),
@@ -401,10 +422,10 @@ fun MembersScreen(
                                         ) {
                                             Text(
                                                 text = Localization.translateRole(member.role, lang),
-                                                fontSize = 11.5.sp,
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = color,
-                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
                                         }
                                         if (member.isDefault) {
@@ -414,10 +435,10 @@ fun MembersScreen(
                                             ) {
                                                 Text(
                                                     text = if (lang == Localization.Language.ENGLISH) "★ Default" else "★ Προεπιλογή",
-                                                    fontSize = 10.5.sp,
+                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = Emerald700,
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                                 )
                                             }
                                         }
@@ -425,87 +446,89 @@ fun MembersScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(6.dp))
+                            if (canManage) {
+                                Spacer(modifier = Modifier.width(4.dp))
 
-                            // Actions: Reorder, Edit, Delete (isolated, distinct, responsive)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                if (members.size > 1) {
+                                // Actions: Reorder, Edit, Delete (Compact & closer together)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    if (members.size > 1) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (index > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                                    else Color.Transparent
+                                                )
+                                                .clickable(enabled = index > 0) { onMoveMemberUp(member) }
+                                                .testTag("move_up_mem_${member.id}"),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowUpward,
+                                                contentDescription = "Move Up",
+                                                modifier = Modifier.size(14.dp),
+                                                tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            )
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (index < members.size - 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                                    else Color.Transparent
+                                                )
+                                                .clickable(enabled = index < members.size - 1) { onMoveMemberDown(member) }
+                                                .testTag("move_down_mem_${member.id}"),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDownward,
+                                                contentDescription = "Move Down",
+                                                modifier = Modifier.size(14.dp),
+                                                tint = if (index < members.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            )
+                                        }
+                                    }
+
                                     Box(
                                         modifier = Modifier
-                                            .size(34.dp)
+                                            .size(28.dp)
                                             .clip(CircleShape)
-                                            .background(
-                                                if (index > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                                                else Color.Transparent
-                                            )
-                                            .clickable(enabled = index > 0) { onMoveMemberUp(member) }
-                                            .testTag("move_up_mem_${member.id}"),
+                                            .background(Emerald700.copy(alpha = 0.12f))
+                                            .clickable { onEditMember(member) }
+                                            .testTag("edit_mem_${member.id}"),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.ArrowUpward,
-                                            contentDescription = "Move Up",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit",
+                                            modifier = Modifier.size(14.dp),
+                                            tint = Emerald700
                                         )
                                     }
 
                                     Box(
                                         modifier = Modifier
-                                            .size(34.dp)
+                                            .size(28.dp)
                                             .clip(CircleShape)
-                                            .background(
-                                                if (index < members.size - 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                                                else Color.Transparent
-                                            )
-                                            .clickable(enabled = index < members.size - 1) { onMoveMemberDown(member) }
-                                            .testTag("move_down_mem_${member.id}"),
+                                            .background(Color(0xFFEF4444).copy(alpha = 0.12f))
+                                            .clickable { memberToDelete = member }
+                                            .testTag("delete_mem_${member.id}"),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.ArrowDownward,
-                                            contentDescription = "Move Down",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = if (index < members.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete",
+                                            modifier = Modifier.size(14.dp),
+                                            tint = Color(0xFFEF4444)
                                         )
                                     }
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Emerald700.copy(alpha = 0.12f))
-                                        .clickable { onEditMember(member) }
-                                        .testTag("edit_mem_${member.id}"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = Emerald700
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFEF4444).copy(alpha = 0.12f))
-                                        .clickable { memberToDelete = member }
-                                        .testTag("delete_mem_${member.id}"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = Color(0xFFEF4444)
-                                    )
                                 }
                             }
                         }
@@ -556,17 +579,41 @@ fun MembersScreen(
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
-                                        Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = Emerald700.copy(alpha = 0.15f)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
-                                            Text(
-                                                text = if (lang == Localization.Language.ENGLISH) "INVITED" else "ΠΡΟΣΚΕΚΛΗΜΕΝΟΣ",
-                                                color = Emerald700,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Emerald700.copy(alpha = 0.15f)
+                                            ) {
+                                                Text(
+                                                    text = if (lang == Localization.Language.ENGLISH) "INVITED" else "ΠΡΟΣΚΕΚΛΗΜΕΝΟΣ",
+                                                    color = Emerald700,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+
+                                            if (canManage && onRemoveInvitedEmail != null && !email.equals(currentUserEmail, ignoreCase = true)) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFFEF4444).copy(alpha = 0.12f))
+                                                        .clickable { invitedEmailToDelete = email }
+                                                        .testTag("delete_invited_email_btn"),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = if (lang == Localization.Language.ENGLISH) "Revoke Access" else "Αφαίρεση πρόσβασης",
+                                                        modifier = Modifier.size(14.dp),
+                                                        tint = Color(0xFFEF4444)
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -618,6 +665,67 @@ fun MembersScreen(
             dismissButton = {
                 TextButton(onClick = { memberToDelete = null }) {
                     Text(Localization.cancel(lang))
+                }
+            }
+        )
+    }
+
+    // Revoke Invited Email Access Confirmation Dialog
+    if (invitedEmailToDelete != null) {
+        val target = invitedEmailToDelete!!
+        AlertDialog(
+            onDismissRequest = { invitedEmailToDelete = null },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "Revoke Access" else "Αφαίρεση Πρόσβασης",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = if (lang == Localization.Language.ENGLISH)
+                        "Are you sure you want to revoke access for \"$target\" from this household? They will no longer be able to view or log expenses."
+                    else
+                        "Είστε βέβαιοι ότι θέλετε να αφαιρέσετε την πρόσβαση του χρήστη «$target» από αυτό το εξοδολόγιο; Δεν θα μπορεί πλέον να βλέπει ή να καταχωρεί έξοδα.",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val toRemove = invitedEmailToDelete
+                        invitedEmailToDelete = null
+                        if (toRemove != null) {
+                            onRemoveInvitedEmail?.invoke(toRemove)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "Revoke" else "Αφαίρεση",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { invitedEmailToDelete = null }) {
+                    Text(text = if (lang == Localization.Language.ENGLISH) "Cancel" else "Ακύρωση")
                 }
             }
         )

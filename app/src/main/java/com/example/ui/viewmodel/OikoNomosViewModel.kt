@@ -94,6 +94,26 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private val _userHouseholds = MutableStateFlow<List<Household>>(emptyList())
     val userHouseholds = _userHouseholds.asStateFlow()
 
+    val canManageMembersAndCategories: StateFlow<Boolean> = combine(
+        _currentUser,
+        _currentHousehold
+    ) { user, household ->
+        if (user == null || household == null) true
+        else if (household.ownerId.isBlank() || household.ownerId == user.uid) true
+        else {
+            val role = household.memberRoles[user.uid]
+            role.equals("OWNER", ignoreCase = true)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun hasOwnerPermissions(): Boolean {
+        val user = _currentUser.value ?: return true
+        val household = _currentHousehold.value ?: return true
+        if (household.ownerId.isBlank() || household.ownerId == user.uid) return true
+        val role = household.memberRoles[user.uid]
+        return role?.equals("OWNER", ignoreCase = true) == true
+    }
+
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
@@ -509,9 +529,13 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     households = (households + fetched).distinctBy { it.id }
                 }
             } else {
-                // Strict isolation: non-Marios users must NEVER have Marios's households
-                val mariosHids = setOf(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
-                households = households.filterNot { mariosHids.contains(it.id) }
+                val userEmail = user.email ?: profile.email
+                // Keep households where user is owner, member, or has been invited
+                households = households.filter { h ->
+                    h.ownerId == user.uid ||
+                    h.memberUids.contains(user.uid) ||
+                    h.invitedEmails.any { it.equals(userEmail, ignoreCase = true) }
+                }
                 if (households.isEmpty()) {
                     val newH = firestoreSyncRepo.createHousehold(user.uid, "Το Εξοδολόγιό μου")
                     households = listOf(newH)
@@ -525,11 +549,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 _userHouseholds.value = households
             }
 
-            val rawSavedHid = prefs.getString("last_household_id", "") ?: ""
-            val savedHid = if (!isMarios && (rawSavedHid == com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID || rawSavedHid == "e1d4ae67-499")) {
-                prefs.edit().remove("last_household_id").apply()
-                ""
-            } else rawSavedHid
+            val savedHid = prefs.getString("last_household_id", "") ?: ""
 
             val userHouseholdIds = households.map { it.id }
             val savedBelongsToUser = savedHid.isNotBlank() && userHouseholdIds.contains(savedHid)
@@ -609,37 +629,6 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private fun isMariosSeedCategory(catName: String): Boolean = false
 
     private suspend fun sanitizeAccountIsolation(user: FirebaseUser, activeHouseholdId: String) {
-        val isMarios = isMariosUser(user)
-        val mariosHids = setOf(
-            com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID,
-            "e1d4ae67-499"
-        )
-        val mariosUids = setOf(
-            com.example.data.seed.FirestoreDataSeed.DEFAULT_USER_UID,
-            "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63",
-            "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"
-        )
-        if (isMarios) {
-            // Actively purge any foreign incomes or expenses that leaked into Marios's default household
-            try {
-                val hIncomes = firestoreSyncRepo.getIncomesOnce(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID)
-                for (inc in hIncomes) {
-                    if (inc.createdByUid.isNotBlank() && !mariosUids.contains(inc.createdByUid)) {
-                        firestoreSyncRepo.deleteIncome(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, inc.id)
-                    }
-                }
-                val hExpenses = firestoreSyncRepo.getExpensesOnce(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID)
-                for (exp in hExpenses) {
-                    if (exp.createdByUid.isNotBlank() && !mariosUids.contains(exp.createdByUid)) {
-                        firestoreSyncRepo.deleteExpense(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, exp.id)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("OikoNomosVM", "Sanitize Marios household warning: ${e.message}")
-            }
-            return
-        }
-
         val userUid = user.uid
 
         // 1. Members: Ensure the active household has at least one member (the user) in Firestore
@@ -701,30 +690,6 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             }
         } catch (e: Exception) {
             Log.w("OikoNomosVM", "Sanitize categories warning: ${e.message}")
-        }
-
-        // 3. Incomes: Only purge leaked Marios seed household incomes
-        try {
-            val uIncomes = firestoreSyncRepo.getUserIncomesOnce(userUid)
-            for (inc in uIncomes) {
-                if (mariosHids.contains(inc.householdId) || (inc.createdByUid.isNotBlank() && mariosUids.contains(inc.createdByUid))) {
-                    firestoreSyncRepo.deleteUserIncome(userUid, inc.id)
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("OikoNomosVM", "Sanitize incomes warning: ${e.message}")
-        }
-
-        // 4. Expenses: Only purge leaked Marios seed household expenses
-        try {
-            val uExpenses = firestoreSyncRepo.getUserExpensesOnce(userUid)
-            for (exp in uExpenses) {
-                if (mariosHids.contains(exp.householdId) || (exp.createdByUid.isNotBlank() && mariosUids.contains(exp.createdByUid))) {
-                    firestoreSyncRepo.deleteUserExpense(userUid, exp.id)
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("OikoNomosVM", "Sanitize expenses warning: ${e.message}")
         }
     }
 
@@ -1148,15 +1113,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63",
                     "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"
                 )
-                val filteredCloudExpenses = if (!isMarios) {
-                    allCloudExpenses.filter { exp ->
-                        exp.householdId == activeHouseholdId && (exp.createdByUid.isBlank() || exp.createdByUid == userUid)
-                    }
-                } else {
-                    allCloudExpenses.filter { exp ->
-                        (exp.householdId == activeHouseholdId || (exp.householdId.isBlank() && _userHouseholds.value.size <= 1)) &&
-                        (exp.createdByUid.isBlank() || mariosUids.contains(exp.createdByUid))
-                    }
+                val filteredCloudExpenses = allCloudExpenses.filter { exp ->
+                    exp.householdId == activeHouseholdId || (exp.householdId.isBlank() && _userHouseholds.value.size <= 1)
                 }
 
                 if (filteredCloudExpenses.isNotEmpty()) {
@@ -1168,18 +1126,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
                 // 6. RECOVER / RESTORE INCOMES (Zero Data Loss across household scope)
                 val allCloudIncomes = firestoreSyncRepo.getAllIncomesAcrossAllScopes(allHouseholdIds, user.uid)
-                val mariosHids = setOf(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
-                val filteredCloudIncomes = if (!isMarios) {
-                    allCloudIncomes.filter { inc ->
-                        !mariosHids.contains(inc.householdId) &&
-                        (inc.createdByUid.isBlank() || inc.createdByUid == userUid) &&
-                        inc.householdId == activeHouseholdId
-                    }
-                } else {
-                    allCloudIncomes.filter { inc ->
-                        (inc.householdId == activeHouseholdId || (inc.householdId.isBlank() && _userHouseholds.value.size <= 1)) &&
-                        (inc.createdByUid.isBlank() || mariosUids.contains(inc.createdByUid))
-                    }
+                val filteredCloudIncomes = allCloudIncomes.filter { inc ->
+                    inc.householdId == activeHouseholdId || (inc.householdId.isBlank() && _userHouseholds.value.size <= 1)
                 }
 
                 if (filteredCloudIncomes.isNotEmpty()) {
@@ -1345,18 +1293,8 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 exp.householdId == currentHid || (exp.householdId.isBlank() && _userHouseholds.value.size <= 1)
             } else true
         }
-        val filteredExpenses = if (!isMarios) {
-            rawList.filter { exp ->
-                !mariosHids.contains(exp.householdId) &&
-                (exp.createdByUid.isBlank() || exp.createdByUid == userUid)
-            }
-        } else {
-            rawList.filter { exp ->
-                exp.createdByUid.isBlank() || mariosUids.contains(exp.createdByUid)
-            }
-        }
 
-        val combined = filteredExpenses
+        val combined = rawList
             .distinctBy { it.id.ifBlank { "${it.title}_${it.timestamp}_${it.amount}" } }
             .sortedWith(
                 compareByDescending<FirebaseExpense> { it.timestamp }
@@ -1430,28 +1368,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                     .thenByDescending { it.id }
             )
 
-        val user = _currentUser.value
-        val isMarios = isMariosUser(user)
-        val userUid = user?.uid.orEmpty()
-        val mariosHids = setOf(com.example.data.seed.FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499")
-        val mariosUids = setOf(
-            com.example.data.seed.FirestoreDataSeed.DEFAULT_USER_UID,
-            "t5kN4RvPRugIxXUz18Fep2khSrC2", "tSLWmkXZ0MTqIKGoX3wd6HdhDw63",
-            "jllDLLQl7VgFzOQpVIHi0wo8B013", "oA6smvWcC6QYCAKMvYdWEcmVCO43"
-        )
-
-        val filteredRemote = if (!isMarios) {
-            combinedRemote.filter { inc ->
-                !mariosHids.contains(inc.householdId) &&
-                (inc.createdByUid.isBlank() || inc.createdByUid == userUid)
-            }
-        } else {
-            combinedRemote.filter { inc ->
-                inc.createdByUid.isBlank() || mariosUids.contains(inc.createdByUid)
-            }
-        }
-
-        val domainRemote = mapFirebaseIncomesToDomain(filteredRemote)
+        val domainRemote = mapFirebaseIncomesToDomain(combinedRemote)
         val recentLocalIncomes = _allIncomes.value.filter { local ->
             local.cloudId.isNotBlank() && (System.currentTimeMillis() - local.timestamp < 120_000L) &&
             domainRemote.none { it.cloudId == local.cloudId || (it.title == local.title && Math.abs(it.timestamp - local.timestamp) < 5000 && Math.abs(it.amount - local.amount) < 0.01) }
@@ -2004,12 +1921,12 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun joinHousehold(code: String) {
+    fun joinHousehold(code: String, role: String? = null) {
         val user = _currentUser.value ?: return
         viewModelScope.launch {
             try {
                 _isSyncing.value = true
-                val result = firestoreSyncRepo.joinHouseholdByCode(user.uid, code)
+                val result = firestoreSyncRepo.joinHouseholdByCode(user.uid, code, role)
                 result.onSuccess { h ->
                     _currentHousehold.value = h
                     observeHouseholdData(h.id)
@@ -2025,7 +1942,20 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun inviteMemberByEmail(email: String, context: Context? = null) {
+    fun updateHouseholdInviteRole(role: String) {
+        val hid = _currentHousehold.value?.id ?: return
+        viewModelScope.launch {
+            try {
+                firestoreSyncRepo.updateHouseholdInviteRole(hid, role)
+                val cur = _currentHousehold.value
+                if (cur != null) {
+                    _currentHousehold.value = cur.copy(pendingInviteRole = role)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun inviteMemberByEmail(email: String, role: String = "CONTRIBUTOR", context: Context? = null) {
         val hid = _currentHousehold.value?.id ?: return
         val cleanEmail = email.trim()
         val isEn = _appLanguage.value == "EN"
@@ -2044,13 +1974,19 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
         viewModelScope.launch {
             try {
-                firestoreSyncRepo.inviteMemberToHousehold(hid, cleanEmail)
+                firestoreSyncRepo.inviteMemberToHousehold(hid, cleanEmail, role)
 
                 // Update current household state immediately
                 val currentH = _currentHousehold.value
                 if (currentH != null && currentH.id == hid) {
                     val updated = (currentH.invitedEmails + cleanEmail).distinct()
-                    _currentHousehold.value = currentH.copy(invitedEmails = updated)
+                    val updatedRoles = currentH.memberRoles.toMutableMap()
+                    updatedRoles[cleanEmail.lowercase()] = role
+                    _currentHousehold.value = currentH.copy(
+                        invitedEmails = updated,
+                        memberRoles = updatedRoles,
+                        pendingInviteRole = role
+                    )
                 }
 
                 // Refresh user households list from cloud
@@ -2129,6 +2065,94 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             } catch (e: Exception) {
                 showSnackbar("Σφάλμα πρόσκλησης: ${e.message}")
+            }
+        }
+    }
+
+    fun removeMemberByEmail(email: String) {
+        val hid = _currentHousehold.value?.id ?: return
+        val cleanEmail = email.trim()
+        val isEn = _appLanguage.value == "EN"
+
+        // Prevent removing the owner's own email
+        val ownerEmail = _currentUser.value?.email ?: _userProfile.value?.email ?: ""
+        if (cleanEmail.equals(ownerEmail, ignoreCase = true)) {
+            showSnackbar(if (isEn) "Cannot remove the household owner" else "Δεν μπορείτε να αφαιρέσετε τον κάτοχο του εξοδολογίου")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                firestoreSyncRepo.removeMemberFromHousehold(hid, cleanEmail)
+
+                // Update current household state immediately
+                val currentH = _currentHousehold.value
+                if (currentH != null && currentH.id == hid) {
+                    val updated = currentH.invitedEmails.filterNot { it.equals(cleanEmail, ignoreCase = true) }
+                    val updatedRoles = currentH.memberRoles.toMutableMap()
+                    updatedRoles.remove(cleanEmail.lowercase())
+                    _currentHousehold.value = currentH.copy(
+                        invitedEmails = updated,
+                        memberRoles = updatedRoles
+                    )
+                }
+
+                showSnackbar(
+                    if (isEn) "Access revoked for $cleanEmail"
+                    else "Η πρόσβαση του χρήστη «$cleanEmail» αφαιρέθηκε"
+                )
+            } catch (e: Exception) {
+                Log.w("OikoNomosVM", "Error removing member by email: ${e.message}")
+                showSnackbar(
+                    if (isEn) "Error revoking access: ${e.message}"
+                    else "Σφάλμα αφαίρεσης πρόσβασης: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun isCurrentUserPro(): Boolean {
+        return _userProfile.value?.isPremium == true || isMariosUser() || _currentHousehold.value?.isPremium == true
+    }
+
+    fun deleteHousehold(household: Household) {
+        val user = _currentUser.value ?: return
+        val isUserPro = isCurrentUserPro() || household.isPremium
+        if (!isUserPro) {
+            showPremiumPaywall("multi_exodologio")
+            return
+        }
+
+        val isCurrent = _currentHousehold.value?.id == household.id
+        val remaining = _userHouseholds.value.filter { it.id != household.id }
+
+        viewModelScope.launch {
+            try {
+                firestoreSyncRepo.deleteHousehold(household.id, user.uid)
+                if (remaining.isNotEmpty()) {
+                    _userHouseholds.value = remaining
+                    if (isCurrent) {
+                        switchExodologio(remaining.first())
+                    }
+                } else {
+                    val defaultName = if (_appLanguage.value == "EN") "My Household Book" else "Το Εξοδολόγιό μου"
+                    val newHousehold = firestoreSyncRepo.createHousehold(defaultName, user.uid)
+                    _userHouseholds.value = listOf(newHousehold)
+                    switchExodologio(newHousehold)
+                }
+                showSnackbar(
+                    if (_appLanguage.value == "EN")
+                        "Household \"${household.name}\" deleted successfully"
+                    else
+                        "Το εξοδολόγιο «${household.name}» διαγράφηκε επιτυχώς"
+                )
+            } catch (e: Exception) {
+                showSnackbar(
+                    if (_appLanguage.value == "EN")
+                        "Error deleting household: ${e.message}"
+                    else
+                        "Σφάλμα διαγραφής εξοδολογίου: ${e.message}"
+                )
             }
         }
     }
@@ -2821,6 +2845,9 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun openExodologioDetailsDialog() {
         _showExodologioDetailsDialog.value = true
+        viewModelScope.launch {
+            refreshUserHouseholds()
+        }
     }
 
     fun dismissExodologioDetailsDialog() {
@@ -2829,10 +2856,44 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun openExodologioManager() {
         _showExodologioManagerDialog.value = true
+        viewModelScope.launch {
+            refreshUserHouseholds()
+        }
     }
 
     fun dismissExodologioManager() {
         _showExodologioManagerDialog.value = false
+    }
+
+    suspend fun refreshUserHouseholds() {
+        val user = _currentUser.value ?: return
+        val userEmail = user.email ?: _userProfile.value?.email ?: ""
+        try {
+            val discoveredHids = firestoreSyncRepo.discoverUserHouseholds(user.uid, userEmail)
+            val allHids = (_userHouseholds.value.map { it.id } + (_userProfile.value?.householdIds ?: emptyList()) + discoveredHids)
+                .filter { it.isNotBlank() }
+                .distinct()
+            val loaded = firestoreSyncRepo.fetchUserHouseholds(allHids)
+            val valid = loaded.filter { h ->
+                h.ownerId == user.uid ||
+                h.memberUids.contains(user.uid) ||
+                h.invitedEmails.any { it.equals(userEmail, ignoreCase = true) }
+            }
+            if (valid.isNotEmpty()) {
+                _userHouseholds.value = valid
+                val p = _userProfile.value
+                if (p != null) {
+                    val validIds = valid.map { it.id }
+                    if (p.householdIds != validIds) {
+                        val updated = p.copy(householdIds = validIds)
+                        _userProfile.value = updated
+                        saveUserProfileToPrefs(updated)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("OikoNomosVM", "refreshUserHouseholds error: ${e.message}")
+        }
     }
 
     fun renameCurrentHousehold(newName: String) {
@@ -4285,6 +4346,10 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun seedStandardCategories() {
+        if (!hasOwnerPermissions()) {
+            showSnackbar(if (_appLanguage.value == "EN") "Only household owners can manage categories" else "Μόνο οι ιδιοκτήτες του εξοδολογίου μπορούν να διαχειριστούν κατηγορίες")
+            return
+        }
         viewModelScope.launch {
             val existing = repository.getAllCategoriesList()
             val maxSort = existing.maxOfOrNull { it.sortOrder } ?: -1
@@ -4308,6 +4373,10 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
     // Member CRUD
     fun openMemberDialog(member: FamilyMember? = null) {
+        if (!hasOwnerPermissions()) {
+            showSnackbar(if (_appLanguage.value == "EN") "Only household owners can manage members" else "Μόνο οι ιδιοκτήτες του εξοδολογίου μπορούν να διαχειριστούν μέλη")
+            return
+        }
         _editingMember.value = member
         _showMemberDialog.value = true
     }
@@ -4514,6 +4583,10 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun deleteMember(member: FamilyMember) {
+        if (!hasOwnerPermissions()) {
+            showSnackbar(if (_appLanguage.value == "EN") "Only household owners can delete members" else "Μόνο οι ιδιοκτήτες του εξοδολογίου μπορούν να διαγράψουν μέλη")
+            return
+        }
         _allMembers.value = _allMembers.value.filter { it.id != member.id }
         viewModelScope.launch {
             repository.deleteMember(member)
@@ -4636,6 +4709,10 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
 
     // Category CRUD
     fun openCategoryDialog(category: ExpenseCategory? = null) {
+        if (!hasOwnerPermissions()) {
+            showSnackbar(if (_appLanguage.value == "EN") "Only household owners can manage categories" else "Μόνο οι ιδιοκτήτες του εξοδολογίου μπορούν να διαχειριστούν κατηγορίες")
+            return
+        }
         _editingCategory.value = category
         _showCategoryDialog.value = true
     }
@@ -4791,6 +4868,10 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun deleteCategory(category: ExpenseCategory) {
+        if (!hasOwnerPermissions()) {
+            showSnackbar(if (_appLanguage.value == "EN") "Only household owners can delete categories" else "Μόνο οι ιδιοκτήτες του εξοδολογίου μπορούν να διαγράψουν κατηγορίες")
+            return
+        }
         _allCategories.value = _allCategories.value.filter { it.id != category.id }
         viewModelScope.launch {
             repository.deleteCategory(category)

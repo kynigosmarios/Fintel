@@ -63,6 +63,7 @@ import java.util.Locale
 fun CategoriesScreen(
     categories: List<ExpenseCategory>,
     appLanguage: String,
+    canManage: Boolean = true,
     onAddCategory: () -> Unit,
     onEditCategory: (ExpenseCategory) -> Unit,
     onDeleteCategory: (ExpenseCategory) -> Unit,
@@ -123,66 +124,81 @@ fun CategoriesScreen(
                         )
                     }
 
-                    // Action buttons: Defaults pill + Add Category pill
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Seed standard categories button (Soft Pill)
-                        if (categories.size < 5) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color(0xFFD1FAE5).copy(alpha = 0.7f),
-                                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
-                                modifier = Modifier.clickable { onSeedStandardCategories() }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    if (canManage) {
+                        // Action buttons: Defaults pill + Add Category pill
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Seed standard categories button (Soft Pill)
+                            if (categories.size < 5) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFFD1FAE5).copy(alpha = 0.7f),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
+                                    modifier = Modifier.clickable { onSeedStandardCategories() }
                                 ) {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = null,
-                                        tint = Color(0xFF047857),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Defaults" else "Έτοιμες",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF047857)
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            tint = Color(0xFF047857),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "Defaults" else "Έτοιμες",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF047857)
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        // Primary Add Category Button (Modern Pill)
-                        Button(
-                            onClick = onAddCategory,
-                            modifier = Modifier
-                                .height(38.dp)
-                                .testTag("add_category_button"),
+                            // Primary Add Category Button (Modern Pill)
+                            Button(
+                                onClick = onAddCategory,
+                                modifier = Modifier
+                                    .height(38.dp)
+                                    .testTag("add_category_button"),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Emerald700,
+                                    contentColor = Color.White
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "Add" else "Προσθήκη",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
                             shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Emerald700,
-                                contentColor = Color.White
-                            ),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (lang == Localization.Language.ENGLISH) "Add" else "Προσθήκη",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                text = if (lang == Localization.Language.ENGLISH) "View Only" else "Προβολή Μόνο",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                             )
                         }
                     }
@@ -307,143 +323,145 @@ fun CategoriesScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .clickable { onEditCategory(category) }
+                                    .clickable(enabled = canManage) { onEditCategory(category) }
                                     .padding(vertical = 4.dp, horizontal = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 // Category Icon in tinted container
                                 Surface(
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(12.dp),
                                     color = color.copy(alpha = 0.16f),
-                                    modifier = Modifier.size(46.dp)
+                                    modifier = Modifier.size(38.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = CategoryIconHelper.getIcon(category.iconKey),
                                             contentDescription = null,
                                             tint = color,
-                                            modifier = Modifier.size(23.dp)
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 // Details (Title + Budget)
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = Localization.translateCategory(category.name, lang),
-                                        fontSize = 16.sp,
+                                        fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     if (category.monthlyBudget > 0.0) {
                                         Surface(
                                             shape = RoundedCornerShape(6.dp),
                                             color = Emerald700.copy(alpha = 0.12f)
                                         ) {
                                             Text(
-                                                text = "🎯 Budget: ${String.format(Locale.US, "%.2f €", category.monthlyBudget)}",
-                                                fontSize = 12.sp,
+                                                text = "🎯 ${String.format(Locale.US, "%.2f €", category.monthlyBudget)}",
+                                                fontSize = 11.sp,
                                                 color = Emerald700,
                                                 fontWeight = FontWeight.SemiBold,
-                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
                                         }
                                     } else {
                                         Text(
-                                            text = if (lang == Localization.Language.ENGLISH) "No budget limit" else "Χωρίς όριο",
-                                            fontSize = 12.sp,
+                                            text = if (lang == Localization.Language.ENGLISH) "No budget" else "Χωρίς όριο",
+                                            fontSize = 11.5.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                                         )
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(6.dp))
+                            if (canManage) {
+                                Spacer(modifier = Modifier.width(4.dp))
 
-                            // Actions: Reorder, Edit, Delete (isolated, distinct, responsive)
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                if (categories.size > 1) {
+                                // Actions: Reorder, Edit, Delete (Compact & closer together)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    if (categories.size > 1) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (index > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                                    else Color.Transparent
+                                                )
+                                                .clickable(enabled = index > 0) { onMoveCategoryUp(category) }
+                                                .testTag("move_up_cat_${category.id}"),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowUpward,
+                                                contentDescription = "Move Up",
+                                                modifier = Modifier.size(14.dp),
+                                                tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            )
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (index < categories.size - 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                                    else Color.Transparent
+                                                )
+                                                .clickable(enabled = index < categories.size - 1) { onMoveCategoryDown(category) }
+                                                .testTag("move_down_cat_${category.id}"),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDownward,
+                                                contentDescription = "Move Down",
+                                                modifier = Modifier.size(14.dp),
+                                                tint = if (index < categories.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            )
+                                        }
+                                    }
+
                                     Box(
                                         modifier = Modifier
-                                            .size(34.dp)
+                                            .size(28.dp)
                                             .clip(CircleShape)
-                                            .background(
-                                                if (index > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                                                else Color.Transparent
-                                            )
-                                            .clickable(enabled = index > 0) { onMoveCategoryUp(category) }
-                                            .testTag("move_up_cat_${category.id}"),
+                                            .background(Emerald700.copy(alpha = 0.12f))
+                                            .clickable { onEditCategory(category) }
+                                            .testTag("edit_cat_${category.id}"),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.ArrowUpward,
-                                            contentDescription = "Move Up",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = if (index > 0) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit",
+                                            modifier = Modifier.size(14.dp),
+                                            tint = Emerald700
                                         )
                                     }
 
                                     Box(
                                         modifier = Modifier
-                                            .size(34.dp)
+                                            .size(28.dp)
                                             .clip(CircleShape)
-                                            .background(
-                                                if (index < categories.size - 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                                                else Color.Transparent
-                                            )
-                                            .clickable(enabled = index < categories.size - 1) { onMoveCategoryDown(category) }
-                                            .testTag("move_down_cat_${category.id}"),
+                                            .background(Color(0xFFEF4444).copy(alpha = 0.12f))
+                                            .clickable { categoryToDelete = category }
+                                            .testTag("delete_cat_${category.id}"),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.ArrowDownward,
-                                            contentDescription = "Move Down",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = if (index < categories.size - 1) MaterialTheme.colorScheme.onSurfaceVariant else Color.Transparent
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete",
+                                            modifier = Modifier.size(14.dp),
+                                            tint = Color(0xFFEF4444)
                                         )
                                     }
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Emerald700.copy(alpha = 0.12f))
-                                        .clickable { onEditCategory(category) }
-                                        .testTag("edit_cat_${category.id}"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = Emerald700
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFEF4444).copy(alpha = 0.12f))
-                                        .clickable { categoryToDelete = category }
-                                        .testTag("delete_cat_${category.id}"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = Color(0xFFEF4444)
-                                    )
                                 }
                             }
                         }

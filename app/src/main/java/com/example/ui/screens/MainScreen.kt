@@ -199,6 +199,7 @@ fun MainScreen(
     val isInitialExpensesLoading by viewModel.isInitialExpensesLoading.collectAsStateWithLifecycle()
 
     val userHouseholds by viewModel.userHouseholds.collectAsStateWithLifecycle()
+    val canManage by viewModel.canManageMembersAndCategories.collectAsStateWithLifecycle()
     val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
     val showExodologioManagerDialog by viewModel.showExodologioManagerDialog.collectAsStateWithLifecycle()
     val showBurgerMenu by viewModel.showBurgerMenu.collectAsStateWithLifecycle()
@@ -557,9 +558,12 @@ fun MainScreen(
                         currentHousehold = currentHousehold,
                         isPremium = userProfile?.isPremium == true,
                         appLanguage = appLanguage,
+                        canManage = canManage,
+                        currentUserEmail = currentUser?.email ?: userProfile?.email ?: "",
                         onAddMember = { viewModel.openMemberDialog() },
                         onEditMember = { viewModel.openMemberDialog(it) },
                         onDeleteMember = { viewModel.deleteMember(it) },
+                        onRemoveInvitedEmail = { viewModel.removeMemberByEmail(it) },
                         onUpdateMemberColor = { member, color -> viewModel.updateMemberColor(member, color) },
                         onMoveMemberUp = { viewModel.moveMemberUp(it) },
                         onMoveMemberDown = { viewModel.moveMemberDown(it) },
@@ -569,6 +573,7 @@ fun MainScreen(
                     3 -> CategoriesScreen(
                         categories = categories,
                         appLanguage = appLanguage,
+                        canManage = canManage,
                         onAddCategory = { viewModel.openCategoryDialog() },
                         onEditCategory = { viewModel.openCategoryDialog(it) },
                         onDeleteCategory = { viewModel.deleteCategory(it) },
@@ -736,12 +741,16 @@ fun MainScreen(
         name = if (appLanguage == "EN") "My Household" else "Το Εξοδολόγιό μου",
         inviteCode = "OIKO-${System.currentTimeMillis().toString().takeLast(4)}"
     )
+    val isUserPro = viewModel.isCurrentUserPro()
     if (showInviteDialog) {
         InviteMemberDialog(
             household = activeHouseholdForInvite,
-            isPro = userProfile?.isPremium == true || activeHouseholdForInvite.isPremium,
+            isPro = isUserPro || activeHouseholdForInvite.isPremium,
             appLanguage = appLanguage,
-            onInviteEmail = { email -> viewModel.inviteMemberByEmail(email, context) },
+            currentUserEmail = currentUser?.email ?: userProfile?.email ?: "",
+            onRoleSelected = { role -> viewModel.updateHouseholdInviteRole(role) },
+            onInviteEmail = { email, role -> viewModel.inviteMemberByEmail(email, role, context) },
+            onRemoveInvitedEmail = { viewModel.removeMemberByEmail(it) },
             onMessage = { msg -> viewModel.showSnackbar(msg) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall("invite_member") },
             onDismiss = { showInviteDialog = false }
@@ -753,11 +762,12 @@ fun MainScreen(
         ExodologioDetailsDialog(
             currentHousehold = currentHousehold,
             allHouseholds = userHouseholds,
-            isPremium = userProfile?.isPremium == true,
+            isPremium = isUserPro,
             appLanguage = appLanguage,
             onRenameHousehold = { viewModel.renameCurrentHousehold(it) },
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
+            onDeleteHousehold = { viewModel.deleteHousehold(it) },
             onManageMembers = { currentTab = 3 },
             onShareInviteCode = { showInviteDialog = true },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
@@ -771,10 +781,11 @@ fun MainScreen(
         ExodologioManagerDialog(
             currentHousehold = currentHousehold,
             allHouseholds = userHouseholds,
-            isPremium = userProfile?.isPremium == true,
+            isPremium = isUserPro,
             appLanguage = appLanguage,
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
+            onDeleteHousehold = { viewModel.deleteHousehold(it) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
             onInviteMember = {
                 viewModel.dismissExodologioManager()

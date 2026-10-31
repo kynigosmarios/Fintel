@@ -26,11 +26,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.PieChart
@@ -239,7 +241,10 @@ fun AnalyticsScreen(
     var chartTypeMembers by remember { mutableIntStateOf(0) } // 0 = Μπάρες, 1 = Πίτα (Requirement 6)
     var chartTypeIncome by remember { mutableIntStateOf(0) } // 0 = Μπάρες, 1 = Πίτα
 
-    // Month Selection State (Requirement 2)
+    // 3 Period Modes: Month, Year, Total (Requirement 1)
+    var filterScope by remember { mutableStateOf("MONTH") } // "MONTH", "YEAR", "ALL"
+
+    // Month Selection State
     val currentMonthKey = remember { SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date()) }
     val currentMonthLabel = remember(lang) {
         val cal = java.util.Calendar.getInstance()
@@ -255,8 +260,21 @@ fun AnalyticsScreen(
         set.toList().sortedDescending()
     }
 
+    // Year Selection State
+    val currentYearKey = remember { SimpleDateFormat("yyyy", Locale.getDefault()).format(Date()) }
+    val availableYears = remember(expenses, incomes) {
+        val set = linkedSetOf<String>()
+        set.add(currentYearKey)
+        val fmt = SimpleDateFormat("yyyy", Locale.getDefault())
+        expenses.forEach { exp -> set.add(fmt.format(Date(exp.timestamp))) }
+        incomes.forEach { inc -> set.add(fmt.format(Date(inc.timestamp))) }
+        set.toList().sortedDescending()
+    }
+
     var selectedPeriodKey by remember { mutableStateOf("CURRENT_MONTH") }
+    var selectedYearKey by remember { mutableStateOf(currentYearKey) }
     var showPeriodDropdown by remember { mutableStateOf(false) }
+    var showYearDropdown by remember { mutableStateOf(false) }
 
     fun getMonthLabel(key: String): String {
         return try {
@@ -267,33 +285,39 @@ fun AnalyticsScreen(
         }
     }
 
-    val activePeriodDisplay = when (selectedPeriodKey) {
+    val activePeriodDisplay = when (filterScope) {
         "ALL" -> Localization.allMonthsCombined(lang)
-        "CURRENT_MONTH" -> currentMonthLabel
-        else -> getMonthLabel(selectedPeriodKey)
+        "YEAR" -> if (lang == Localization.Language.ENGLISH) "Year $selectedYearKey" else "Έτος $selectedYearKey"
+        else -> if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == currentMonthKey) currentMonthLabel else getMonthLabel(selectedPeriodKey)
     }
 
-    // Filter expenses and incomes by selected period
-    val periodExpenses = remember(expenses, selectedPeriodKey) {
-        when (selectedPeriodKey) {
+    // Filter expenses and incomes by selected scope (Month, Year, Total)
+    val periodExpenses = remember(expenses, filterScope, selectedPeriodKey, selectedYearKey) {
+        when (filterScope) {
             "ALL" -> expenses
-            "CURRENT_MONTH" -> expenses.filter {
-                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == currentMonthKey
+            "YEAR" -> expenses.filter {
+                SimpleDateFormat("yyyy", Locale.getDefault()).format(Date(it.timestamp)) == selectedYearKey
             }
-            else -> expenses.filter {
-                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == selectedPeriodKey
+            else -> {
+                val effKey = if (selectedPeriodKey == "CURRENT_MONTH") currentMonthKey else selectedPeriodKey
+                expenses.filter {
+                    SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == effKey
+                }
             }
         }
     }
 
-    val periodIncomes = remember(incomes, selectedPeriodKey) {
-        when (selectedPeriodKey) {
+    val periodIncomes = remember(incomes, filterScope, selectedPeriodKey, selectedYearKey) {
+        when (filterScope) {
             "ALL" -> incomes
-            "CURRENT_MONTH" -> incomes.filter {
-                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == currentMonthKey
+            "YEAR" -> incomes.filter {
+                SimpleDateFormat("yyyy", Locale.getDefault()).format(Date(it.timestamp)) == selectedYearKey
             }
-            else -> incomes.filter {
-                SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == selectedPeriodKey
+            else -> {
+                val effKey = if (selectedPeriodKey == "CURRENT_MONTH") currentMonthKey else selectedPeriodKey
+                incomes.filter {
+                    SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date(it.timestamp)) == effKey
+                }
             }
         }
     }
@@ -304,10 +328,9 @@ fun AnalyticsScreen(
     val savingsRate = if (totalIncome > 0) ((netBalance / totalIncome) * 100).coerceIn(-100.0, 100.0) else 0.0
 
     // 3 Smart Universal Statistics: Daily Average, Savings Ratio, Peak Day
-    val daysInActivePeriod = remember(selectedPeriodKey, periodExpenses) {
+    val daysInActivePeriod = remember(filterScope, selectedPeriodKey, selectedYearKey, periodExpenses) {
         val cal = java.util.Calendar.getInstance()
-        when (selectedPeriodKey) {
-            "CURRENT_MONTH" -> maxOf(1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+        when (filterScope) {
             "ALL" -> {
                 if (periodExpenses.isEmpty()) 1 else {
                     val minTs = periodExpenses.minOf { it.timestamp }
@@ -315,13 +338,30 @@ fun AnalyticsScreen(
                     maxOf(1, ((maxTs - minTs) / (1000L * 60 * 60 * 24)).toInt() + 1)
                 }
             }
+            "YEAR" -> {
+                val curYear = SimpleDateFormat("yyyy", Locale.getDefault()).format(cal.time)
+                if (selectedYearKey == curYear) {
+                    maxOf(1, cal.get(java.util.Calendar.DAY_OF_YEAR))
+                } else {
+                    val y = selectedYearKey.toIntOrNull() ?: 2026
+                    try {
+                        if (java.time.Year.of(y).isLeap) 366 else 365
+                    } catch (_: Exception) {
+                        365
+                    }
+                }
+            }
             else -> {
-                try {
-                    val date = SimpleDateFormat("yyyy-MM", Locale.US).parse(selectedPeriodKey) ?: Date()
-                    cal.time = date
-                    cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
-                } catch (e: Exception) {
-                    30
+                if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == currentMonthKey) {
+                    maxOf(1, cal.get(java.util.Calendar.DAY_OF_MONTH))
+                } else {
+                    try {
+                        val date = SimpleDateFormat("yyyy-MM", Locale.US).parse(selectedPeriodKey) ?: Date()
+                        cal.time = date
+                        cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+                    } catch (e: Exception) {
+                        30
+                    }
                 }
             }
         }
@@ -528,7 +568,7 @@ fun AnalyticsScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Month Selector Bar (Requirement 2)
+        // Period Selector Bar (Month, Year, Total - Requirement 1)
         item {
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -539,148 +579,316 @@ fun AnalyticsScreen(
                     .fillMaxWidth()
                     .testTag("analytics_month_selector_card")
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 10.dp, vertical = 10.dp)
                 ) {
-                    IconButton(
-                        onClick = {
-                            val effKey = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == "ALL") currentMonthKey else selectedPeriodKey
-                            try {
-                                val cal = java.util.Calendar.getInstance().apply {
-                                    time = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(effKey) ?: Date()
-                                    add(java.util.Calendar.MONTH, -1)
-                                }
-                                val prevKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(cal.time)
-                                selectedPeriodKey = if (prevKey == currentMonthKey) "CURRENT_MONTH" else prevKey
-                            } catch (e: Exception) {
-                                selectedPeriodKey = "CURRENT_MONTH"
-                            }
-                        },
-                        modifier = Modifier.size(40.dp)
+                    // 3 Filter Buttons: "Μήνας", "Χρονιά", "Σύνολο"
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = "Previous Month",
-                            tint = Emerald700
+                        val scopes = listOf(
+                            Triple("MONTH", if (lang == Localization.Language.ENGLISH) "Month" else "Μήνας", Icons.Default.CalendarMonth),
+                            Triple("YEAR", if (lang == Localization.Language.ENGLISH) "Year" else "Χρονιά", Icons.Default.DateRange),
+                            Triple("ALL", if (lang == Localization.Language.ENGLISH) "Total" else "Σύνολο", Icons.Default.AllInclusive)
                         )
+
+                        scopes.forEach { (scopeKey, label, icon) ->
+                            val isSelected = filterScope == scopeKey
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) Emerald700 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { filterScope = scopeKey }
+                                    .testTag("analytics_filter_${scopeKey.lowercase()}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = label,
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
 
-                    Box(contentAlignment = Alignment.Center) {
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = Emerald700.copy(alpha = 0.09f),
-                            border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.25f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .clickable { showPeriodDropdown = true }
-                        ) {
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Secondary Sub-row: Selection controls depending on scope
+                    when (filterScope) {
+                        "MONTH" -> {
                             Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CalendarMonth,
-                                    contentDescription = null,
-                                    tint = Emerald700,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = activePeriodDisplay,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = Localization.selectMonthYear(lang),
-                                    tint = Emerald700,
-                                    modifier = Modifier.size(19.dp)
-                                )
-                            }
-                        }
-
-                        DropdownMenu(
-                            expanded = showPeriodDropdown,
-                            onDismissRequest = { showPeriodDropdown = false }
-                        ) {
-                            DropdownMenuItem(
-                                leadingIcon = {
-                                    Icon(Icons.Default.Receipt, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
-                                },
-                                text = {
-                                    Text(
-                                        text = Localization.allMonthsCombined(lang),
-                                        fontWeight = if (selectedPeriodKey == "ALL") FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                onClick = {
-                                    selectedPeriodKey = "ALL"
-                                    showPeriodDropdown = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                leadingIcon = {
-                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
-                                },
-                                text = {
-                                    Text(
-                                        text = "${Localization.currentMonth(lang)} ($currentMonthLabel)",
-                                        fontWeight = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == currentMonthKey) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                onClick = {
-                                    selectedPeriodKey = "CURRENT_MONTH"
-                                    showPeriodDropdown = false
-                                }
-                            )
-                            availableMonths.filter { it != currentMonthKey }.forEach { monthKey ->
-                                val label = getMonthLabel(monthKey)
-                                DropdownMenuItem(
-                                    leadingIcon = {
-                                        Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
-                                    },
-                                    text = {
-                                        Text(
-                                            text = label,
-                                            fontWeight = if (selectedPeriodKey == monthKey) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    },
+                                IconButton(
                                     onClick = {
-                                        selectedPeriodKey = monthKey
-                                        showPeriodDropdown = false
+                                        val effKey = if (selectedPeriodKey == "CURRENT_MONTH") currentMonthKey else selectedPeriodKey
+                                        try {
+                                            val cal = java.util.Calendar.getInstance().apply {
+                                                time = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(effKey) ?: Date()
+                                                add(java.util.Calendar.MONTH, -1)
+                                            }
+                                            val prevKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(cal.time)
+                                            selectedPeriodKey = if (prevKey == currentMonthKey) "CURRENT_MONTH" else prevKey
+                                        } catch (e: Exception) {
+                                            selectedPeriodKey = "CURRENT_MONTH"
+                                        }
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronLeft,
+                                        contentDescription = "Previous Month",
+                                        tint = Emerald700
+                                    )
+                                }
+
+                                Box(contentAlignment = Alignment.Center) {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Emerald700.copy(alpha = 0.09f),
+                                        border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.25f)),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { showPeriodDropdown = true }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CalendarMonth,
+                                                contentDescription = null,
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == currentMonthKey) currentMonthLabel else getMonthLabel(selectedPeriodKey),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDropDown,
+                                                contentDescription = Localization.selectMonthYear(lang),
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                     }
-                                )
+
+                                    DropdownMenu(
+                                        expanded = showPeriodDropdown,
+                                        onDismissRequest = { showPeriodDropdown = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            leadingIcon = {
+                                                Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
+                                            },
+                                            text = {
+                                                Text(
+                                                    text = "${Localization.currentMonth(lang)} ($currentMonthLabel)",
+                                                    fontWeight = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == currentMonthKey) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            onClick = {
+                                                selectedPeriodKey = "CURRENT_MONTH"
+                                                showPeriodDropdown = false
+                                            }
+                                        )
+                                        availableMonths.filter { it != currentMonthKey }.forEach { monthKey ->
+                                            val label = getMonthLabel(monthKey)
+                                            DropdownMenuItem(
+                                                leadingIcon = {
+                                                    Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
+                                                },
+                                                text = {
+                                                    Text(
+                                                        text = label,
+                                                        fontWeight = if (selectedPeriodKey == monthKey) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                },
+                                                onClick = {
+                                                    selectedPeriodKey = monthKey
+                                                    showPeriodDropdown = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        val effKey = if (selectedPeriodKey == "CURRENT_MONTH") currentMonthKey else selectedPeriodKey
+                                        try {
+                                            val cal = java.util.Calendar.getInstance().apply {
+                                                time = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(effKey) ?: Date()
+                                                add(java.util.Calendar.MONTH, 1)
+                                            }
+                                            val nextKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(cal.time)
+                                            selectedPeriodKey = if (nextKey == currentMonthKey) "CURRENT_MONTH" else nextKey
+                                        } catch (e: Exception) {
+                                            selectedPeriodKey = "CURRENT_MONTH"
+                                        }
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Next Month",
+                                        tint = Emerald700
+                                    )
+                                }
                             }
                         }
-                    }
-
-                    IconButton(
-                        onClick = {
-                            val effKey = if (selectedPeriodKey == "CURRENT_MONTH" || selectedPeriodKey == "ALL") currentMonthKey else selectedPeriodKey
-                            try {
-                                val cal = java.util.Calendar.getInstance().apply {
-                                    time = SimpleDateFormat("yyyy-MM", Locale.getDefault()).parse(effKey) ?: Date()
-                                    add(java.util.Calendar.MONTH, 1)
+                        "YEAR" -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        val curY = selectedYearKey.toIntOrNull() ?: currentYearKey.toInt()
+                                        selectedYearKey = (curY - 1).toString()
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronLeft,
+                                        contentDescription = "Previous Year",
+                                        tint = Emerald700
+                                    )
                                 }
-                                val nextKey = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(cal.time)
-                                selectedPeriodKey = if (nextKey == currentMonthKey) "CURRENT_MONTH" else nextKey
-                            } catch (e: Exception) {
-                                selectedPeriodKey = "CURRENT_MONTH"
+
+                                Box(contentAlignment = Alignment.Center) {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = Emerald700.copy(alpha = 0.09f),
+                                        border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.25f)),
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable { showYearDropdown = true }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.DateRange,
+                                                contentDescription = null,
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = if (lang == Localization.Language.ENGLISH) "Year $selectedYearKey" else "Έτος $selectedYearKey",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDropDown,
+                                                contentDescription = null,
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    DropdownMenu(
+                                        expanded = showYearDropdown,
+                                        onDismissRequest = { showYearDropdown = false }
+                                    ) {
+                                        availableYears.forEach { year ->
+                                            DropdownMenuItem(
+                                                leadingIcon = {
+                                                    Icon(Icons.Default.DateRange, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
+                                                },
+                                                text = {
+                                                    Text(
+                                                        text = if (lang == Localization.Language.ENGLISH) "Year $year" else "Έτος $year",
+                                                        fontWeight = if (selectedYearKey == year) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                },
+                                                onClick = {
+                                                    selectedYearKey = year
+                                                    showYearDropdown = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        val curY = selectedYearKey.toIntOrNull() ?: currentYearKey.toInt()
+                                        selectedYearKey = (curY + 1).toString()
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ChevronRight,
+                                        contentDescription = "Next Year",
+                                        tint = Emerald700
+                                    )
+                                }
                             }
-                        },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "Next Month",
-                            tint = Emerald700
-                        )
+                        }
+                        "ALL" -> {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = Emerald700.copy(alpha = 0.08f),
+                                border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AllInclusive,
+                                        contentDescription = null,
+                                        tint = Emerald700,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH)
+                                            "All-Time Records (${periodExpenses.size} expenses, ${periodIncomes.size} incomes)"
+                                        else
+                                            "Σύνολο Όλων των Εγγραφών (${periodExpenses.size} έξοδα, ${periodIncomes.size} έσοδα)",
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Emerald700
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

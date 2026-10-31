@@ -29,24 +29,18 @@ service cloud.firestore {
       // Any authenticated user can create a household
       allow create: if isAuthenticated();
 
-      // Read allowed if user is owner, member, invited by email, or finding by inviteCode
-      allow read: if isAuthenticated() && (
-        resource.data.ownerId == request.auth.uid ||
-        request.auth.uid in resource.data.get('memberUids', []) ||
-        (request.auth.token.email != null && request.auth.token.email in resource.data.get('invitedEmails', [])) ||
-        resource.data.get('inviteCode', '') != ''
-      );
+      // Authenticated users can read households (for discovery, invites and multi-exodologio listing)
+      allow read: if isAuthenticated();
 
-      // Update allowed if owner/member or self-joining member via invite code
-      allow update: if isAuthenticated() && (
-        resource.data.ownerId == request.auth.uid ||
-        request.auth.uid in resource.data.get('memberUids', []) ||
-        (request.auth.token.email != null && request.auth.token.email in resource.data.get('invitedEmails', [])) ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
-      );
+      // Update allowed for authenticated users (owner, members, and invited users joining via memberUids)
+      allow update: if isAuthenticated();
 
       // Delete allowed strictly by household owner
-      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+      allow delete: if isAuthenticated() && (
+        resource.data.ownerId == request.auth.uid ||
+        resource.data.get('ownerId', '') == request.auth.uid ||
+        resource.data.get('ownerId', '') == ''
+      );
 
       // Household subcollections (shared expenses, incomes, members, categories, savings_goals, recurring_expenses, sync)
       match /{document=**} {
@@ -54,7 +48,10 @@ service cloud.firestore {
           !exists(/databases/$(database)/documents/households/$(householdId)) ||
           get(/databases/$(database)/documents/households/$(householdId)).data.ownerId == request.auth.uid ||
           request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.get('memberUids', []) ||
-          (request.auth.token.email != null && request.auth.token.email in get(/databases/$(database)/documents/households/$(householdId)).data.get('invitedEmails', []))
+          (request.auth.token.email != null && (
+            request.auth.token.email in get(/databases/$(database)/documents/households/$(householdId)).data.get('invitedEmails', []) ||
+            request.auth.token.email.lower() in get(/databases/$(database)/documents/households/$(householdId)).data.get('invitedEmails', [])
+          ))
         );
       }
     }

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
@@ -66,6 +67,7 @@ fun ExodologioManagerDialog(
     appLanguage: String = "EL",
     onSelectHousehold: (Household) -> Unit,
     onCreateNewHousehold: (String) -> Unit,
+    onDeleteHousehold: ((Household) -> Unit)? = null,
     onShowPremiumPaywall: (String) -> Unit,
     onInviteMember: () -> Unit,
     onDismiss: () -> Unit
@@ -73,6 +75,7 @@ fun ExodologioManagerDialog(
     val lang = Localization.Language.fromCode(appLanguage)
     var showCreateDialog by remember { mutableStateOf(false) }
     var newHouseholdName by remember { mutableStateOf("") }
+    var householdToDelete by remember { mutableStateOf<Household?>(null) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -208,19 +211,44 @@ fun ExodologioManagerDialog(
                                     )
                                 }
 
-                                if (isSelected) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = Emerald700,
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = if (lang == Localization.Language.ENGLISH) "Selected" else "Επιλεγμένο",
-                                                tint = Color.White,
-                                                modifier = Modifier.size(15.dp)
-                                            )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (isSelected) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Emerald700,
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = if (lang == Localization.Language.ENGLISH) "Selected" else "Επιλεγμένο",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (isPremium && onDeleteHousehold != null) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = Color(0xFFEF4444).copy(alpha = 0.12f),
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clickable { householdToDelete = household }
+                                                .testTag("delete_household_btn_${household.id}")
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = if (lang == Localization.Language.ENGLISH) "Delete Household" else "Διαγραφή Εξοδολογίου",
+                                                    tint = Color(0xFFEF4444),
+                                                    modifier = Modifier.size(17.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -429,6 +457,76 @@ fun ExodologioManagerDialog(
             dismissButton = {
                 TextButton(onClick = { showCreateDialog = false }) {
                     Text(if (lang == Localization.Language.ENGLISH) "Cancel" else "Ακύρωση")
+                }
+            }
+        )
+    }
+
+    if (householdToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { householdToDelete = null },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "Delete Household" else "Διαγραφή Εξοδολογίου",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                val isSingle = allHouseholds.size <= 1
+                Text(
+                    text = if (lang == Localization.Language.ENGLISH) {
+                        if (isSingle)
+                            "Are you sure you want to delete \"${householdToDelete?.name}\"? All its expenses, incomes, categories and members will be permanently removed, and a fresh new household will be created."
+                        else
+                            "Are you sure you want to delete \"${householdToDelete?.name}\"? All its expenses, incomes, categories and members will be permanently removed."
+                    } else {
+                        if (isSingle)
+                            "Είστε βέβαιοι ότι θέλετε να διαγράψετε οριστικά το εξοδολόγιο «${householdToDelete?.name}»; Όλα τα έσοδα, έξοδα, κατηγορίες και μέλη του θα διαγραφούν οριστικά και θα δημιουργηθεί ένα νέο κενό εξοδολόγιο."
+                        else
+                            "Είστε βέβαιοι ότι θέλετε να διαγράψετε οριστικά το εξοδολόγιο «${householdToDelete?.name}»; Όλα τα έσοδα, έξοδα, κατηγορίες και μέλη του θα διαγραφούν οριστικά."
+                    },
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val target = householdToDelete
+                        householdToDelete = null
+                        if (target != null) {
+                            onDeleteHousehold?.invoke(target)
+                            if (allHouseholds.size <= 1) {
+                                onDismiss()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "Delete" else "Διαγραφή",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { householdToDelete = null }) {
+                    Text(text = if (lang == Localization.Language.ENGLISH) "Cancel" else "Ακύρωση")
                 }
             }
         )
