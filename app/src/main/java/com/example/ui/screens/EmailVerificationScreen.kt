@@ -99,7 +99,7 @@ fun EmailVerificationScreen(
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = (-0.5).sp,
-                color = Color(0xFF157347)
+                color = MaterialTheme.colorScheme.primary
             )
 
             Spacer(modifier = Modifier.height(24.dp))
