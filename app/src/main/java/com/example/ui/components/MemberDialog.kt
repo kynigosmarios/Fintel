@@ -82,7 +82,7 @@ fun MemberDialog(
     val lang = Localization.Language.fromCode(appLanguage)
 
     var name by remember(memberToEdit) { mutableStateOf(memberToEdit?.name ?: "") }
-    var role by remember(memberToEdit) { mutableStateOf(memberToEdit?.role ?: "Γονέας") }
+    var role by remember(memberToEdit) { mutableStateOf(memberToEdit?.role ?: "Μονοπρόσωπο") }
     var selectedColor by remember(memberToEdit) {
         mutableLongStateOf(memberToEdit?.avatarColorHex ?: 0xFF0284C7)
     }

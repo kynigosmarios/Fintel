@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -326,6 +327,23 @@ fun AnalyticsScreen(
     val totalIncome = periodIncomes.sumOf { it.amount }
     val netBalance = totalIncome - totalSpend
     val savingsRate = if (totalIncome > 0) ((netBalance / totalIncome) * 100).coerceIn(-100.0, 100.0) else 0.0
+
+    // Active recorded months for scaling category budgets when viewing "YEAR" (12) or "ALL" (months of active records)
+    val activeRecordedMonthsCount = remember(expenses, incomes) {
+        val fmt = SimpleDateFormat("yyyy-MM", Locale.US)
+        val recordedMonths = mutableSetOf<String>()
+        expenses.forEach { recordedMonths.add(fmt.format(Date(it.timestamp))) }
+        incomes.forEach { recordedMonths.add(fmt.format(Date(it.timestamp))) }
+        recordedMonths.size.coerceAtLeast(1)
+    }
+
+    val budgetMultiplier = remember(filterScope, activeRecordedMonthsCount) {
+        when (filterScope) {
+            "YEAR" -> 12
+            "ALL" -> activeRecordedMonthsCount
+            else -> 1
+        }
+    }
 
     // 3 Smart Universal Statistics: Daily Average, Savings Ratio, Peak Day
     val daysInActivePeriod = remember(filterScope, selectedPeriodKey, selectedYearKey, periodExpenses) {
@@ -1043,37 +1061,51 @@ fun AnalyticsScreen(
                         // Metric 1: Daily Average
                         Surface(
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                         ) {
-                            Column(modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.CalendarMonth,
-                                        contentDescription = null,
-                                        tint = Emerald700,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = Localization.dailyAverageTitle(lang),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                            Column(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Emerald700.copy(alpha = 0.12f),
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.CalendarMonth,
+                                            contentDescription = null,
+                                            tint = Emerald700,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(3.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = Localization.dailyAverageTitle(lang),
+                                    fontSize = 10.5.sp,
+                                    lineHeight = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    minLines = 2,
+                                    maxLines = 2
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = String.format(Locale.US, "%.2f €", dailyAverageExpense),
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
                                 )
                                 Text(
                                     text = Localization.dailyAverageUnit(lang),
                                     fontSize = 9.5.sp,
-                                    color = MaterialTheme.colorScheme.outline
+                                    color = MaterialTheme.colorScheme.outline,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -1082,37 +1114,51 @@ fun AnalyticsScreen(
                         val savingsColor = if (netBalance >= 0) Color(0xFF059669) else Color(0xFFDC2626)
                         Surface(
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                             color = savingsColor.copy(alpha = 0.08f),
                             border = BorderStroke(1.dp, savingsColor.copy(alpha = 0.22f))
                         ) {
-                            Column(modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.TrendingUp,
-                                        contentDescription = null,
-                                        tint = savingsColor,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = Localization.savingsRatioTitle(lang),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                            Column(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = savingsColor.copy(alpha = 0.12f),
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.TrendingUp,
+                                            contentDescription = null,
+                                            tint = savingsColor,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(3.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = Localization.savingsRatioTitle(lang),
+                                    fontSize = 10.5.sp,
+                                    lineHeight = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    minLines = 2,
+                                    maxLines = 2
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = if (totalIncome > 0) String.format(Locale.US, "%s%.1f%%", if (savingsRate >= 0) "+" else "", savingsRate) else "0.0%",
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = savingsColor
+                                    color = savingsColor,
+                                    maxLines = 1
                                 )
                                 Text(
                                     text = if (netBalance >= 0) Localization.withinLimit(lang) else Localization.deficitLabel(lang),
                                     fontSize = 9.5.sp,
-                                    color = savingsColor
+                                    color = savingsColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -1120,37 +1166,51 @@ fun AnalyticsScreen(
                         // Metric 3: Peak Day
                         Surface(
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                         ) {
-                            Column(modifier = Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.ReceiptLong,
-                                        contentDescription = null,
-                                        tint = Color(0xFFEA580C),
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = Localization.peakDayTitle(lang),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                            Column(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFEA580C).copy(alpha = 0.12f),
+                                    modifier = Modifier.size(26.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.ReceiptLong,
+                                            contentDescription = null,
+                                            tint = Color(0xFFEA580C),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(3.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = Localization.peakDayTitle(lang),
+                                    fontSize = 10.5.sp,
+                                    lineHeight = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    minLines = 2,
+                                    maxLines = 2
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = peakSpendingDayInfo?.let { String.format(Locale.US, "%.0f €", it.second) } ?: "-",
                                     fontSize = 13.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
                                 )
                                 Text(
                                     text = peakSpendingDayInfo?.first ?: Localization.noPeakDay(lang),
                                     fontSize = 9.5.sp,
-                                    color = MaterialTheme.colorScheme.outline
+                                    color = MaterialTheme.colorScheme.outline,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -2108,11 +2168,26 @@ fun AnalyticsScreen(
                             )
                         }
 
-                        Text(
-                            text = Localization.categoriesCount(categories.size, lang),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = Localization.categoriesCount(categories.size, lang),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (budgetMultiplier > 1) {
+                                val scopeSubtitle = if (filterScope == "YEAR") {
+                                    if (lang == Localization.Language.ENGLISH) "Yearly (x12 months)" else "Ετήσιο (x12 μήνες)"
+                                } else {
+                                    if (lang == Localization.Language.ENGLISH) "Total (x$budgetMultiplier months)" else "Σύνολο (x$budgetMultiplier μήνες)"
+                                }
+                                Text(
+                                    text = scopeSubtitle,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Emerald700
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -2122,7 +2197,7 @@ fun AnalyticsScreen(
                         .sortedWith(
                             compareByDescending<ExpenseCategory> { cat ->
                                 val spent = categorySpendMap[cat] ?: 0.0
-                                val budget = cat.monthlyBudget
+                                val budget = cat.monthlyBudget * budgetMultiplier
                                 if (budget > 0.0) spent / budget else 0.0
                             }.thenByDescending { categorySpendMap[it] ?: 0.0 }
                         )
@@ -2132,7 +2207,7 @@ fun AnalyticsScreen(
                         categories.sortedWith(
                             compareByDescending<ExpenseCategory> { cat ->
                                 val spent = categorySpendMap[cat] ?: 0.0
-                                val budget = cat.monthlyBudget
+                                val budget = cat.monthlyBudget * budgetMultiplier
                                 if (budget > 0.0) spent / budget else 0.0
                             }.thenByDescending { categorySpendMap[it] ?: 0.0 }
                         ).take(6)
@@ -2148,7 +2223,7 @@ fun AnalyticsScreen(
                     } else {
                         displayedCats.forEach { cat ->
                             val spent = categorySpendMap[cat] ?: 0.0
-                            val budget = cat.monthlyBudget
+                            val budget = cat.monthlyBudget * budgetMultiplier
                             val ratio = if (budget > 0) spent / budget else 0.0
                             val progress = ratio.toFloat().coerceIn(0f, 1f)
 
@@ -2201,8 +2276,9 @@ fun AnalyticsScreen(
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         if (budget > 0) {
+                                            val budgetFormatted = if (budget % 1.0 == 0.0) String.format(Locale.US, "%.0f€", budget) else String.format(Locale.US, "%.2f€", budget)
                                             Text(
-                                                text = String.format(Locale.US, "%.2f€ / %.0f€", spent, budget),
+                                                text = "${String.format(Locale.US, "%.2f€", spent)} / $budgetFormatted",
                                                 fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant

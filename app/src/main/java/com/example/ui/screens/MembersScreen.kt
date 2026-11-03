@@ -238,14 +238,6 @@ fun MembersScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH)
-                                    "Shared access • Choose Owner or Contributor"
-                                else
-                                    "Κοινή πρόσβαση • Επιλογή Ιδιοκτήτη ή Καταχωρητή",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
                     }
 

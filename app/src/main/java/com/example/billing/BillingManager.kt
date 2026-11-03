@@ -23,7 +23,12 @@ class BillingManager(
 
     private var billingClient: BillingClient = BillingClient.newBuilder(context)
         .setListener(this)
-        .enablePendingPurchases()
+        .enablePendingPurchases(
+            PendingPurchasesParams.newBuilder()
+                .enableOneTimeProducts()
+                .enablePrepaidPlans()
+                .build()
+        )
         .build()
 
     private val _isBillingReady = MutableStateFlow(false)
@@ -74,8 +79,9 @@ class BillingManager(
                 .build()
         )
         val params = QueryProductDetailsParams.newBuilder().setProductList(productList).build()
-        billingClient.queryProductDetailsAsync(params) { billingResult, productDetailsList ->
+        billingClient.queryProductDetailsAsync(params) { billingResult, queryResult ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                val productDetailsList = queryResult.productDetailsList ?: emptyList()
                 for (details in productDetailsList) {
                     when (details.productId) {
                         SUB_MONTHLY -> _monthlyProductDetails.value = details

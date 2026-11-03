@@ -72,6 +72,8 @@ fun ExodologioDetailsDialog(
     currentHousehold: Household?,
     allHouseholds: List<Household>,
     isPremium: Boolean,
+    isOwner: Boolean = true,
+    isHouseholdOwner: (Household) -> Boolean = { isOwner },
     appLanguage: String = "EL",
     onRenameHousehold: (String) -> Unit,
     onSelectHousehold: (Household) -> Unit,
@@ -266,25 +268,27 @@ fun ExodologioDetailsDialog(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = Emerald700.copy(alpha = 0.12f),
-                                            modifier = Modifier
-                                                .size(28.dp)
-                                                .clickable { isEditingName = true }
-                                                .testTag("edit_household_name_btn")
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Edit,
-                                                    contentDescription = Localization.edit(lang),
-                                                    tint = Emerald700,
-                                                    modifier = Modifier.size(15.dp)
-                                                )
+                                        if (isOwner) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = Emerald700.copy(alpha = 0.12f),
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .clickable { isEditingName = true }
+                                                    .testTag("edit_household_name_btn")
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Edit,
+                                                        contentDescription = Localization.edit(lang),
+                                                        tint = Emerald700,
+                                                        modifier = Modifier.size(15.dp)
+                                                    )
+                                                }
                                             }
                                         }
 
-                                        if (isPremium && onDeleteHousehold != null && currentHousehold != null) {
+                                        if (isOwner && onDeleteHousehold != null && currentHousehold != null) {
                                             Surface(
                                                 shape = CircleShape,
                                                 color = Color(0xFFEF4444).copy(alpha = 0.12f),
@@ -433,7 +437,7 @@ fun ExodologioDetailsDialog(
                                                             )
                                                         }
                                                     }
-                                                    if (isPremium && onDeleteHousehold != null) {
+                                                    if (onDeleteHousehold != null && isHouseholdOwner(household)) {
                                                         Surface(
                                                             shape = CircleShape,
                                                             color = Color(0xFFEF4444).copy(alpha = 0.12f),
@@ -519,40 +523,21 @@ fun ExodologioDetailsDialog(
                         }
                     }
 
-                    // Delete active household button (for Pro users)
-                    if (isPremium && onDeleteHousehold != null && currentHousehold != null) {
-                        OutlinedButton(
-                            onClick = { householdToDelete = currentHousehold },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444)),
-                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(42.dp)
-                                .testTag("delete_household_action_btn")
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH) "Delete Household" else "Διαγραφή Εξοδολογίου",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFEF4444)
-                            )
-                        }
-                    }
 
-                    // Clear expenses button
-                    OutlinedButton(
-                        onClick = { showClearConfirmDialog = true },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
-                        modifier = Modifier.fillMaxWidth().height(42.dp)
-                    ) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(Localization.clearAllExpenses(lang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+
+                    // Clear expenses button (only for owners)
+                    if (isOwner) {
+                        OutlinedButton(
+                            onClick = { showClearConfirmDialog = true },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
+                            modifier = Modifier.fillMaxWidth().height(42.dp)
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(Localization.clearAllExpenses(lang), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
 
                     // Close button

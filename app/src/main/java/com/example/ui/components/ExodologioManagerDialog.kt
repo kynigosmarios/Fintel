@@ -64,6 +64,7 @@ fun ExodologioManagerDialog(
     currentHousehold: Household?,
     allHouseholds: List<Household>,
     isPremium: Boolean,
+    isHouseholdOwner: (Household) -> Boolean = { true },
     appLanguage: String = "EL",
     onSelectHousehold: (Household) -> Unit,
     onCreateNewHousehold: (String) -> Unit,
@@ -232,7 +233,7 @@ fun ExodologioManagerDialog(
                                         }
                                     }
 
-                                    if (isPremium && onDeleteHousehold != null) {
+                                    if (onDeleteHousehold != null && isHouseholdOwner(household)) {
                                         Surface(
                                             shape = CircleShape,
                                             color = Color(0xFFEF4444).copy(alpha = 0.12f),
@@ -509,9 +510,7 @@ fun ExodologioManagerDialog(
                         householdToDelete = null
                         if (target != null) {
                             onDeleteHousehold?.invoke(target)
-                            if (allHouseholds.size <= 1) {
-                                onDismiss()
-                            }
+                            onDismiss()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
@@ -541,11 +540,15 @@ fun PremiumPaywallDialog(
     onDismiss: () -> Unit
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .padding(vertical = 12.dp)
+                .fillMaxWidth()
+                .widthIn(max = 520.dp)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
                 .testTag("premium_paywall_dialog"),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -554,7 +557,7 @@ fun PremiumPaywallDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(22.dp),
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header Star Badge
@@ -644,28 +647,22 @@ fun PremiumPaywallDialog(
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        // Feature 1: Invite Member via Email
+                        // Feature 1: Shared Household Access
                         BenefitRowItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Invite members via Email" else "Πρόσκληση μελών μέσω Email",
+                            title = if (lang == Localization.Language.ENGLISH) "Shared Household Access" else "Κοινή χρήση εξοδολογίου",
                             subtitle = if (lang == Localization.Language.ENGLISH)
-                                "Invite anyone by email. The invited user doesn't need Pro to access the shared household!"
+                                "Add any user's email. Registered members see and access the shared household automatically without needing Pro!"
                             else
-                                "Πρόσκληση μέσω email. Ο προσκεκλημένος έχει πλήρη πρόσβαση χωρίς να απαιτείται να έχει Pro!"
+                                "Προσθέστε το email οποιουδήποτε χρήστη. Εφόσον είναι μέλος στην εφαρμογή, βλέπει άμεσα το εξοδολόγιο χωρίς να απαιτείται να είναι Pro!"
                         )
 
-                        // Feature 2: Multi-household creation
+                        // Feature 2: Unlimited Households
                         BenefitRowItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Create multiple households" else "Δημιουργία πολλαπλών εξοδολογίων",
+                            title = if (lang == Localization.Language.ENGLISH) "Unlimited Households" else "Απεριόριστα εξοδολόγια",
                             subtitle = if (lang == Localization.Language.ENGLISH)
-                                "Create, manage and invite members to more than 1 household (Home, Work, Vacation, Trips)"
+                                "Create and organize multiple households (Home, Work, Vacation, Projects) and invite collaborators"
                             else
-                                "Δημιουργήστε πάνω από 1 εξοδολόγια (Σπίτι, Εργασία, Εξοχικό, Ταξίδια) και προσκαλέστε μέλη"
-                        )
-
-                        // Feature 3: Realtime sync
-                        BenefitRowItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Automatic cloud sync" else "Αυτόματος συγχρονισμός cloud",
-                            subtitle = if (lang == Localization.Language.ENGLISH) "Instant real-time sync across all devices" else "Άμεση ενημέρωση σε πραγματικό χρόνο σε όλες τις συσκευές"
+                                "Δημιουργήστε και διαχειριστείτε απεριόριστα εξοδολόγια (Σπίτι, Εργασία, Εξοχικό, Projects) και μοιραστείτε τα"
                         )
                     }
                 }
@@ -692,9 +689,9 @@ fun PremiumPaywallDialog(
                         Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (lang == Localization.Language.ENGLISH) "Subscribe for 2.99€/mo on Google Play" else "Συνδρομή με 2,99€/μήνα στο Google Play",
+                            text = if (lang == Localization.Language.ENGLISH) "Get it now" else "Απόκτησέ το τώρα",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.5.sp
+                            fontSize = 14.sp
                         )
                     }
                 }

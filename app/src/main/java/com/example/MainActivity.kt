@@ -78,6 +78,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        try {
+            viewModel.onAppResumed()
+        } catch (e: Exception) {
+            Log.w("MainActivity", "onResume safe fallback: ${e.message}")
+        }
+    }
+
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
         try {
@@ -120,7 +129,10 @@ fun AppRootNavigator(viewModel: OikoNomosViewModel) {
     val appLanguage by viewModel.appLanguage.collectAsStateWithLifecycle()
 
     val currentScreen = when {
+        !isAuthInitialized -> RootScreen.LOADING
         currentUser == null -> RootScreen.AUTH
+        !isUserVerified -> RootScreen.EMAIL_VERIFICATION
+        !notificationConsentCompleted -> RootScreen.NOTIFICATION_CONSENT
         else -> RootScreen.MAIN
     }
 

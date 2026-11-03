@@ -20,6 +20,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.snapshots
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
@@ -66,8 +67,12 @@ class FirestoreSyncRepository(
         }
     }
 
-    suspend fun discoverUserHouseholds(uid: String, email: String): List<String> {
-        val foundIds = mutableSetOf<String>()
+    suspend fun getAllUserHouseholds(
+        uid: String,
+        email: String,
+        excludedHouseholdIds: Set<String> = emptySet()
+    ): List<Household> {
+        val foundMap = mutableMapOf<String, Household>()
         val cleanEmail = email.trim()
         val lowerEmail = cleanEmail.lowercase()
         val isMariosAccount = cleanEmail.equals(FirestoreDataSeed.DEFAULT_USER_EMAIL, ignoreCase = true) ||
@@ -77,90 +82,182 @@ class FirestoreSyncRepository(
                 uid == "jllDLLQl7VgFzOQpVIHi0wo8B013" ||
                 uid == "oA6smvWcC6QYCAKMvYdWEcmVCO43"
 
-        if (isMariosAccount) {
-            foundIds.add(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID)
-            foundIds.add("e1d4ae67-499")
+        fun parseAndAccept(doc: DocumentSnapshot): Household? {
+            if (excludedHouseholdIds.contains(doc.id)) return null
+            val deletedFor = (doc.get("deletedForUsers") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+            if (uid.isNotBlank() && deletedFor.contains(uid)) return null
+
+            val h = doc.toObject(Household::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE) ?: return null
+            if (h.id.isBlank()) h.id = doc.id
+            val rawName = doc.getString("name")
+            if (!rawName.isNullOrBlank()) h.name = rawName
+            return h
         }
 
-        // 1. Indexed query for households where user is the owner
+        // 1. Households owned by user
         if (uid.isNotBlank()) {
             try {
                 val qOwner = db.collection("households").whereEqualTo("ownerId", uid).get().await()
                 for (doc in qOwner.documents) {
-                    foundIds.add(doc.id)
+                    parseAndAccept(doc)?.let { foundMap[it.id] = it }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "discoverUserHouseholds owner error: ${e.message}")
+                Log.w(TAG, "getAllUserHouseholds owner error: ${e.message}")
             }
 
-            // 2. Households where user is in memberUids
+            // 2. Households where memberUids contains user UID
             try {
                 val qMembers = db.collection("households").whereArrayContains("memberUids", uid).get().await()
                 for (doc in qMembers.documents) {
-                    foundIds.add(doc.id)
+                    parseAndAccept(doc)?.let { foundMap[it.id] = it }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "discoverUserHouseholds memberUids error: ${e.message}")
+                Log.w(TAG, "getAllUserHouseholds memberUids error: ${e.message}")
             }
         }
 
-        // 3. Households where invitedEmails contains user's email
+        // 3. Households where invitedEmails contains cleanEmail or lowerEmail
         if (cleanEmail.isNotBlank()) {
             val emailVariations = listOf(cleanEmail, lowerEmail).distinct()
             for (ev in emailVariations) {
                 try {
                     val qInvited = db.collection("households").whereArrayContains("invitedEmails", ev).get().await()
                     for (doc in qInvited.documents) {
-                        foundIds.add(doc.id)
-                        if (uid.isNotBlank()) {
+                        parseAndAccept(doc)?.let { h ->
+                            foundMap[h.id] = h
+                            if (uid.isNotBlank()) {
+                                try {
+                                    val memberRoles = (doc.get("memberRoles") as? Map<*, *>) ?: emptyMap<String, String>()
+                                    val assignedRole = memberRoles[ev]?.toString()
+                                        ?: memberRoles[lowerEmail]?.toString()
+                                        ?: doc.getString("pendingInviteRole")
+                                        ?: "CONTRIBUTOR"
+                                    doc.reference.update(
+                                        mapOf(
+                                            "memberUids" to FieldValue.arrayUnion(uid),
+                                            "memberRoles.$uid" to assignedRole
+                                        )
+                                    ).await()
+                                } catch (_: Exception) {}
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "getAllUserHouseholds invited error: ${e.message}")
+                }
+            }
+        }
+
+        // 4. Check user profile's assigned householdIds
+        if (uid.isNotBlank()) {
+            try {
+                val uDoc = db.collection("users").document(uid).get().await()
+                if (uDoc.exists()) {
+                    val hid = uDoc.getString("householdId")
+                    val hids = (uDoc.get("householdIds") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                    val allProfileHids = (listOfNotNull(hid) + hids).filter { it.isNotBlank() && !excludedHouseholdIds.contains(it) }.distinct()
+                    for (targetHid in allProfileHids) {
+                        if (!foundMap.containsKey(targetHid)) {
                             try {
-                                val memberRoles = (doc.get("memberRoles") as? Map<*, *>) ?: emptyMap<String, String>()
-                                val assignedRole = memberRoles[ev]?.toString()
-                                    ?: memberRoles[lowerEmail]?.toString()
-                                    ?: doc.getString("pendingInviteRole")
-                                    ?: "CONTRIBUTOR"
+                                val hDoc = db.collection("households").document(targetHid).get().await()
+                                if (hDoc.exists()) {
+                                    parseAndAccept(hDoc)?.let { foundMap[it.id] = it }
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "getAllUserHouseholds user profile error: ${e.message}")
+            }
+        }
+
+        // 5. Fallback scan on households collection (limit 150)
+        try {
+            val allHouseholdsSnap = db.collection("households").limit(150).get().await()
+            for (doc in allHouseholdsSnap.documents) {
+                if (foundMap.containsKey(doc.id)) continue
+                if (excludedHouseholdIds.contains(doc.id)) continue
+                val deletedFor = (doc.get("deletedForUsers") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                if (uid.isNotBlank() && deletedFor.contains(uid)) continue
+
+                val owner = doc.getString("ownerId") ?: ""
+                val members = (doc.get("memberUids") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                val invited = (doc.get("invitedEmails") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+
+                val isOwner = uid.isNotBlank() && owner == uid
+                val isMember = uid.isNotBlank() && members.contains(uid)
+                val isInvited = (cleanEmail.isNotBlank() || lowerEmail.isNotBlank()) &&
+                        invited.any { it.equals(cleanEmail, ignoreCase = true) || it.equals(lowerEmail, ignoreCase = true) }
+
+                if (isOwner || isMember || isInvited) {
+                    parseAndAccept(doc)?.let { h ->
+                        foundMap[h.id] = h
+                        if (uid.isNotBlank() && !isMember && isInvited) {
+                            try {
+                                val assignedRole = doc.getString("pendingInviteRole") ?: "CONTRIBUTOR"
                                 doc.reference.update(
                                     mapOf(
                                         "memberUids" to FieldValue.arrayUnion(uid),
                                         "memberRoles.$uid" to assignedRole
                                     )
                                 ).await()
-                                // Also update user's own profile document with the new householdId
-                                db.collection("users").document(uid).set(
-                                    mapOf(
-                                        "householdIds" to FieldValue.arrayUnion(doc.id)
-                                    ),
-                                    SetOptions.merge()
-                                ).await()
-                            } catch (e: Exception) {
-                                Log.w(TAG, "discoverUserHouseholds invite link notice: ${e.message}")
-                            }
+                            } catch (_: Exception) {}
                         }
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "discoverUserHouseholds invited error: ${e.message}")
                 }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "getAllUserHouseholds scan fallback warning: ${e.message}")
+        }
+
+        // Special Marios handling
+        if (isMariosAccount) {
+            val defaultHid = FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID
+            val epixHid = "e1d4ae67-499"
+            if (!excludedHouseholdIds.contains(defaultHid) && !foundMap.containsKey(defaultHid)) {
+                foundMap[defaultHid] = Household(
+                    id = defaultHid,
+                    name = "Οικογένεια Μάριος",
+                    ownerId = uid,
+                    memberUids = listOf(uid, "t5kN4RvPRugIxXUz18Fep2khSrC2"),
+                    invitedEmails = listOf("kynigosmarios@gmail.com")
+                )
+            }
+            if (!excludedHouseholdIds.contains(epixHid) && !foundMap.containsKey(epixHid)) {
+                foundMap[epixHid] = Household(
+                    id = epixHid,
+                    name = "Επιχείρηση",
+                    ownerId = uid,
+                    memberUids = listOf(uid, "t5kN4RvPRugIxXUz18Fep2khSrC2"),
+                    invitedEmails = listOf("kynigosmarios@gmail.com")
+                )
             }
         }
 
-        // 4. Also check user's own profile document for any assigned householdIds
-        if (uid.isNotBlank()) {
+        val resultList = foundMap.values.toList()
+
+        // Sync all found household IDs back to the user's profile using arrayUnion
+        if (uid.isNotBlank() && resultList.isNotEmpty()) {
             try {
-                val uDoc = db.collection("users").document(uid).get().await()
-                if (uDoc.exists()) {
-                    val hid = uDoc.getString("householdId")
-                    if (!hid.isNullOrBlank()) foundIds.add(hid)
-                    val hids = uDoc.get("householdIds") as? List<*>
-                    hids?.mapNotNull { it as? String }?.filter { it.isNotBlank() }?.let {
-                        foundIds.addAll(it)
-                    }
-                }
+                val validIds = resultList.map { it.id }.filter { it.isNotBlank() }.distinct()
+                val userRef = db.collection("users").document(uid)
+                userRef.set(
+                    mapOf(
+                        "householdIds" to FieldValue.arrayUnion(*validIds.toTypedArray())
+                    ),
+                    SetOptions.merge()
+                ).await()
             } catch (e: Exception) {
-                Log.w(TAG, "discoverUserHouseholds user profile error: ${e.message}")
+                Log.w(TAG, "getAllUserHouseholds profile arrayUnion notice: ${e.message}")
             }
         }
 
-        return foundIds.filter { it.isNotBlank() }.distinct().toList()
+        return resultList
+    }
+
+    suspend fun discoverUserHouseholds(uid: String, email: String, excludedHouseholdIds: Set<String> = emptySet()): List<String> {
+        return getAllUserHouseholds(uid, email, excludedHouseholdIds).map { it.id }
     }
 
     suspend fun seedFirestoreIfEmpty(householdId: String, userId: String, isMarios: Boolean) {
@@ -319,13 +416,14 @@ class FirestoreSyncRepository(
         phoneNumber: String = "",
         occupation: String = "",
         city: String = "",
-        authProvider: String = ""
+        authProvider: String = "",
+        excludedHouseholdIds: Set<String> = emptySet()
     ): UserProfile {
         val userRef = db.collection("users").document(uid)
         val snapshot = userRef.get().await()
 
         // Discover all households in cloud associated with this user or email
-        val discoveredHids = discoverUserHouseholds(uid, email)
+        val discoveredHids = discoverUserHouseholds(uid, email, excludedHouseholdIds)
 
         return if (snapshot.exists()) {
             val existing = snapshot.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
@@ -363,7 +461,7 @@ class FirestoreSyncRepository(
                     uid == "jllDLLQl7VgFzOQpVIHi0wo8B013" ||
                     uid == "oA6smvWcC6QYCAKMvYdWEcmVCO43"
             val rawHids = (existing.householdIds + listOf(existing.householdId) + discoveredHids)
-                .filter { it.isNotBlank() }
+                .filter { it.isNotBlank() && !excludedHouseholdIds.contains(it) }
                 .distinct()
             val allHids = rawHids
             val cleanExistingHid = existing.householdId
@@ -531,10 +629,11 @@ class FirestoreSyncRepository(
         return newHousehold
     }
 
-    suspend fun fetchUserHouseholds(householdIds: List<String>): List<Household> {
-        if (householdIds.isEmpty()) return emptyList()
+    suspend fun fetchUserHouseholds(householdIds: List<String>, excludedHouseholdIds: Set<String> = emptySet()): List<Household> {
+        val filteredIds = householdIds.filter { it.isNotBlank() && !excludedHouseholdIds.contains(it) }
+        if (filteredIds.isEmpty()) return emptyList()
         val list = mutableListOf<Household>()
-        for (id in householdIds) {
+        for (id in filteredIds) {
             try {
                 val doc = db.collection("households").document(id).get().await()
                 if (doc.exists()) {
@@ -704,18 +803,74 @@ class FirestoreSyncRepository(
     suspend fun findUserByEmail(email: String): UserProfile? {
         val clean = email.trim()
         if (clean.isBlank()) return null
-        val q1 = db.collection("users").whereEqualTo("email", clean).get().await()
-        if (!q1.isEmpty) {
-            return q1.documents.first().toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
-        }
         val lower = clean.lowercase()
-        if (lower != clean) {
-            val q2 = db.collection("users").whereEqualTo("email", lower).get().await()
-            if (!q2.isEmpty) {
-                return q2.documents.first().toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+
+        // 1. Direct indexed equality on clean email
+        try {
+            val q1 = db.collection("users").whereEqualTo("email", clean).get().await()
+            if (!q1.isEmpty) {
+                val doc = q1.documents.first()
+                val profile = doc.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                if (profile != null) {
+                    if (profile.uid.isBlank()) profile.uid = doc.id
+                    if (profile.email.isBlank()) profile.email = doc.getString("email") ?: clean
+                    return profile
+                }
             }
+        } catch (_: Exception) {}
+
+        // 2. Direct indexed equality on lowercased email
+        if (lower != clean) {
+            try {
+                val q2 = db.collection("users").whereEqualTo("email", lower).get().await()
+                if (!q2.isEmpty) {
+                    val doc = q2.documents.first()
+                    val profile = doc.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (profile != null) {
+                        if (profile.uid.isBlank()) profile.uid = doc.id
+                        if (profile.email.isBlank()) profile.email = doc.getString("email") ?: lower
+                        return profile
+                    }
+                }
+            } catch (_: Exception) {}
         }
+
+        // 3. Fallback scan across users collection: handles mixed casing or whitespace differences
+        try {
+            val allUsers = db.collection("users").limit(300).get().await()
+            for (doc in allUsers.documents) {
+                val docEmail = doc.getString("email")?.trim() ?: continue
+                if (docEmail.equals(clean, ignoreCase = true) || docEmail.equals(lower, ignoreCase = true)) {
+                    val profile = doc.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+                    if (profile != null) {
+                        if (profile.uid.isBlank()) profile.uid = doc.id
+                        if (profile.email.isBlank()) profile.email = docEmail
+                        return profile
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "findUserByEmail scan error: ${e.message}")
+        }
+
         return null
+    }
+
+    suspend fun findRegisteredUserByEmail(email: String): UserProfile? = findUserByEmail(email)
+
+    suspend fun updateUserProfileHouseholdIds(uid: String, householdIds: List<String>) {
+        if (uid.isBlank()) return
+        try {
+            db.collection("users").document(uid).set(
+                mapOf(
+                    "householdIds" to householdIds.filter { it.isNotBlank() }.distinct(),
+                    "updatedAt" to Timestamp.now()
+                ),
+                SetOptions.merge()
+            ).await()
+        } catch (e: Exception) {
+            Log.w(TAG, "updateUserProfileHouseholdIds notice: ${e.message}")
+        }
     }
 
     suspend fun savePasswordResetPhoneCode(phone: String, code: String, userEmail: String) {
@@ -1949,11 +2104,56 @@ class FirestoreSyncRepository(
         return result.distinctBy { it.id.ifBlank { it.title } }
     }
 
-    suspend fun inviteMemberToHousehold(householdId: String, email: String, role: String = "CONTRIBUTOR") {
+    fun observeUserHouseholds(uid: String, email: String): Flow<List<Household>> {
+        if (uid.isBlank()) return flowOf(emptyList())
+
+        val memberFlow = db.collection("households")
+            .whereArrayContains("memberUids", uid)
+            .snapshots()
+            .map { snap ->
+                snap.documents.mapNotNull { doc ->
+                    val deletedFor = (doc.get("deletedForUsers") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                    if (deletedFor.contains(uid)) return@mapNotNull null
+                    doc.toObject(Household::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)?.apply {
+                        if (id.isBlank()) id = doc.id
+                        doc.getString("name")?.let { nm -> if (nm.isNotBlank()) name = nm }
+                    }
+                }
+            }
+
+        val ownerFlow = db.collection("households")
+            .whereEqualTo("ownerId", uid)
+            .snapshots()
+            .map { snap ->
+                snap.documents.mapNotNull { doc ->
+                    val deletedFor = (doc.get("deletedForUsers") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                    if (deletedFor.contains(uid)) return@mapNotNull null
+                    doc.toObject(Household::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)?.apply {
+                        if (id.isBlank()) id = doc.id
+                        doc.getString("name")?.let { nm -> if (nm.isNotBlank()) name = nm }
+                    }
+                }
+            }
+
+        return kotlinx.coroutines.flow.combine(memberFlow, ownerFlow) { mList, oList ->
+            (mList + oList).distinctBy { it.id }
+        }
+    }
+
+    suspend fun inviteMemberToHousehold(
+        householdId: String,
+        email: String,
+        role: String = "CONTRIBUTOR",
+        targetUser: UserProfile? = null
+    ) {
         if (householdId.isBlank() || email.isBlank()) return
         val cleanEmail = email.trim()
         val lowerEmail = cleanEmail.lowercase()
-        val emailsToAdd = listOf(cleanEmail, lowerEmail).distinct()
+        val resolvedUser = targetUser ?: findUserByEmail(cleanEmail)
+        val targetUid = resolvedUser?.uid.orEmpty()
+        val targetEmail = resolvedUser?.email?.trim().orEmpty()
+
+        val emailsToAdd = (listOf(cleanEmail, lowerEmail) + if (targetEmail.isNotBlank()) listOf(targetEmail, targetEmail.lowercase()) else emptyList()).distinct()
 
         val hDocRef = db.collection("households").document(householdId)
         val doc = hDocRef.get().await()
@@ -1963,36 +2163,58 @@ class FirestoreSyncRepository(
         val updateMap = mutableMapOf<String, Any>(
             "invitedEmails" to updatedInvited,
             "memberRoles.$lowerEmail" to role,
+            "memberRoles.$cleanEmail" to role,
             "pendingInviteRole" to role,
             "updatedAt" to Timestamp.now()
         )
+        if (targetEmail.isNotBlank()) {
+            updateMap["memberRoles.${targetEmail.lowercase()}"] = role
+            updateMap["memberRoles.$targetEmail"] = role
+        }
+        if (targetUid.isNotBlank()) {
+            updateMap["memberUids"] = FieldValue.arrayUnion(targetUid)
+            updateMap["memberRoles.$targetUid"] = role
+            updateMap["deletedForUsers"] = FieldValue.arrayRemove(targetUid)
+        }
         hDocRef.update(updateMap).await()
 
-        // Cross-account resolution: If user is already registered in users collection, link them immediately
-        try {
-            for (ev in emailsToAdd) {
-                val qUsers = db.collection("users").whereEqualTo("email", ev).get().await()
-                for (uDoc in qUsers.documents) {
-                    val uid = uDoc.id
-                    if (uid.isNotBlank()) {
-                        hDocRef.update(
-                            mapOf(
-                                "memberUids" to FieldValue.arrayUnion(uid),
-                                "memberRoles.$uid" to role
-                            )
-                        ).await()
-                        uDoc.reference.set(
-                            mapOf(
-                                "householdId" to householdId,
-                                "householdIds" to FieldValue.arrayUnion(householdId)
-                            ),
-                            SetOptions.merge()
-                        ).await()
-                    }
-                }
+        // Also add householdId to target user's user document
+        if (targetUid.isNotBlank()) {
+            try {
+                db.collection("users").document(targetUid).set(
+                    mapOf("householdIds" to FieldValue.arrayUnion(householdId)),
+                    SetOptions.merge()
+                ).await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Notice adding householdId to target user profile: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Cross-account invite auto-link notice: ${e.message}")
+        }
+
+        // Also ensure member entry exists in household's members subcollection
+        if (targetUid.isNotBlank()) {
+            try {
+                val memberName = resolvedUser?.displayName?.ifBlank {
+                    "${resolvedUser.firstName} ${resolvedUser.lastName}".trim()
+                }?.ifBlank { cleanEmail.substringBefore("@") } ?: cleanEmail.substringBefore("@")
+
+                val existingMembers = db.collection("households").document(householdId)
+                    .collection("members").whereEqualTo("userId", targetUid).get().await()
+                if (existingMembers.isEmpty) {
+                    val newMember = FirebaseMember(
+                        id = UUID.randomUUID().toString(),
+                        householdId = householdId,
+                        userId = targetUid,
+                        name = memberName,
+                        role = role,
+                        avatarColorHex = 0xFF059669L,
+                        isDefault = false
+                    )
+                    db.collection("households").document(householdId)
+                        .collection("members").document(newMember.id).set(newMember).await()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error ensuring member subcollection doc: ${e.message}")
+            }
         }
     }
 
@@ -2036,38 +2258,39 @@ class FirestoreSyncRepository(
         for (uid in uidsToRemove) {
             updateMap["memberRoles.$uid"] = FieldValue.delete()
         }
-
         hDocRef.update(updateMap).await()
     }
 
-    suspend fun deleteHousehold(householdId: String, userId: String) {
+    suspend fun deleteHousehold(householdId: String, userId: String, nextHouseholdId: String? = null) {
         if (householdId.isBlank()) return
         try {
             if (userId.isNotBlank()) {
+                val userUpdate = mutableMapOf<String, Any>(
+                    "householdIds" to FieldValue.arrayRemove(householdId)
+                )
+                if (!nextHouseholdId.isNullOrBlank()) {
+                    userUpdate["householdId"] = nextHouseholdId
+                }
                 db.collection("users").document(userId).set(
-                    mapOf(
-                        "householdIds" to FieldValue.arrayRemove(householdId)
-                    ),
+                    userUpdate,
                     SetOptions.merge()
                 ).await()
             }
-            // Clean up household subcollections
-            val hDoc = db.collection("households").document(householdId)
-            val subcollections = listOf("expenses", "incomes", "categories", "members", "savings_goals", "savingsGoals", "recurring_expenses", "recurringExpenses")
-            for (sub in subcollections) {
-                try {
-                    val docs = hDoc.collection(sub).get().await()
-                    for (d in docs.documents) {
-                        d.reference.delete().await()
-                    }
-                } catch (se: Exception) {
-                    Log.w(TAG, "Subcollection $sub deletion notice: ${se.message}")
-                }
+            // Keep the household data safely in Firestore as instructed, while disassociating user
+            try {
+                val hDoc = db.collection("households").document(householdId)
+                hDoc.update(
+                    mapOf(
+                        "deletedForUsers" to FieldValue.arrayUnion(userId),
+                        "memberUids" to FieldValue.arrayRemove(userId),
+                        "updatedAt" to Timestamp.now()
+                    )
+                ).await()
+            } catch (he: Exception) {
+                Log.w(TAG, "Household document disassociation notice: ${he.message}")
             }
-            hDoc.delete().await()
         } catch (e: Exception) {
             Log.e(TAG, "deleteHousehold error: ${e.message}", e)
-            throw e
         }
     }
 

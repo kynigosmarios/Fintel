@@ -143,7 +143,7 @@ import kotlinx.coroutines.launch
 
 enum class AppTab(val title: String) {
     EXPENSES("Έξοδα"),
-    ANALYTICS("Αναλυτικά"),
+    ANALYTICS("Στατιστικά"),
     MEMBERS("Μέλη"),
     CATEGORIES("Κατηγορίες")
 }
@@ -763,12 +763,14 @@ fun MainScreen(
             currentHousehold = currentHousehold,
             allHouseholds = userHouseholds,
             isPremium = isUserPro,
+            isOwner = canManage,
+            isHouseholdOwner = { viewModel.isUserOwnerOfHousehold(it) },
             appLanguage = appLanguage,
             onRenameHousehold = { viewModel.renameCurrentHousehold(it) },
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
             onDeleteHousehold = { viewModel.deleteHousehold(it) },
-            onManageMembers = { currentTab = 3 },
+            onManageMembers = { currentTab = 2 },
             onShareInviteCode = { showInviteDialog = true },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
             onClearExpenses = { viewModel.clearCurrentExodologioExpenses() },
@@ -782,6 +784,7 @@ fun MainScreen(
             currentHousehold = currentHousehold,
             allHouseholds = userHouseholds,
             isPremium = isUserPro,
+            isHouseholdOwner = { viewModel.isUserOwnerOfHousehold(it) },
             appLanguage = appLanguage,
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
