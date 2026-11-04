@@ -1,7 +1,9 @@
 package com.example.ui.components
 
 import android.app.TimePickerDialog
+import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -30,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
@@ -587,6 +590,92 @@ fun AppSettingsDialog(
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    // Section: Αυτόματος Αναγνώστης Τραπεζών (Auto-Catcher)
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = if (lang == Localization.Language.ENGLISH) "BANK AUTO-CATCHER" else "ΑΥΤΟΜΑΤΟΣ ΑΝΑΓΝΩΣΤΗΣ ΤΡΑΠΕΖΩΝ",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                            letterSpacing = 0.5.sp,
+                            modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Emerald700.copy(alpha = 0.15f),
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.AccountBalance,
+                                                contentDescription = null,
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "Push Notification Reader" else "Ανάγνωση Τραπεζικών Push",
+                                            fontSize = 13.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH)
+                                                "Detects Eurobank, Alpha, Piraeus, NBG, Revolut, Payzy purchases"
+                                            else
+                                                "Αναγνωρίζει αγορές από Eurobank, Alpha, Πειραιώς, Εθνική, Revolut, Payzy",
+                                            fontSize = 11.5.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Button(
+                                    onClick = {
+                                        try {
+                                            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                        } catch (e: Exception) {
+                                            onMessage("Μεταβείτε στις Ρυθμίσεις > Ειδοποιήσεις για ενεργοποίηση")
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(38.dp)
+                                        .testTag("enable_notification_listener_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700)
+                                ) {
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Configure Notification Access" else "Ρύθμιση Πρόσβασης Ειδοποιήσεων",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }

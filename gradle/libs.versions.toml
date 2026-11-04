@@ -1,7 +1,7 @@
 [versions]
 agp = "9.1.1"
 kotlin = "2.2.10"
-googleDevtoolsKsp = "2.3.5"
+googleDevtoolsKsp = "2.3.6"
 secretsGradlePlugin = "2.0.1"
 googleServices = "4.5.0"
 composeBom = "2024.09.00"
@@ -42,6 +42,8 @@ robolectric = "4.16.1"
 kotlinxCoroutinesAndroid = "1.10.2"
 kotlinxCoroutinesCore = "1.10.2"
 kotlinxCoroutinesTest = "1.10.2"
+playServicesMlkitTextRecognition = "19.0.1"
+playServicesMlkitBarcodeScanning = "18.3.1"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
@@ -94,6 +96,8 @@ moshi-kotlin-codegen = { module = "com.squareup.moshi:moshi-kotlin-codegen", ver
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 play-billing = { module = "com.android.billingclient:billing", version.ref = "playBilling" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
+play-services-mlkit-text-recognition = { module = "com.google.android.gms:play-services-mlkit-text-recognition", version.ref = "playServicesMlkitTextRecognition" }
+play-services-mlkit-barcode-scanning = { module = "com.google.android.gms:play-services-mlkit-barcode-scanning", version.ref = "playServicesMlkitBarcodeScanning" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 

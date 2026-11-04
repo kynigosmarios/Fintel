@@ -63,6 +63,8 @@ import com.example.util.Localization
 fun VoiceInputDialog(
     isListening: Boolean,
     appLanguage: String = "EL",
+    monthlyUsage: Int = 0,
+    isPro: Boolean = false,
     onStartListening: () -> Unit,
     onStopListening: () -> Unit,
     onSubmitVoiceText: (String) -> Unit,
@@ -143,7 +145,24 @@ fun VoiceInputDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isPro) Color(0xFFF59E0B).copy(alpha = 0.14f) else Emerald700.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, if (isPro) Color(0xFFF59E0B).copy(alpha = 0.4f) else Emerald700.copy(alpha = 0.3f))
+                ) {
+                    Text(
+                        text = if (isPro) (if (lang == Localization.Language.ENGLISH) "⭐ Fintel Pro: Unlimited Voice Entries" else "⭐ Fintel Pro: Απεριόριστες Καταχωρήσεις")
+                        else (if (lang == Localization.Language.ENGLISH) "Free Quota: ${(15 - monthlyUsage).coerceAtLeast(0)}/15 left this month" else "Δωρεάν: ${(15 - monthlyUsage).coerceAtLeast(0)}/15 απομένουν αυτόν τον μήνα"),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPro) Color(0xFFB45309) else Emerald700,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Pulsing Mic Animation
                 Box(

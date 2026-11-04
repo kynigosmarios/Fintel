@@ -115,6 +115,8 @@ dependencies {
     implementation(libs.moshi.kotlin)
     implementation(libs.okhttp)
     implementation(libs.play.billing)
+    implementation(libs.play.services.mlkit.text.recognition)
+    implementation(libs.play.services.mlkit.barcode.scanning)
     implementation(libs.retrofit)
 
     ksp(libs.androidx.room.compiler)

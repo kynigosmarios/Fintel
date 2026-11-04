@@ -30,9 +30,11 @@ import com.example.data.repository.ExpenseRepository
 import com.example.data.repository.FirestoreSyncRepository
 import com.example.data.safety.DataSafetyGuard
 import com.example.data.seed.FirestoreDataSeed
+import com.example.util.BankNotificationHolder
 import com.example.util.GreekVoiceParser
 import com.example.util.Localization
 import com.example.util.ParsedVoiceExpense
+import com.example.util.PendingBankTransaction
 import com.example.util.RecurringExpenseAutoProcessor
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
@@ -3106,15 +3108,75 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private val _editingRecurringExpense = MutableStateFlow<RecurringExpense?>(null)
     val editingRecurringExpense = _editingRecurringExpense.asStateFlow()
 
+    private val _showReceiptScanDialog = MutableStateFlow(false)
+    val showReceiptScanDialog = _showReceiptScanDialog.asStateFlow()
+
+    private fun getMonthlyVoiceUsageKey(): String =
+        "voice_usage_" + SimpleDateFormat("yyyy_MM", Locale.ROOT).format(Date())
+
+    private val _monthlyVoiceUsage = MutableStateFlow(prefs.getInt(getMonthlyVoiceUsageKey(), 0))
+    val monthlyVoiceUsage = _monthlyVoiceUsage.asStateFlow()
+
+    val pendingBankTransactions: StateFlow<List<PendingBankTransaction>> = BankNotificationHolder.pendingTransactions
+
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage = _snackbarMessage.asStateFlow()
 
     fun openVoiceInputDialog() {
+        if (!isCurrentUserPro() && _monthlyVoiceUsage.value >= 15) {
+            showPremiumPaywall("voice_limit")
+            showSnackbar("Συμπληρώσατε το μηνιαίο όριο (15/15) δωρεάν φωνητικών καταχωρήσεων")
+            return
+        }
         _showVoiceInputDialog.value = true
     }
 
     fun dismissVoiceInputDialog() {
         _showVoiceInputDialog.value = false
+    }
+
+    fun openReceiptScanDialog() {
+        _showReceiptScanDialog.value = true
+    }
+
+    fun dismissReceiptScanDialog() {
+        _showReceiptScanDialog.value = false
+    }
+
+    fun confirmBankTransaction(tx: PendingBankTransaction) {
+        viewModelScope.launch {
+            val user = _currentUser.value
+            val targetHouseholdId = getOrEnsureHouseholdId(user)
+            val defaultCat = allCategories.value.firstOrNull {
+                it.name.contains("Σούπερ", ignoreCase = true) || it.name.contains("Super", ignoreCase = true)
+            } ?: allCategories.value.firstOrNull() ?: ExpenseCategory(id = 1L, name = "Γενικά", iconKey = "other", colorHex = 0xFF4CAF50)
+
+            val defaultMember = allMembers.value.firstOrNull()
+
+            saveExpense(
+                id = 0L,
+                title = tx.merchantName,
+                amount = tx.amount,
+                categoryId = defaultCat.id,
+                categoryName = defaultCat.name,
+                timestamp = tx.timestamp,
+                splitType = "ALL_FAMILY",
+                memberIds = emptyList(),
+                memberNamesDisplay = "Κοινό Οικογένειας",
+                note = "Αυτόματη καταχώρηση από ${tx.bankName}",
+                payerMemberId = defaultMember?.id ?: 0L,
+                payerMemberName = defaultMember?.name ?: "Οικογένεια",
+                payerMemberIdsCsv = if (defaultMember != null) "${defaultMember.id}" else "",
+                payerAmountsCsv = ""
+            )
+
+            BankNotificationHolder.removeTransaction(tx.id)
+            showSnackbar("Καταχωρήθηκε: ${tx.merchantName} (${String.format(Locale.GERMANY, "%.2f €", tx.amount)})")
+        }
+    }
+
+    fun dismissBankTransaction(tx: PendingBankTransaction) {
+        BankNotificationHolder.removeTransaction(tx.id)
     }
 
     fun openBurgerMenu() {
@@ -3616,6 +3678,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun openSavingsGoalDialog(goal: SavingsGoal? = null) {
+        if (goal == null && !isCurrentUserPro() && allSavingsGoals.value.size >= 1) {
+            showPremiumPaywall("savings_goal_limit")
+            showSnackbar("Η δωρεάν έκδοση υποστηρίζει έως 1 Στόχο Αποταμίευσης")
+            return
+        }
         _editingSavingsGoal.value = goal
         _showSavingsGoalDialog.value = true
     }
@@ -3721,6 +3788,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun openRecurringExpenseDialog(recurring: RecurringExpense? = null) {
+        if (recurring == null && !isCurrentUserPro() && allRecurringExpenses.value.size >= 2) {
+            showPremiumPaywall("recurring_expense_limit")
+            showSnackbar("Η δωρεάν έκδοση υποστηρίζει έως 2 Πάγιες Εντολές")
+            return
+        }
         _editingRecurringExpense.value = recurring
         _showRecurringExpenseDialog.value = true
     }
@@ -4306,6 +4378,11 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (e: Exception) {
                 Log.w("OikoNomosVM", "Cloud voice syncUserExpense error: ${e.message}")
             }
+
+            // Increment monthly voice usage counter
+            val newCount = _monthlyVoiceUsage.value + 1
+            _monthlyVoiceUsage.value = newCount
+            prefs.edit().putInt(getMonthlyVoiceUsageKey(), newCount).apply()
         }
     }
 

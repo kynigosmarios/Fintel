@@ -45,6 +45,7 @@ import com.example.util.Localization
 fun QuickActionChooserDialog(
     appLanguage: String = "EL",
     onVoiceClick: () -> Unit,
+    onScanReceiptClick: () -> Unit = {},
     onManualClick: () -> Unit,
     onIncomeClick: () -> Unit = {},
     onOpenAppClick: () -> Unit,
@@ -123,11 +124,28 @@ fun QuickActionChooserDialog(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Option 2: ⚡ 2. Γρήγορη καταχώρηση εξόδου
+                // Option 2: 📸 2. Σάρωση Απόδειξης (OCR & QR)
                 QuickActionItem(
-                    title = if (lang == Localization.Language.ENGLISH) "2. Add Expense" else "2. Καταχώρηση Εξόδου",
+                    title = if (lang == Localization.Language.ENGLISH) "2. Scan Receipt (OCR)" else "2. Σάρωση Απόδειξης (OCR)",
+                    subtitle = if (lang == Localization.Language.ENGLISH) "Photo or gallery receipt reader (Pro)" else "Φωτογραφία απόδειξης για αυτόματο ποσό & μαγαζί",
+                    icon = Icons.Default.FlashOn,
+                    iconBgColor = Color(0xFFD97706),
+                    iconTint = Color.White,
+                    borderColor = Color(0xFFD97706).copy(alpha = 0.45f),
+                    testTag = "quick_action_scan_receipt_option",
+                    onClick = {
+                        onDismiss()
+                        onScanReceiptClick()
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Option 3: ⚡ 3. Γρήγορη καταχώρηση εξόδου
+                QuickActionItem(
+                    title = if (lang == Localization.Language.ENGLISH) "3. Add Expense" else "3. Καταχώρηση Εξόδου",
                     subtitle = if (lang == Localization.Language.ENGLISH) "Direct manual expense logging" else "Άμεση καταχώρηση ποσού, κατηγορίας & μελών",
                     icon = Icons.Default.FlashOn,
                     iconBgColor = Color(0xFF0284C7),

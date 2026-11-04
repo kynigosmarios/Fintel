@@ -565,16 +565,19 @@ fun PremiumPaywallDialog(
                 )
 
                 val paywallSubtitle = when (reason) {
-                    "multi_exodologio" -> null
-                    "invite_member" -> if (lang == Localization.Language.ENGLISH) "Adding members is a Pro feature" else "Η προσθήκη μελών είναι δυνατότητα Pro"
-                    else -> if (lang == Localization.Language.ENGLISH) "Unlock all Fintel Pro features" else "Ξεκλειδώστε όλες τις δυνατότητες του Fintel"
+                    "voice_limit" -> if (lang == Localization.Language.ENGLISH) "You have reached the monthly limit of 15 free voice entries" else "Συμπληρώσατε το μηνιαίο όριο των 15 δωρεάν φωνητικών καταχωρήσεων"
+                    "savings_goal_limit" -> if (lang == Localization.Language.ENGLISH) "Free edition supports up to 1 Savings Goal" else "Η δωρεάν έκδοση υποστηρίζει έως 1 Στόχο Αποταμίευσης"
+                    "recurring_expense_limit" -> if (lang == Localization.Language.ENGLISH) "Free edition supports up to 2 Recurring Expenses" else "Η δωρεάν έκδοση υποστηρίζει έως 2 Πάγιες Εντολές"
+                    "multi_exodologio" -> if (lang == Localization.Language.ENGLISH) "Unlock unlimited households & wallets" else "Ξεκλειδώστε απεριόριστα ανεξάρτητα εξοδολόγια & πορτοφόλια"
+                    "ocr_receipt" -> if (lang == Localization.Language.ENGLISH) "Camera & Gallery Receipt OCR is a Pro feature" else "Η σάρωση αποδείξεων με Κάμερα & OCR είναι δυνατότητα Pro"
+                    else -> if (lang == Localization.Language.ENGLISH) "Unlock all automation & smart financial tools" else "Ξεκλειδώστε όλα τα εργαλεία αυτοματισμού & οργάνωσης"
                 }
 
                 if (paywallSubtitle != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = paywallSubtitle,
-                        fontSize = 12.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Amber700,
                         textAlign = TextAlign.Center
@@ -583,32 +586,146 @@ fun PremiumPaywallDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Price Badge
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Amber700.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, Amber700.copy(alpha = 0.35f)),
-                    modifier = Modifier.padding(bottom = 12.dp)
+                var selectedPlan by remember { mutableStateOf(1) } // 0: monthly, 1: yearly, 2: lifetime
+
+                // 3-tier pricing selectors
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    // Option 1: Yearly (Best Value)
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (selectedPlan == 1) Amber700.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(if (selectedPlan == 1) 2.dp else 1.dp, if (selectedPlan == 1) Amber700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedPlan = 1 }
                     ) {
-                        Text(
-                            text = if (lang == Localization.Language.ENGLISH) "2.99€ / month" else "2,99€ / μήνα",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Amber700
-                        )
-                        Text(
-                            text = if (lang == Localization.Language.ENGLISH) "Google Play Subscription • Cancel anytime" else "Συνδρομή Google Play • Ακύρωση ανά πάσα στιγμή",
-                            fontSize = 10.5.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (lang == Localization.Language.ENGLISH) "Annual (Best Value)" else "Ετήσια Συνδρομή",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Amber700
+                                    ) {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "SAVE 33%" else "-33%",
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "Only 1.66€ / month" else "Μόλις 1,66€ / μήνα",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "19,99€ / έτος",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (selectedPlan == 1) Amber700 else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    // Option 0: Monthly
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (selectedPlan == 0) Amber700.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(if (selectedPlan == 0) 2.dp else 1.dp, if (selectedPlan == 0) Amber700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedPlan = 0 }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "Monthly Plan" else "Μηνιαία Συνδρομή",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "Cancel anytime" else "Ακύρωση ανά πάσα στιγμή",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "2,49€ / μήνα",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selectedPlan == 0) Amber700 else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    // Option 2: Lifetime
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = if (selectedPlan == 2) Amber700.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        border = BorderStroke(if (selectedPlan == 2) 2.dp else 1.dp, if (selectedPlan == 2) Amber700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedPlan = 2 }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "Lifetime Access" else "Εφάπαξ Πρόσβαση (Lifetime)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (lang == Localization.Language.ENGLISH) "One-time payment forever" else "Πληρώνετε μία φορά για πάντα",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "39,99€",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (selectedPlan == 2) Amber700 else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
 
-                // Benefit List Card with clear aligned items
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Benefit List Card
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -617,31 +734,58 @@ fun PremiumPaywallDialog(
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
                     ) {
                         Text(
-                            text = if (lang == Localization.Language.ENGLISH) "What Pro includes:" else "Τι προσφέρει η έκδοση Pro:",
+                            text = if (lang == Localization.Language.ENGLISH) "What Pro includes:" else "Τι περιλαμβάνει το Fintel Pro:",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        // Feature 1: Shared Household Access
+                        // Feature 1: Unlimited Voice Input
                         BenefitRowItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Shared Household Access" else "Κοινή χρήση εξοδολογίου",
+                            title = if (lang == Localization.Language.ENGLISH) "Unlimited Voice Entries" else "Απεριόριστη Φωνητική Καταχώρηση",
                             subtitle = if (lang == Localization.Language.ENGLISH)
-                                "Add any user's email. Registered members see and access the shared household automatically without needing Pro!"
+                                "Record any expense via voice with Greek natural language parser without the 15/month free cap"
                             else
-                                "Προσθέστε το email οποιουδήποτε χρήστη. Εφόσον είναι μέλος στην εφαρμογή, βλέπει άμεσα το εξοδολόγιο χωρίς να απαιτείται να είναι Pro!"
+                                "Πλήρης φωνητική καταγραφή εξόδων στα ελληνικά χωρίς το μηνιαίο όριο των 15 δωρεάν καταχωρήσεων"
                         )
 
-                        // Feature 2: Unlimited Households
+                        // Feature 2: Receipt OCR & QR Scanner
                         BenefitRowItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Unlimited Households" else "Απεριόριστα εξοδολόγια",
+                            title = if (lang == Localization.Language.ENGLISH) "Receipt OCR & AADE QR Scanner" else "Σάρωση Αποδείξεων & QR ΑΑΔΕ",
                             subtitle = if (lang == Localization.Language.ENGLISH)
-                                "Create and organize multiple households (Home, Work, Vacation, Projects) and invite collaborators"
+                                "Scan receipts with Camera or Gallery to automatically detect store name, amount, date, and category"
                             else
-                                "Δημιουργήστε και διαχειριστείτε απεριόριστα εξοδολόγια (Σπίτι, Εργασία, Εξοχικό, Projects) και μοιραστείτε τα"
+                                "Φωτογραφίστε αποδείξεις από σούπερ μάρκετ ή καταστήματα και περάστε αυτόματα ποσό, κατάστημα και ημερομηνία"
+                        )
+
+                        // Feature 3: Bank Notification Auto-Catcher
+                        BenefitRowItem(
+                            title = if (lang == Localization.Language.ENGLISH) "Bank Notifications Auto-Catcher" else "Αυτόματος Αναγνώστης Τραπεζών",
+                            subtitle = if (lang == Localization.Language.ENGLISH)
+                                "Detects push notifications from Eurobank, Alpha, Piraeus, NBG, Revolut, Payzy for 1-tap logging"
+                            else
+                                "Αναγνωρίζει τις ειδοποιήσεις από Eurobank, Alpha, Πειραιώς, Εθνική, Revolut, Payzy για καταχώρηση με 1 πάτημα"
+                        )
+
+                        // Feature 4: Multiple Households
+                        BenefitRowItem(
+                            title = if (lang == Localization.Language.ENGLISH) "Multiple Households & Wallets" else "Πολλαπλά Εξοδολόγια & Πορτοφόλια",
+                            subtitle = if (lang == Localization.Language.ENGLISH)
+                                "Create separate budgets for Home, Freelance/Business, Vacation, Car"
+                            else
+                                "Δημιουργήστε ξεχωριστά εξοδολόγια για Σπίτι, Επαγγελματικό, Εξοχικό, Αυτοκίνητο"
+                        )
+
+                        // Feature 5: Unlimited Goals & Recurring
+                        BenefitRowItem(
+                            title = if (lang == Localization.Language.ENGLISH) "Unlimited Goals & Recurring Expenses" else "Απεριόριστοι Στόχοι & Πάγιες Εντολές",
+                            subtitle = if (lang == Localization.Language.ENGLISH)
+                                "Track unlimited savings goals and automate recurring monthly bills"
+                            else
+                                "Παρακολουθήστε όσους στόχους αποταμίευσης θέλετε και διαχειριστείτε όλους τους πάγιους λογαριασμούς"
                         )
                     }
                 }
@@ -668,9 +812,9 @@ fun PremiumPaywallDialog(
                         Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (lang == Localization.Language.ENGLISH) "Get it now" else "Απόκτησέ το τώρα",
+                            text = if (lang == Localization.Language.ENGLISH) "Unlock Fintel Pro" else "Απόκτηση Fintel Pro",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontSize = 14.5.sp
                         )
                     }
                 }

@@ -104,6 +104,7 @@ import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.outlined.Savings
 import com.example.ui.components.AppSettingsDialog
+import com.example.ui.components.BankNotificationBanner
 import com.example.ui.components.BurgerMenuDrawer
 import com.example.ui.components.CategoryDialog
 import com.example.ui.components.ExodologioDetailsDialog
@@ -115,6 +116,7 @@ import com.example.ui.components.ManualIncomeDialog
 import com.example.ui.components.MemberDialog
 import com.example.ui.components.OnboardingCarouselDialog
 import com.example.ui.components.PrivacyConsentDialog
+import com.example.ui.components.ReceiptScanDialog
 import com.example.ui.components.UserAvatar
 import com.example.ui.components.PremiumPaywallDialog
 import com.example.ui.components.QuickActionChooserDialog
@@ -210,6 +212,9 @@ fun MainScreen(
 
     val showQuickActionChooser by viewModel.showQuickActionChooser.collectAsStateWithLifecycle()
     val showVoiceInputDialog by viewModel.showVoiceInputDialog.collectAsStateWithLifecycle()
+    val showReceiptScanDialog by viewModel.showReceiptScanDialog.collectAsStateWithLifecycle()
+    val pendingBankTransactions by viewModel.pendingBankTransactions.collectAsStateWithLifecycle()
+    val monthlyVoiceUsage by viewModel.monthlyVoiceUsage.collectAsStateWithLifecycle()
     val showExportReportDialog by viewModel.showExportReportDialog.collectAsStateWithLifecycle()
     val showSavingsGoalDialog by viewModel.showSavingsGoalDialog.collectAsStateWithLifecycle()
     val editingSavingsGoal by viewModel.editingSavingsGoal.collectAsStateWithLifecycle()
@@ -508,6 +513,16 @@ fun MainScreen(
                 onSwitchClick = { viewModel.openExodologioManager() }
             )
 
+            // Bank Notification Auto-Catcher Banner
+            if (pendingBankTransactions.isNotEmpty()) {
+                BankNotificationBanner(
+                    transactions = pendingBankTransactions,
+                    appLanguage = appLanguage,
+                    onConfirmTransaction = { viewModel.confirmBankTransaction(it) },
+                    onDismissTransaction = { viewModel.dismissBankTransaction(it) }
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -563,6 +578,7 @@ fun MainScreen(
                         canManage = canManage,
                         currentUserEmail = currentUser?.email ?: userProfile?.email ?: "",
                         deletedMembers = deletedMembers,
+                        expenses = allExpenses,
                         onAddMember = { viewModel.openMemberDialog() },
                         onEditMember = { viewModel.openMemberDialog(it) },
                         onDeleteMember = { viewModel.deleteMember(it) },
@@ -571,7 +587,8 @@ fun MainScreen(
                         onUpdateMemberColor = { member, color -> viewModel.updateMemberColor(member, color) },
                         onMoveMemberUp = { viewModel.moveMemberUp(it) },
                         onMoveMemberDown = { viewModel.moveMemberDown(it) },
-                        onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) }
+                        onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
+                        onShowMessage = { viewModel.showSnackbar(it) }
                     )
                     3 -> CategoriesScreen(
                         categories = categories,
@@ -713,6 +730,7 @@ fun MainScreen(
         QuickActionChooserDialog(
             appLanguage = appLanguage,
             onVoiceClick = { viewModel.openVoiceInputDialog() },
+            onScanReceiptClick = { viewModel.openReceiptScanDialog() },
             onManualClick = { viewModel.openManualExpenseDialog() },
             onIncomeClick = { viewModel.openManualIncomeDialog() },
             onOpenAppClick = { viewModel.dismissQuickActionChooser() },
@@ -805,10 +823,13 @@ fun MainScreen(
         )
     }
 
-    // Voice Input Dialog (Robust Speech Recording, Manual Fallback, and Preset Chips)
+    // Voice Input Dialog (Robust Speech Recording with Freemium Limit Tracking)
     if (showVoiceInputDialog) {
         VoiceInputDialog(
             isListening = isListening,
+            appLanguage = appLanguage,
+            monthlyUsage = monthlyVoiceUsage,
+            isPro = isUserPro,
             onStartListening = { handleMicToggle() },
             onStopListening = { speechHelper.stopListening() },
             onSubmitVoiceText = { text ->
@@ -820,6 +841,36 @@ fun MainScreen(
                 viewModel.dismissVoiceInputDialog()
             },
             onShowMessage = { viewModel.showSnackbar(it) }
+        )
+    }
+
+    // Receipt OCR & AADE QR Scanner Dialog
+    if (showReceiptScanDialog) {
+        ReceiptScanDialog(
+            categories = categories,
+            members = members,
+            isPro = isUserPro,
+            appLanguage = appLanguage,
+            onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
+            onExpenseConfirmed = { title, amount, category, timestamp, member, note ->
+                viewModel.saveExpense(
+                    id = 0L,
+                    title = title,
+                    amount = amount,
+                    categoryId = category.id,
+                    categoryName = category.name,
+                    timestamp = timestamp,
+                    splitType = "ALL_FAMILY",
+                    memberIds = emptyList(),
+                    memberNamesDisplay = "Κοινό Οικογένειας",
+                    note = note,
+                    payerMemberId = member?.id ?: 0L,
+                    payerMemberName = member?.name ?: "Οικογένεια",
+                    payerMemberIdsCsv = if (member != null) "${member.id}" else "",
+                    payerAmountsCsv = ""
+                )
+            },
+            onDismiss = { viewModel.dismissReceiptScanDialog() }
         )
     }
 
