@@ -13,6 +13,7 @@ import com.example.data.model.Household
 import com.example.data.model.UserProfile
 import com.example.data.model.toSafeCategory
 import com.example.data.model.toSafeMember
+import com.example.util.GreekVoiceParser
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -116,38 +117,6 @@ class FirestoreSyncRepository(
             }
         }
 
-        // 3. Households where invitedEmails contains cleanEmail or lowerEmail
-        if (cleanEmail.isNotBlank()) {
-            val emailVariations = listOf(cleanEmail, lowerEmail).distinct()
-            for (ev in emailVariations) {
-                try {
-                    val qInvited = db.collection("households").whereArrayContains("invitedEmails", ev).get().await()
-                    for (doc in qInvited.documents) {
-                        parseAndAccept(doc)?.let { h ->
-                            foundMap[h.id] = h
-                            if (uid.isNotBlank()) {
-                                try {
-                                    val memberRoles = (doc.get("memberRoles") as? Map<*, *>) ?: emptyMap<String, String>()
-                                    val assignedRole = memberRoles[ev]?.toString()
-                                        ?: memberRoles[lowerEmail]?.toString()
-                                        ?: doc.getString("pendingInviteRole")
-                                        ?: "CONTRIBUTOR"
-                                    doc.reference.update(
-                                        mapOf(
-                                            "memberUids" to FieldValue.arrayUnion(uid),
-                                            "memberRoles.$uid" to assignedRole
-                                        )
-                                    ).await()
-                                } catch (_: Exception) {}
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "getAllUserHouseholds invited error: ${e.message}")
-                }
-            }
-        }
-
         // 4. Check user profile's assigned householdIds
         if (uid.isNotBlank()) {
             try {
@@ -183,27 +152,13 @@ class FirestoreSyncRepository(
 
                 val owner = doc.getString("ownerId") ?: ""
                 val members = (doc.get("memberUids") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
-                val invited = (doc.get("invitedEmails") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
 
                 val isOwner = uid.isNotBlank() && owner == uid
                 val isMember = uid.isNotBlank() && members.contains(uid)
-                val isInvited = (cleanEmail.isNotBlank() || lowerEmail.isNotBlank()) &&
-                        invited.any { it.equals(cleanEmail, ignoreCase = true) || it.equals(lowerEmail, ignoreCase = true) }
 
-                if (isOwner || isMember || isInvited) {
+                if (isOwner || isMember) {
                     parseAndAccept(doc)?.let { h ->
                         foundMap[h.id] = h
-                        if (uid.isNotBlank() && !isMember && isInvited) {
-                            try {
-                                val assignedRole = doc.getString("pendingInviteRole") ?: "CONTRIBUTOR"
-                                doc.reference.update(
-                                    mapOf(
-                                        "memberUids" to FieldValue.arrayUnion(uid),
-                                        "memberRoles.$uid" to assignedRole
-                                    )
-                                ).await()
-                            } catch (_: Exception) {}
-                        }
                     }
                 }
             }
@@ -492,6 +447,7 @@ class FirestoreSyncRepository(
             val finalHouseholdIds = (allHids + finalHouseholdId).filter { it.isNotBlank() }.distinct()
 
             val merged = existing.copy(
+                email = (if (email.isNotBlank()) email else existing.email).trim(),
                 displayName = profileDisplayName,
                 firstName = derivedFirst,
                 lastName = derivedLast,
@@ -835,11 +791,14 @@ class FirestoreSyncRepository(
             } catch (_: Exception) {}
         }
 
-        // 3. Fallback scan across users collection: handles mixed casing or whitespace differences
+        // 3. Fallback scan across users collection: handles mixed casing, whitespace differences, and alternate field names
         try {
-            val allUsers = db.collection("users").limit(300).get().await()
+            val allUsers = db.collection("users").limit(500).get().await()
             for (doc in allUsers.documents) {
-                val docEmail = doc.getString("email")?.trim() ?: continue
+                val docEmail = doc.getString("email")?.trim()
+                    ?: doc.getString("userEmail")?.trim()
+                    ?: doc.getString("contactEmail")?.trim()
+                    ?: continue
                 if (docEmail.equals(clean, ignoreCase = true) || docEmail.equals(lower, ignoreCase = true)) {
                     val profile = doc.toObject(UserProfile::class.java, DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
                     if (profile != null) {
@@ -851,6 +810,20 @@ class FirestoreSyncRepository(
             }
         } catch (e: Exception) {
             Log.w(TAG, "findUserByEmail scan error: ${e.message}")
+        }
+
+        // 4. Default Marios check if email matches
+        if (clean.equals(FirestoreDataSeed.DEFAULT_USER_EMAIL, ignoreCase = true)) {
+            return UserProfile(
+                uid = FirestoreDataSeed.DEFAULT_USER_UID,
+                email = FirestoreDataSeed.DEFAULT_USER_EMAIL,
+                displayName = "Μάριος Κυνηγός",
+                firstName = "Μάριος",
+                lastName = "Κυνηγός",
+                householdId = FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID,
+                householdIds = listOf(FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID, "e1d4ae67-499"),
+                isPremium = true
+            )
         }
 
         return null
@@ -1346,6 +1319,47 @@ class FirestoreSyncRepository(
             .await()
     }
 
+    suspend fun setMemberDeleted(householdId: String, memberId: String, memberName: String, isDeleted: Boolean) {
+        if (householdId.isBlank()) return
+        try {
+            val membersCol = db.collection("households").document(householdId).collection("members")
+            val targetNameNorm = GreekVoiceParser.normalizeGreek(memberName.trim().lowercase())
+            val snap = membersCol.get().await()
+            var matched = false
+            for (doc in snap.documents) {
+                val docName = GreekVoiceParser.normalizeGreek(doc.getString("name").orEmpty().trim().lowercase())
+                val docId = doc.getString("id") ?: doc.id
+                if (docId == memberId || doc.id == memberId || (targetNameNorm.isNotBlank() && docName == targetNameNorm)) {
+                    doc.reference.update("isDeleted", isDeleted).await()
+                    matched = true
+                }
+            }
+            if (!matched && memberId.isNotBlank()) {
+                membersCol.document(memberId).set(mapOf("isDeleted" to isDeleted), SetOptions.merge()).await()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error setting member isDeleted in household $householdId: ${e.message}")
+        }
+    }
+
+    suspend fun permanentDeleteMemberExact(householdId: String, memberId: String, memberName: String) {
+        if (householdId.isBlank()) return
+        try {
+            val membersCol = db.collection("households").document(householdId).collection("members")
+            val targetNameNorm = GreekVoiceParser.normalizeGreek(memberName.trim().lowercase())
+            val snap = membersCol.get().await()
+            for (doc in snap.documents) {
+                val docName = GreekVoiceParser.normalizeGreek(doc.getString("name").orEmpty().trim().lowercase())
+                val docId = doc.getString("id") ?: doc.id
+                if (docId == memberId || doc.id == memberId || (targetNameNorm.isNotBlank() && docName == targetNameNorm)) {
+                    doc.reference.delete().await()
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error permanently deleting member from household $householdId: ${e.message}")
+        }
+    }
+
     // Household Categories Sync
     fun observeCategories(householdId: String): Flow<List<FirebaseCategory>> {
         if (householdId.isBlank()) return flowOf(emptyList())
@@ -1383,6 +1397,47 @@ class FirestoreSyncRepository(
             .collection("categories").document(categoryId)
             .delete()
             .await()
+    }
+
+    suspend fun setCategoryDeleted(householdId: String, categoryId: String, categoryName: String, isDeleted: Boolean) {
+        if (householdId.isBlank()) return
+        try {
+            val catsCol = db.collection("households").document(householdId).collection("categories")
+            val targetNameNorm = GreekVoiceParser.normalizeGreek(categoryName.trim().lowercase())
+            val snap = catsCol.get().await()
+            var matched = false
+            for (doc in snap.documents) {
+                val docName = GreekVoiceParser.normalizeGreek(doc.getString("name").orEmpty().trim().lowercase())
+                val docId = doc.getString("id") ?: doc.id
+                if (docId == categoryId || doc.id == categoryId || (targetNameNorm.isNotBlank() && docName == targetNameNorm)) {
+                    doc.reference.update("isDeleted", isDeleted).await()
+                    matched = true
+                }
+            }
+            if (!matched && categoryId.isNotBlank()) {
+                catsCol.document(categoryId).set(mapOf("isDeleted" to isDeleted), SetOptions.merge()).await()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error setting category isDeleted in household $householdId: ${e.message}")
+        }
+    }
+
+    suspend fun permanentDeleteCategoryExact(householdId: String, categoryId: String, categoryName: String) {
+        if (householdId.isBlank()) return
+        try {
+            val catsCol = db.collection("households").document(householdId).collection("categories")
+            val targetNameNorm = GreekVoiceParser.normalizeGreek(categoryName.trim().lowercase())
+            val snap = catsCol.get().await()
+            for (doc in snap.documents) {
+                val docName = GreekVoiceParser.normalizeGreek(doc.getString("name").orEmpty().trim().lowercase())
+                val docId = doc.getString("id") ?: doc.id
+                if (docId == categoryId || doc.id == categoryId || (targetNameNorm.isNotBlank() && docName == targetNameNorm)) {
+                    doc.reference.delete().await()
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error permanently deleting category from household $householdId: ${e.message}")
+        }
     }
 
     // Direct / One-time fetches for Members
@@ -2106,6 +2161,8 @@ class FirestoreSyncRepository(
 
     fun observeUserHouseholds(uid: String, email: String): Flow<List<Household>> {
         if (uid.isBlank()) return flowOf(emptyList())
+        val cleanEmail = email.trim()
+        val lowerEmail = cleanEmail.lowercase()
 
         val memberFlow = db.collection("households")
             .whereArrayContains("memberUids", uid)
@@ -2176,7 +2233,7 @@ class FirestoreSyncRepository(
             updateMap["memberRoles.$targetUid"] = role
             updateMap["deletedForUsers"] = FieldValue.arrayRemove(targetUid)
         }
-        hDocRef.update(updateMap).await()
+        hDocRef.set(updateMap, SetOptions.merge()).await()
 
         // Also add householdId to target user's user document
         if (targetUid.isNotBlank()) {
@@ -2291,6 +2348,37 @@ class FirestoreSyncRepository(
             }
         } catch (e: Exception) {
             Log.e(TAG, "deleteHousehold error: ${e.message}", e)
+        }
+    }
+
+    suspend fun leaveSharedHousehold(householdId: String, userId: String, userEmail: String) {
+        if (householdId.isBlank()) return
+        val cleanEmail = userEmail.trim()
+        val lowerEmail = cleanEmail.lowercase()
+        try {
+            if (userId.isNotBlank()) {
+                db.collection("users").document(userId).set(
+                    mapOf("householdIds" to FieldValue.arrayRemove(householdId)),
+                    SetOptions.merge()
+                ).await()
+            }
+            val hRef = db.collection("households").document(householdId)
+            val updates = mutableMapOf<String, Any>(
+                "deletedForUsers" to FieldValue.arrayUnion(userId),
+                "updatedAt" to Timestamp.now()
+            )
+            if (userId.isNotBlank()) {
+                updates["memberUids"] = FieldValue.arrayRemove(userId)
+                updates["memberRoles.$userId"] = FieldValue.delete()
+            }
+            if (cleanEmail.isNotBlank()) {
+                updates["invitedEmails"] = FieldValue.arrayRemove(cleanEmail, lowerEmail)
+                updates["memberRoles.$cleanEmail"] = FieldValue.delete()
+                updates["memberRoles.$lowerEmail"] = FieldValue.delete()
+            }
+            hRef.update(updates).await()
+        } catch (e: Exception) {
+            Log.w(TAG, "leaveSharedHousehold notice: ${e.message}")
         }
     }
 

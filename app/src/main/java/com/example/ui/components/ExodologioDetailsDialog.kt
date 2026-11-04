@@ -27,10 +27,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
@@ -38,6 +40,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -75,12 +78,12 @@ fun ExodologioDetailsDialog(
     isOwner: Boolean = true,
     isHouseholdOwner: (Household) -> Boolean = { isOwner },
     appLanguage: String = "EL",
+    currentUserId: String = "",
     onRenameHousehold: (String) -> Unit,
     onSelectHousehold: (Household) -> Unit,
     onCreateNewHousehold: (String) -> Unit,
     onDeleteHousehold: ((Household) -> Unit)? = null,
     onManageMembers: () -> Unit,
-    onShareInviteCode: (String) -> Unit,
     onShowPremiumPaywall: (String) -> Unit,
     onClearExpenses: () -> Unit,
     onDismiss: () -> Unit
@@ -368,16 +371,26 @@ fun ExodologioDetailsDialog(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = if (lang == Localization.Language.ENGLISH) "YOUR HOUSEHOLDS" else "ΤΑ ΕΞΟΔΟΛΟΓΙΑ ΣΑΣ",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                    letterSpacing = 0.5.sp
-                                )
+                                val isEn = lang == Localization.Language.ENGLISH
+                                val myHouseholds = allHouseholds
+
+                                // MY HOUSEHOLDS
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(Icons.Default.Home, contentDescription = null, tint = Emerald700, modifier = Modifier.size(16.dp))
+                                    Text(
+                                        text = if (isEn) "MY HOUSEHOLDS (${myHouseholds.size})" else "ΤΑ ΕΞΟΔΟΛΟΓΙΑ ΜΟΥ (${myHouseholds.size})",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Emerald700,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    allHouseholds.forEach { household ->
+                                    myHouseholds.forEach { household ->
                                         val isSelected = household.id == currentHousehold?.id
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),
@@ -411,12 +424,19 @@ fun ExodologioDetailsDialog(
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                     Spacer(modifier = Modifier.width(10.dp))
-                                                    Text(
-                                                        text = Localization.translateHouseholdName(household.name, lang).ifBlank { household.name },
-                                                        fontSize = 13.5.sp,
-                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
+                                                    Column {
+                                                        Text(
+                                                            text = Localization.translateHouseholdName(household.name, lang).ifBlank { household.name },
+                                                            fontSize = 13.5.sp,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                            text = if (isEn) "${household.memberUids.size} members" else "${household.memberUids.size} μέλη",
+                                                            fontSize = 11.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
                                                 }
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
@@ -429,7 +449,7 @@ fun ExodologioDetailsDialog(
                                                             modifier = Modifier.padding(start = 6.dp)
                                                         ) {
                                                             Text(
-                                                                text = if (lang == Localization.Language.ENGLISH) "ACTIVE" else "ΕΝΕΡΓΟ",
+                                                                text = if (isEn) "ACTIVE" else "ΕΝΕΡΓΟ",
                                                                 color = Color.White,
                                                                 fontSize = 9.5.sp,
                                                                 fontWeight = FontWeight.Bold,
@@ -449,7 +469,7 @@ fun ExodologioDetailsDialog(
                                                             Box(contentAlignment = Alignment.Center) {
                                                                 Icon(
                                                                     imageVector = Icons.Default.Delete,
-                                                                    contentDescription = if (lang == Localization.Language.ENGLISH) "Delete Household" else "Διαγραφή Εξοδολογίου",
+                                                                    contentDescription = if (isEn) "Delete Household" else "Διαγραφή Εξοδολογίου",
                                                                     tint = Color(0xFFEF4444),
                                                                     modifier = Modifier.size(15.dp)
                                                                 )

@@ -41,20 +41,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
-            <!-- App Links / Deep Links for Household Invitations -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:host="oikonomos-af58b.web.app"
-                    android:pathPrefix="/invite"
-                    android:scheme="https" />
-                <data
-                    android:host="invite"
-                    android:scheme="fintel" />
-            </intent-filter>
         </activity>
 
         <!-- Daily Expense Reminder Broadcast Receivers -->

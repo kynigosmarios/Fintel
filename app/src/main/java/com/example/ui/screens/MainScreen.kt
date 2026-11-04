@@ -122,7 +122,6 @@ import com.example.ui.components.RecurringExpenseDialog
 import com.example.ui.components.SavingsGoalDialog
 import com.example.ui.components.TileSettingsDialog
 import com.example.ui.components.UserProfileDialog
-import com.example.ui.components.InviteMemberDialog
 import com.example.ui.components.VoiceConfirmationDialog
 import com.example.ui.components.VoiceInputDialog
 import com.example.ui.components.VoiceListeningOverlay
@@ -164,7 +163,9 @@ fun MainScreen(
     val expenses by viewModel.filteredExpenses.collectAsStateWithLifecycle()
     val allExpenses by viewModel.allExpenses.collectAsStateWithLifecycle()
     val members by viewModel.allMembers.collectAsStateWithLifecycle()
+    val deletedMembers by viewModel.deletedMembers.collectAsStateWithLifecycle()
     val categories by viewModel.allCategories.collectAsStateWithLifecycle()
+    val deletedCategories by viewModel.deletedCategories.collectAsStateWithLifecycle()
     val selectedMemberFilter by viewModel.selectedMemberFilter.collectAsStateWithLifecycle()
     val selectedCategoryFilter by viewModel.selectedCategoryFilter.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
@@ -222,7 +223,7 @@ fun MainScreen(
     val dailyReminderHour by viewModel.dailyReminderHour.collectAsStateWithLifecycle()
     val dailyReminderMinute by viewModel.dailyReminderMinute.collectAsStateWithLifecycle()
     val showPrivacyConsentDialog by viewModel.showPrivacyConsentDialog.collectAsStateWithLifecycle()
-    var showInviteDialog by remember { mutableStateOf(false) }
+    val notificationConsentCompleted by viewModel.notificationConsentCompleted.collectAsStateWithLifecycle()
 
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
 
@@ -500,6 +501,7 @@ fun MainScreen(
                 households = userHouseholds,
                 appLanguage = appLanguage,
                 isDarkTheme = isDarkTheme,
+                currentUserId = currentUser?.uid.orEmpty(),
                 onSelectHousehold = { viewModel.switchExodologio(it) },
                 onManageHouseholdsClick = { viewModel.openExodologioDetailsDialog() },
                 onCreateNewHouseholdClick = { viewModel.openExodologioManager() },
@@ -560,23 +562,27 @@ fun MainScreen(
                         appLanguage = appLanguage,
                         canManage = canManage,
                         currentUserEmail = currentUser?.email ?: userProfile?.email ?: "",
+                        deletedMembers = deletedMembers,
                         onAddMember = { viewModel.openMemberDialog() },
                         onEditMember = { viewModel.openMemberDialog(it) },
                         onDeleteMember = { viewModel.deleteMember(it) },
-                        onRemoveInvitedEmail = { viewModel.removeMemberByEmail(it) },
+                        onRestoreMember = { viewModel.restoreMember(it) },
+                        onPermanentDeleteMember = { viewModel.permanentDeleteMember(it) },
                         onUpdateMemberColor = { member, color -> viewModel.updateMemberColor(member, color) },
                         onMoveMemberUp = { viewModel.moveMemberUp(it) },
                         onMoveMemberDown = { viewModel.moveMemberDown(it) },
-                        onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
-                        onShareInviteCode = { showInviteDialog = true }
+                        onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) }
                     )
                     3 -> CategoriesScreen(
                         categories = categories,
                         appLanguage = appLanguage,
                         canManage = canManage,
+                        deletedCategories = deletedCategories,
                         onAddCategory = { viewModel.openCategoryDialog() },
                         onEditCategory = { viewModel.openCategoryDialog(it) },
                         onDeleteCategory = { viewModel.deleteCategory(it) },
+                        onRestoreCategory = { viewModel.restoreCategory(it) },
+                        onPermanentDeleteCategory = { viewModel.permanentDeleteCategory(it) },
                         onMoveCategoryUp = { viewModel.moveCategoryUp(it) },
                         onMoveCategoryDown = { viewModel.moveCategoryDown(it) },
                         onSeedStandardCategories = { viewModel.seedStandardCategories() }
@@ -735,27 +741,7 @@ fun MainScreen(
         )
     }
 
-    // Invite Member Dialog (Email & Share Link)
-    val activeHouseholdForInvite = currentHousehold ?: userHouseholds.firstOrNull() ?: com.example.data.model.Household(
-        id = "primary_household",
-        name = if (appLanguage == "EN") "My Household" else "Το Εξοδολόγιό μου",
-        inviteCode = "OIKO-${System.currentTimeMillis().toString().takeLast(4)}"
-    )
     val isUserPro = viewModel.isCurrentUserPro()
-    if (showInviteDialog) {
-        InviteMemberDialog(
-            household = activeHouseholdForInvite,
-            isPro = isUserPro || activeHouseholdForInvite.isPremium,
-            appLanguage = appLanguage,
-            currentUserEmail = currentUser?.email ?: userProfile?.email ?: "",
-            onRoleSelected = { role -> viewModel.updateHouseholdInviteRole(role) },
-            onInviteEmail = { email, role -> viewModel.inviteMemberByEmail(email, role, context) },
-            onRemoveInvitedEmail = { viewModel.removeMemberByEmail(it) },
-            onMessage = { msg -> viewModel.showSnackbar(msg) },
-            onShowPremiumPaywall = { viewModel.showPremiumPaywall("invite_member") },
-            onDismiss = { showInviteDialog = false }
-        )
-    }
 
     // Exodologio Details Dialog (Rename, Members, Switch, Clear)
     if (showExodologioDetailsDialog) {
@@ -766,12 +752,12 @@ fun MainScreen(
             isOwner = canManage,
             isHouseholdOwner = { viewModel.isUserOwnerOfHousehold(it) },
             appLanguage = appLanguage,
+            currentUserId = currentUser?.uid.orEmpty(),
             onRenameHousehold = { viewModel.renameCurrentHousehold(it) },
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
             onDeleteHousehold = { viewModel.deleteHousehold(it) },
             onManageMembers = { currentTab = 2 },
-            onShareInviteCode = { showInviteDialog = true },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
             onClearExpenses = { viewModel.clearCurrentExodologioExpenses() },
             onDismiss = { viewModel.dismissExodologioDetailsDialog() }
@@ -786,14 +772,11 @@ fun MainScreen(
             isPremium = isUserPro,
             isHouseholdOwner = { viewModel.isUserOwnerOfHousehold(it) },
             appLanguage = appLanguage,
+            currentUserId = currentUser?.uid.orEmpty(),
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
             onDeleteHousehold = { viewModel.deleteHousehold(it) },
             onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
-            onInviteMember = {
-                viewModel.dismissExodologioManager()
-                showInviteDialog = true
-            },
             onDismiss = { viewModel.dismissExodologioManager() }
         )
     }
@@ -887,6 +870,8 @@ fun MainScreen(
             reminderEnabled = dailyReminderEnabled,
             reminderHour = dailyReminderHour,
             reminderMinute = dailyReminderMinute,
+            notificationConsentHandled = notificationConsentCompleted,
+            onAcceptNotificationConsent = { viewModel.acceptNotificationConsent() },
             onToggleReminder = { viewModel.toggleDailyReminder(it) },
             onSetReminderTime = { h, m -> viewModel.setDailyReminderTime(h, m) },
             onTestReminder = { viewModel.triggerTestReminderNotification() },

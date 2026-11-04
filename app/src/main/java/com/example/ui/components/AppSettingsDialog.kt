@@ -94,6 +94,8 @@ fun AppSettingsDialog(
     reminderEnabled: Boolean = false,
     reminderHour: Int = 21,
     reminderMinute: Int = 30,
+    notificationConsentHandled: Boolean = false,
+    onAcceptNotificationConsent: () -> Unit = {},
     onToggleReminder: (Boolean) -> Unit = {},
     onSetReminderTime: (Int, Int) -> Unit = { _, _ -> },
     onTestReminder: () -> Unit = {},
@@ -108,6 +110,7 @@ fun AppSettingsDialog(
     onDismiss: () -> Unit
 ) {
     var showResetConfirmDialog by remember { mutableStateOf(false) }
+    var showNotificationConsentDialog by remember { mutableStateOf(false) }
     val lang = Localization.Language.fromCode(appLanguage)
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -119,15 +122,9 @@ fun AppSettingsDialog(
         }
     }
 
-    androidx.compose.runtime.LaunchedEffect(reminderEnabled) {
-        if (reminderEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            if (androidx.core.content.ContextCompat.checkSelfPermission(
-                    context,
-                    android.Manifest.permission.POST_NOTIFICATIONS
-                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-            ) {
-                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-            }
+    androidx.compose.runtime.LaunchedEffect(reminderEnabled, notificationConsentHandled) {
+        if (reminderEnabled && !notificationConsentHandled) {
+            showNotificationConsentDialog = true
         }
     }
 
@@ -445,10 +442,24 @@ fun AppSettingsDialog(
                                     Switch(
                                         checked = reminderEnabled,
                                         onCheckedChange = { isChecked ->
-                                            if (isChecked && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                            if (isChecked) {
+                                                if (!notificationConsentHandled) {
+                                                    showNotificationConsentDialog = true
+                                                } else {
+                                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                        val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                                                            context,
+                                                            android.Manifest.permission.POST_NOTIFICATIONS
+                                                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                                        if (!hasPerm) {
+                                                            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                                                        }
+                                                    }
+                                                    onToggleReminder(true)
+                                                }
+                                            } else {
+                                                onToggleReminder(false)
                                             }
-                                            onToggleReminder(isChecked)
                                         },
                                         colors = SwitchDefaults.colors(
                                             checkedThumbColor = Color.White,
@@ -711,6 +722,30 @@ fun AppSettingsDialog(
                 TextButton(onClick = { showResetConfirmDialog = false }) {
                     Text(Localization.cancel(lang), fontSize = 12.5.sp)
                 }
+            }
+        )
+    }
+
+    if (showNotificationConsentDialog) {
+        NotificationConsentDialog(
+            appLanguage = appLanguage,
+            onAccept = {
+                onAcceptNotificationConsent()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val hasPerm = androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (!hasPerm) {
+                        notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
+                onToggleReminder(true)
+                showNotificationConsentDialog = false
+            },
+            onDismiss = {
+                onToggleReminder(false)
+                showNotificationConsentDialog = false
             }
         )
     }

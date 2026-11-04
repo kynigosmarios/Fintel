@@ -48,7 +48,6 @@ fun FamilyCloudSyncCard(
     household: Household?,
     isSyncing: Boolean,
     onCreateHousehold: (String) -> Unit,
-    onJoinHousehold: (String) -> Unit = {},
     onSignOut: () -> Unit,
     onMessage: (String) -> Unit,
     appLanguage: String = "EL"
@@ -93,7 +92,7 @@ fun FamilyCloudSyncCard(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = if (lang == Localization.Language.ENGLISH) "Sync & Family" else "Συγχρονισμός & Οικογένεια",
+                            text = if (lang == Localization.Language.ENGLISH) "Cloud Sync & Backup" else "Συγχρονισμός Cloud",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -102,7 +101,7 @@ fun FamilyCloudSyncCard(
                             text = if (currentUser != null) {
                                 if (lang == Localization.Language.ENGLISH) "Connected account" else "Συνδεδεμένος λογαριασμός"
                             } else {
-                                if (lang == Localization.Language.ENGLISH) "Shared tracking with family" else "Κοινό εξοδολόγιο με την οικογένεια"
+                                if (lang == Localization.Language.ENGLISH) "Cloud backup & sync" else "Αντίγραφα ασφαλείας & συγχρονισμός"
                             },
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -117,9 +116,9 @@ fun FamilyCloudSyncCard(
             if (currentUser == null) {
                 Text(
                     text = if (lang == Localization.Language.ENGLISH)
-                        "Sign in with your Google account to access your personal expenses and shared households in real time."
+                        "Sign in with your Google account to back up and sync your expenses and households in real time across your devices."
                     else
-                        "Συνδεθείτε με το Google λογαριασμό σας για πρόσβαση στα προσωπικά σας έξοδα και στα κοινά εξοδολόγια σε πραγματικό χρόνο.",
+                        "Συνδεθείτε με το Google λογαριασμό σας για δημιουργία αντιγράφων ασφαλείας και συγχρονισμό των εξόδων και εξοδολογίων σας σε πραγματικό χρόνο.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 16.sp
@@ -253,9 +252,9 @@ fun FamilyCloudSyncCard(
                                 }
                                 Text(
                                     text = if (lang == Localization.Language.ENGLISH)
-                                        "${household.memberUids.size} members connected"
+                                        "Active"
                                     else
-                                        "${household.memberUids.size} μέλη συνδεδεμένα",
+                                        "Ενεργό",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -265,43 +264,22 @@ fun FamilyCloudSyncCard(
 
                             Text(
                                 text = if (isGreek)
-                                    "Η κοινή πρόσβαση στο εξοδολόγιο γίνεται αποκλειστικά μέσω email. Κάθε χρήστης που προσκαλείται, συνδέεται με το email του και αποκτά άμεσα πρόσβαση στα κοινά έξοδα."
+                                    "Όλα τα δεδομένα του εξοδολογίου συγχρονίζονται με ασφάλεια στο Google Cloud / Firebase."
                                 else
-                                    "Shared access is managed strictly via email invitations. Any invited member gains immediate access upon signing in with their email.",
+                                    "All household data is securely backed up and synchronized to Google Cloud / Firebase.",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 15.sp
                             )
-
-                            if (household.invitedEmails.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = if (isGreek) "Προσκλήσεις μέσω Email:" else "Invited Emails:",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Emerald700
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                household.invitedEmails.distinct().filter { it.isNotBlank() }.forEach { invited ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        modifier = Modifier.padding(vertical = 2.dp)
-                                    ) {
-                                        Icon(Icons.Default.Email, contentDescription = null, tint = Emerald700, modifier = Modifier.size(12.dp))
-                                        Text(text = invited, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                }
-                            }
                         }
                     }
                 } else {
                     // Not in household yet: option to Create
                     Text(
                         text = if (isGreek)
-                            "Δεν ανήκετε ακόμα σε κοινό εξοδολόγιο. Μπορείτε να δημιουργήσετε νέο εξοδολόγιο ή να ζητήσετε να σας προσκαλέσουν με το email σας:"
+                            "Δεν έχει επιλεγεί εξοδολόγιο. Μπορείτε να δημιουργήσετε νέο εξοδολόγιο:"
                         else
-                            "You are not part of a shared household yet. Create a new one or ask to be invited via your email:",
+                            "No active household selected. You can create a new household:",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 15.sp

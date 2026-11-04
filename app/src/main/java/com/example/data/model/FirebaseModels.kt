@@ -96,6 +96,7 @@ data class FirebaseMember(
     @set:PropertyName("default")
     var isDefault: Boolean = false,
     var sortOrder: Int = 0,
+    var isDeleted: Boolean = false,
     var createdAt: Timestamp? = null
 )
 
@@ -111,6 +112,7 @@ data class FirebaseCategory(
     var voiceKeywords: String = "",
     var sortOrder: Int = 0,
     var fontColorHex: Long = 0L,
+    var isDeleted: Boolean = false,
     var createdAt: Timestamp? = null
 )
 

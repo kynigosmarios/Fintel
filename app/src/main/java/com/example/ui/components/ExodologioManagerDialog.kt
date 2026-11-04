@@ -23,8 +23,12 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GroupAdd
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -66,11 +70,11 @@ fun ExodologioManagerDialog(
     isPremium: Boolean,
     isHouseholdOwner: (Household) -> Boolean = { true },
     appLanguage: String = "EL",
+    currentUserId: String = "",
     onSelectHousehold: (Household) -> Unit,
     onCreateNewHousehold: (String) -> Unit,
     onDeleteHousehold: ((Household) -> Unit)? = null,
     onShowPremiumPaywall: (String) -> Unit,
-    onInviteMember: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
@@ -164,16 +168,48 @@ fun ExodologioManagerDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // List of Households
-                    Text(
-                        text = if (lang == Localization.Language.ENGLISH) "YOUR HOUSEHOLDS" else "ΤΑ ΕΞΟΔΟΛΟΓΙΑ ΣΑΣ",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        letterSpacing = 0.5.sp
-                    )
+                    val isEn = lang == Localization.Language.ENGLISH
+                    val myHouseholds = allHouseholds
 
-                    allHouseholds.forEach { household ->
+                    // 1. SECTION: ΤΑ ΕΞΟΔΟΛΟΓΙΑ ΜΟΥ
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Home,
+                                contentDescription = null,
+                                tint = Emerald700,
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Text(
+                                text = if (isEn) "MY HOUSEHOLDS" else "ΤΑ ΕΞΟΔΟΛΟΓΙΑ ΜΟΥ",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Emerald700,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                        Surface(
+                            shape = CircleShape,
+                            color = Emerald700.copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                text = "${myHouseholds.size}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Emerald700,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    myHouseholds.forEach { household ->
                         val isSelected = household.id == currentHousehold?.id
                         Surface(
                             shape = RoundedCornerShape(14.dp),
@@ -195,18 +231,36 @@ fun ExodologioManagerDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = Localization.translateHouseholdName(household.name, lang),
-                                        fontSize = 14.5.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = Localization.translateHouseholdName(household.name, lang),
+                                            fontSize = 14.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Emerald700.copy(alpha = 0.12f),
+                                            border = BorderStroke(0.5.dp, Emerald700.copy(alpha = 0.3f))
+                                        ) {
+                                            Text(
+                                                text = if (isEn) "Owner" else "Ιδιοκτήτης",
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Emerald700,
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = if (household.memberUids.size == 1)
-                                            (if (lang == Localization.Language.ENGLISH) "1 member" else "1 μέλος")
+                                        text = if (household.memberUids.size <= 1)
+                                            (if (isEn) "1 member" else "1 μέλος")
                                         else
-                                            (if (lang == Localization.Language.ENGLISH) "${household.memberUids.size} members" else "${household.memberUids.size} μέλη"),
+                                            (if (isEn) "${household.memberUids.size} members" else "${household.memberUids.size} μέλη"),
                                         fontSize = 11.5.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -225,7 +279,7 @@ fun ExodologioManagerDialog(
                                             Box(contentAlignment = Alignment.Center) {
                                                 Icon(
                                                     imageVector = Icons.Default.Check,
-                                                    contentDescription = if (lang == Localization.Language.ENGLISH) "Selected" else "Επιλεγμένο",
+                                                    contentDescription = if (isEn) "Selected" else "Επιλεγμένο",
                                                     tint = Color.White,
                                                     modifier = Modifier.size(15.dp)
                                                 )
@@ -245,7 +299,7 @@ fun ExodologioManagerDialog(
                                             Box(contentAlignment = Alignment.Center) {
                                                 Icon(
                                                     imageVector = Icons.Default.Delete,
-                                                    contentDescription = if (lang == Localization.Language.ENGLISH) "Delete Household" else "Διαγραφή Εξοδολογίου",
+                                                    contentDescription = if (isEn) "Delete Household" else "Διαγραφή Εξοδολογίου",
                                                     tint = Color(0xFFEF4444),
                                                     modifier = Modifier.size(17.dp)
                                                 )
@@ -256,11 +310,6 @@ fun ExodologioManagerDialog(
                             }
                         }
                     }
-
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
 
                     // Action 1: Add New Exodologio (Pro feature with star & coloring)
                     Surface(
@@ -318,76 +367,6 @@ fun ExodologioManagerDialog(
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Amber700
                                     )
-                                }
-                            }
-                        }
-                    }
-
-                    // Action 2: Add Members
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (!isPremium) {
-                                    onShowPremiumPaywall("invite_member")
-                                } else {
-                                    onInviteMember()
-                                    onDismiss()
-                                }
-                            }
-                            .testTag("invite_member_button")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color(0xFF0284C7).copy(alpha = 0.12f),
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.GroupAdd,
-                                        contentDescription = null,
-                                        tint = Color(0xFF0284C7),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = Localization.inviteMemberToHousehold(lang),
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = if (lang == Localization.Language.ENGLISH) "Shared tracking with family" else "Κοινή διαχείριση με την οικογένεια",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            if (!isPremium) {
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = Amber700.copy(alpha = 0.15f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.Lock, contentDescription = null, tint = Amber700, modifier = Modifier.size(11.dp))
-                                        Spacer(modifier = Modifier.width(3.dp))
-                                        Text("Pro", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Amber700)
-                                    }
                                 }
                             }
                         }

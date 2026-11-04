@@ -102,6 +102,7 @@ fun DocumentSnapshot.toSafeMember(): FirebaseMember {
         voiceKeywords = getString("voiceKeywords") ?: existing?.voiceKeywords ?: "",
         isDefault = defVal,
         sortOrder = sort,
+        isDeleted = getBoolean("isDeleted") ?: existing?.isDeleted ?: false,
         createdAt = getTimestamp("createdAt") ?: existing?.createdAt
     )
 }
@@ -192,6 +193,7 @@ fun DocumentSnapshot.toSafeCategory(): FirebaseCategory {
         voiceKeywords = getString("voiceKeywords") ?: existing?.voiceKeywords ?: "",
         sortOrder = sort,
         fontColorHex = fontColor,
+        isDeleted = getBoolean("isDeleted") ?: existing?.isDeleted ?: false,
         createdAt = getTimestamp("createdAt") ?: existing?.createdAt
     )
 }

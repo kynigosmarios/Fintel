@@ -25,8 +25,10 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -35,6 +37,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.data.entity.ExpenseCategory
 import com.example.ui.components.CategoryIconHelper
 import com.example.ui.theme.Emerald700
@@ -64,16 +68,22 @@ fun CategoriesScreen(
     categories: List<ExpenseCategory>,
     appLanguage: String,
     canManage: Boolean = true,
+    deletedCategories: List<ExpenseCategory> = emptyList(),
     onAddCategory: () -> Unit,
     onEditCategory: (ExpenseCategory) -> Unit,
     onDeleteCategory: (ExpenseCategory) -> Unit,
+    onRestoreCategory: (ExpenseCategory) -> Unit = {},
+    onPermanentDeleteCategory: (ExpenseCategory) -> Unit = {},
     onMoveCategoryUp: (ExpenseCategory) -> Unit,
     onMoveCategoryDown: (ExpenseCategory) -> Unit,
     onSeedStandardCategories: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
+    val isGreek = lang != Localization.Language.ENGLISH
     var categoryToDelete by remember { mutableStateOf<ExpenseCategory?>(null) }
+    var showDeletedCategoriesDialog by remember { mutableStateOf(false) }
+    var categoryToPermanentlyDelete by remember { mutableStateOf<ExpenseCategory?>(null) }
 
     Column(
         modifier = modifier
@@ -469,30 +479,69 @@ fun CategoriesScreen(
                 }
 
                 item {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = { showDeletedCategoriesDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                            .testTag("deleted_categories_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isGreek) "Διαγραμμένες Κατηγορίες (${deletedCategories.size})" else "Deleted Categories (${deletedCategories.size})",
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                item {
                     Spacer(modifier = Modifier.height(80.dp))
                 }
             }
         }
     }
 
-    // Delete Confirmation Dialog
+    // 1. Soft-Delete Confirmation Dialog
     if (categoryToDelete != null) {
         val cat = categoryToDelete!!
         AlertDialog(
             onDismissRequest = { categoryToDelete = null },
+            shape = RoundedCornerShape(20.dp),
             title = {
                 Text(
-                    text = Localization.deleteCategoryConfirmTitle(lang),
+                    text = if (isGreek) "Διαγραφή Κατηγορίας;" else "Delete Category?",
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
-                Text(
-                    text = if (lang == Localization.Language.ENGLISH)
-                        "Are you sure you want to delete category \"${cat.name}\"?"
-                    else
-                        "Είστε βέβαιοι ότι θέλετε να διαγράψετε την κατηγορία «${cat.name}»;"
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = if (isGreek)
+                            "Είστε βέβαιοι ότι θέλετε να διαγράψετε την κατηγορία «${cat.name}»;"
+                        else
+                            "Are you sure you want to delete category \"${cat.name}\"?",
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = if (isGreek)
+                            "Η κατηγορία θα μεταφερθεί στις «Διαγραμμένες Κατηγορίες», απ' όπου μπορείτε να την επαναφέρετε ανά πάσα στιγμή. Τα ήδη καταχωρημένα έξοδα και τα στατιστικά διατηρούνται 100% ανέπαφα."
+                        else
+                            "The category will be moved to \"Deleted Categories\", from where you can restore it anytime. Existing expenses and statistics remain intact.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             },
             confirmButton = {
                 TextButton(
@@ -502,7 +551,7 @@ fun CategoriesScreen(
                     }
                 ) {
                     Text(
-                        text = Localization.delete(lang),
+                        text = if (isGreek) "Διαγραφή" else "Delete",
                         color = Color(0xFFEF4444),
                         fontWeight = FontWeight.Bold
                     )
@@ -510,7 +559,255 @@ fun CategoriesScreen(
             },
             dismissButton = {
                 TextButton(onClick = { categoryToDelete = null }) {
-                    Text(Localization.cancel(lang))
+                    Text(if (isGreek) "Ακύρωση" else "Cancel")
+                }
+            }
+        )
+    }
+
+    // 2. Recycle Bin Dialog ("Διαγραμμένες Κατηγορίες")
+    if (showDeletedCategoriesDialog) {
+        Dialog(onDismissRequest = { showDeletedCategoriesDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp)
+                    .testTag("deleted_categories_dialog")
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = if (isGreek) "Διαγραμμένες Κατηγορίες" else "Deleted Categories",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isGreek) "Επαναφορά ή οριστική κατάργηση" else "Restore or permanently delete",
+                                fontSize = 11.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (deletedCategories.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (isGreek) "Δεν υπάρχουν διεγραμμένες κατηγορίες." else "No deleted categories.",
+                                fontSize = 13.5.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height((deletedCategories.size * 65).coerceAtMost(300).dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            itemsIndexed(deletedCategories, key = { _, c -> "del_cat_${c.id}_${c.name}" }) { _, cat ->
+                                val catColor = Color(cat.colorHex)
+                                val iconVector = CategoryIconHelper.getIcon(cat.iconKey)
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = catColor.copy(alpha = 0.18f),
+                                                modifier = Modifier.size(34.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = iconVector,
+                                                        contentDescription = null,
+                                                        tint = catColor,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                            Column {
+                                                Text(
+                                                    text = cat.name,
+                                                    fontSize = 13.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                if (cat.monthlyBudget > 0.0) {
+                                                    Text(
+                                                        text = "🎯 ${String.format(Locale.US, "%.2f €", cat.monthlyBudget)}",
+                                                        fontSize = 10.5.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            // Restore button
+                                            Button(
+                                                onClick = {
+                                                    onRestoreCategory(cat)
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Restore,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(13.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text(
+                                                    text = if (isGreek) "Επαναφορά" else "Restore",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+
+                                            // Permanent delete icon
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFEF4444).copy(alpha = 0.12f))
+                                                    .clickable { categoryToPermanentlyDelete = cat }
+                                                    .testTag("perm_del_cat_${cat.id}"),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Permanent Delete",
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = Color(0xFFEF4444)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    ) {
+                        Text(
+                            text = if (isGreek)
+                                "ℹ️ Η διαγραφή κατηγορίας δεν αλλοιώνει τα παλαιότερα στατιστικά και καταχωρημένα έξοδα."
+                            else
+                                "ℹ️ Deleting a category preserves all historical statistics and recorded expenses.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+
+                    TextButton(
+                        onClick = { showDeletedCategoriesDialog = false },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(
+                            text = if (isGreek) "Κλείσιμο" else "Close",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Permanent Category Deletion Confirmation
+    if (categoryToPermanentlyDelete != null) {
+        val target = categoryToPermanentlyDelete!!
+        AlertDialog(
+            onDismissRequest = { categoryToPermanentlyDelete = null },
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    text = if (isGreek) "Οριστική Διαγραφή;" else "Permanently Delete?",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFEF4444)
+                )
+            },
+            text = {
+                Text(
+                    text = if (isGreek)
+                        "Είστε βέβαιοι ότι θέλετε να καταργήσετε οριστικά την κατηγορία «${target.name}»; Τα ιστορικά έξοδα και τα στατιστικά δεν θα αλλοιωθούν."
+                    else
+                        "Are you sure you want to permanently remove category \"${target.name}\"? Historical expenses and stats will remain intact.",
+                    fontSize = 13.5.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onPermanentDeleteCategory(target)
+                        categoryToPermanentlyDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        text = if (isGreek) "Οριστική Διαγραφή" else "Permanently Delete",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { categoryToPermanentlyDelete = null }) {
+                    Text(if (isGreek) "Ακύρωση" else "Cancel")
                 }
             }
         )
