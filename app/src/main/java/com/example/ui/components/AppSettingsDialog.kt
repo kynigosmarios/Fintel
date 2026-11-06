@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.NotificationsActive
@@ -98,10 +99,12 @@ fun AppSettingsDialog(
     reminderHour: Int = 21,
     reminderMinute: Int = 30,
     notificationConsentHandled: Boolean = false,
+    bankAutoCatcherEnabled: Boolean = true,
     onAcceptNotificationConsent: () -> Unit = {},
     onToggleReminder: (Boolean) -> Unit = {},
     onSetReminderTime: (Int, Int) -> Unit = { _, _ -> },
     onTestReminder: () -> Unit = {},
+    onToggleBankAutoCatcher: (Boolean) -> Unit = {},
     onThemeChange: (String) -> Unit,
     onLanguageChange: (String) -> Unit = {},
     onToggleLaunchWithChooser: (Boolean) -> Unit,
@@ -114,6 +117,7 @@ fun AppSettingsDialog(
 ) {
     var showResetConfirmDialog by remember { mutableStateOf(false) }
     var showNotificationConsentDialog by remember { mutableStateOf(false) }
+    var showBankInfoDialog by remember { mutableStateOf(false) }
     val lang = Localization.Language.fromCode(appLanguage)
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -224,135 +228,10 @@ fun AppSettingsDialog(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // 1. Account Summary Card
-                    if (currentUser != null) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                UserAvatar(
-                                    photoUrl = userProfile?.photoUrl?.ifBlank { null } ?: currentUser.photoUrl?.toString(),
-                                    displayName = userProfile?.displayName?.ifBlank { null } ?: currentUser.displayName,
-                                    modifier = Modifier.size(42.dp),
-                                    fontSize = 17.sp
-                                )
 
-                                Spacer(modifier = Modifier.width(12.dp))
 
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = currentUser.displayName?.ifBlank { null } ?: Localization.fintelUser(lang),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = currentUser.email ?: "",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
-                                    modifier = Modifier
-                                        .clickable { onSignOut() }
-                                        .testTag("sign_out_button")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                                            contentDescription = Localization.signOut(lang),
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = Localization.signOut(lang),
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 2. Section: Γλώσσα Εφαρμογής (Language Selection - Greek & English)
+                    // 3. Theme Selection (Light, Dark, System) - Only Icons
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Language,
-                                contentDescription = null,
-                                tint = Emerald700,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = Localization.languageSection(lang),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            LanguageOptionCard(
-                                title = "Ελληνικά",
-                                flag = "🇬🇷",
-                                isSelected = appLanguage == "EL",
-                                onClick = { onLanguageChange("EL") },
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            LanguageOptionCard(
-                                title = "English",
-                                flag = "🇬🇧",
-                                isSelected = appLanguage == "EN",
-                                onClick = { onLanguageChange("EN") },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    // 3. Section: Θέμα Εμφάνισης (Theme - Light, Dark, System) - Only Icons
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = Localization.themeDisplay(lang),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                            letterSpacing = 0.5.sp,
-                            modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
-                        )
-
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -382,25 +261,6 @@ fun AppSettingsDialog(
 
                     // 4. Section: Υπενθύμιση καταχώρησης (Entry Reminder)
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Bedtime,
-                                contentDescription = null,
-                                tint = Emerald700,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH) "ENTRY REMINDER" else "ΥΠΕΝΘΥΜΙΣΗ ΚΑΤΑΧΩΡΗΣΗΣ",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
-                                letterSpacing = 0.5.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -595,17 +455,8 @@ fun AppSettingsDialog(
                         }
                     }
 
-                    // Section: Αυτόματος Αναγνώστης Τραπεζών (Auto-Catcher)
+                    // Section: Ανάγνωση Τραπεζικών Push (Bank Auto-Catcher)
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = if (lang == Localization.Language.ENGLISH) "BANK AUTO-CATCHER" else "ΑΥΤΟΜΑΤΟΣ ΑΝΑΓΝΩΣΤΗΣ ΤΡΑΠΕΖΩΝ",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                            letterSpacing = 0.5.sp,
-                            modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
-                        )
-
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -623,7 +474,7 @@ fun AppSettingsDialog(
                                 ) {
                                     Surface(
                                         shape = RoundedCornerShape(10.dp),
-                                        color = Emerald700.copy(alpha = 0.15f),
+                                        color = Emerald700.copy(alpha = 0.12f),
                                         modifier = Modifier.size(34.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
@@ -635,63 +486,109 @@ fun AppSettingsDialog(
                                             )
                                         }
                                     }
+
                                     Spacer(modifier = Modifier.width(12.dp))
+
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = if (lang == Localization.Language.ENGLISH) "Push Notification Reader" else "Ανάγνωση Τραπεζικών Push",
+                                            text = if (lang == Localization.Language.ENGLISH) "Bank Push Reader" else "Ανάγνωση Τραπεζικών Push",
                                             fontSize = 13.5.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
-                                        Text(
-                                            text = if (lang == Localization.Language.ENGLISH)
-                                                "Detects Eurobank, Alpha, Piraeus, NBG, Revolut, Payzy purchases"
-                                            else
-                                                "Αναγνωρίζει αγορές από Eurobank, Alpha, Πειραιώς, Εθνική, Revolut, Payzy",
-                                            fontSize = 11.5.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
                                     }
+
+                                    Switch(
+                                        checked = bankAutoCatcherEnabled,
+                                        onCheckedChange = { isChecked ->
+                                            onToggleBankAutoCatcher(isChecked)
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = Emerald700
+                                        ),
+                                        modifier = Modifier.testTag("bank_auto_catcher_switch")
+                                    )
                                 }
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                Button(
-                                    onClick = {
-                                        try {
-                                            context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                                        } catch (e: Exception) {
-                                            onMessage("Μεταβείτε στις Ρυθμίσεις > Ειδοποιήσεις για ενεργοποίηση")
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(38.dp)
-                                        .testTag("enable_notification_listener_button"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = if (lang == Localization.Language.ENGLISH) "Configure Notification Access" else "Ρύθμιση Πρόσβασης Ειδοποιήσεων",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Emerald700.copy(alpha = 0.12f),
+                                        border = BorderStroke(1.dp, Emerald700.copy(alpha = 0.35f)),
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clickable { showBankInfoDialog = true }
+                                            .testTag("bank_push_info_button")
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Info,
+                                                contentDescription = if (lang == Localization.Language.ENGLISH) "Info" else "Πληροφορίες",
+                                                tint = Emerald700,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            try {
+                                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                            } catch (e: Exception) {
+                                                onMessage("Μεταβείτε στις Ρυθμίσεις > Ειδοποιήσεις για ενεργοποίηση")
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(38.dp)
+                                            .testTag("enable_notification_listener_button"),
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700)
+                                    ) {
+                                        Text(
+                                            text = if (lang == Localization.Language.ENGLISH) "Configure Access" else "Ρύθμιση Πρόσβασης",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    // 5. Section: Διαχείριση Δεδομένων (Data Reset Row)
+                    // Section: Επιλογή Γλώσσας (Language Selection)
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = Localization.dataManagement(lang),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                            letterSpacing = 0.5.sp,
-                            modifier = Modifier.padding(start = 2.dp, bottom = 8.dp)
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            LanguageOptionCard(
+                                title = "Ελληνικά",
+                                flag = "🇬🇷",
+                                isSelected = appLanguage == "EL",
+                                onClick = { onLanguageChange("EL") },
+                                modifier = Modifier.weight(1f)
+                            )
 
+                            LanguageOptionCard(
+                                title = "English",
+                                flag = "🇬🇧",
+                                isSelected = appLanguage == "EN",
+                                onClick = { onLanguageChange("EN") },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+
+                    // Section: Διαχείριση Δεδομένων (Data Reset Row)
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -731,13 +628,6 @@ fun AppSettingsDialog(
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
-
-                                Text(
-                                    text = Localization.resetAction(lang),
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.error
-                                )
                             }
                         }
                     }
@@ -835,6 +725,49 @@ fun AppSettingsDialog(
             onDismiss = {
                 onToggleReminder(false)
                 showNotificationConsentDialog = false
+            }
+        )
+    }
+
+    if (showBankInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showBankInfoDialog = false },
+            shape = RoundedCornerShape(22.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AccountBalance,
+                        contentDescription = null,
+                        tint = Emerald700,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "Bank Push Reader" else "Ανάγνωση Τραπεζικών Push",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = if (lang == Localization.Language.ENGLISH)
+                        "This feature automatically detects purchase push notifications STRICTLY from supported banks:\n\n• Eurobank\n• Alpha Bank\n• National Bank of Greece (NBG)\n• Piraeus Bank\n• Revolut\n• Payzy\n• Viber Pay\n• PayPal\n• Snappi\n\nIt NEVER triggers from emails or non-banking notifications. All processing is 100% private and on-device."
+                    else
+                        "Η λειτουργία αυτή αναγνωρίζει αυτόματα ειδοποιήσεις αγορών (Push Notifications) ΑΥΣΤΗΡΑ και μόνο από τις υποστηριζόμενες τράπεζες:\n\n• Eurobank\n• Alpha Bank\n• Εθνική Τράπεζα (NBG)\n• Τράπεζα Πειραιώς\n• Revolut\n• Payzy\n• Viber Pay\n• PayPal\n• Snappi\n\nΔεν ενεργοποιείται ΠΟΤΕ από emails ή άλλες προσωπικές ειδοποιήσεις. Η επεξεργασία γίνεται 100% τοπικά στη συσκευή σας για απόλυτη ασφάλεια.",
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showBankInfoDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(Localization.close(lang), color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         )
     }

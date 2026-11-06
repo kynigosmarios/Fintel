@@ -6,6 +6,7 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.example.util.BankNotificationHolder
 import com.example.util.BankNotificationParser
+import com.example.util.BankNotificationSystemManager
 
 class BankNotificationListenerService : NotificationListenerService() {
 
@@ -14,7 +15,16 @@ class BankNotificationListenerService : NotificationListenerService() {
         if (sbn == null) return
 
         try {
+            // Check if user enabled Bank Auto-Catcher in settings
+            if (!BankNotificationSystemManager.isAutoCatcherEnabled(this)) {
+                return
+            }
+
             val packageName = sbn.packageName.orEmpty()
+            if (!BankNotificationParser.isBankPackage(packageName)) {
+                return
+            }
+
             val extras = sbn.notification?.extras ?: return
 
             val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
@@ -30,7 +40,10 @@ class BankNotificationListenerService : NotificationListenerService() {
 
             if (parsed != null) {
                 Log.d("BankNotification", "Caught bank transaction: ${parsed.bankName} - ${parsed.merchantName} - ${parsed.amount}€")
+                // Add to in-app holder
                 BankNotificationHolder.addTransaction(parsed)
+                // Also show in Android system notification
+                BankNotificationSystemManager.showNotification(this, parsed)
             }
         } catch (e: Exception) {
             Log.e("BankNotification", "Error processing notification: ${e.message}", e)

@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -80,6 +81,7 @@ fun BurgerMenuDrawer(
     onDismiss: () -> Unit
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     var showLegalDialog by remember { mutableStateOf(false) }
     var selectedLegalTab by remember { mutableStateOf("PRIVACY") }
 
@@ -273,176 +275,13 @@ fun BurgerMenuDrawer(
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    // Section: Quick Language Selector
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Language,
-                                    contentDescription = null,
-                                    tint = Emerald700,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = Localization.language(lang),
-                                    fontSize = 11.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Greek toggle button
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (appLanguage == "EL") Emerald700 else MaterialTheme.colorScheme.surface,
-                                    border = BorderStroke(1.dp, if (appLanguage == "EL") Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(38.dp)
-                                        .testTag("language_button_el")
-                                        .clickable { onLanguageChange("EL") }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("🇬🇷", fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Ελληνικά",
-                                            fontSize = 12.sp,
-                                            fontWeight = if (appLanguage == "EL") FontWeight.Bold else FontWeight.Medium,
-                                            color = if (appLanguage == "EL") Color.White else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-
-                                // English toggle button
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = if (appLanguage == "EN") Emerald700 else MaterialTheme.colorScheme.surface,
-                                    border = BorderStroke(1.dp, if (appLanguage == "EN") Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(38.dp)
-                                        .testTag("language_button_en")
-                                        .clickable { onLanguageChange("EN") }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("🇬🇧", fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "English",
-                                            fontSize = 12.sp,
-                                            fontWeight = if (appLanguage == "EN") FontWeight.Bold else FontWeight.Medium,
-                                            color = if (appLanguage == "EN") Color.White else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Active Household & Shared Members Card
-                    // Active Household Card
-                    if (currentHousehold != null) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onDismiss()
-                                    onOpenExodologio()
-                                }
-                                .testTag("burger_active_household_card")
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.MenuBook,
-                                            contentDescription = null,
-                                            tint = Emerald700,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = if (lang == Localization.Language.ENGLISH) "ACTIVE HOUSEHOLD" else "ΕΝΕΡΓΟ ΕΞΟΔΟΛΟΓΙΟ",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                            letterSpacing = 0.5.sp
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                Text(
-                                    text = Localization.translateHouseholdName(currentHousehold.name, lang).ifBlank { Localization.myExodologio(lang) },
-                                    fontSize = 14.5.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = if (lang == Localization.Language.ENGLISH) "Private • Only you have access" else "Ιδιωτικό • Μόνο εσείς έχετε πρόσβαση",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-                    }
-
-                    // Section: Primary Navigation Items
-                    Text(
-                        text = if (lang == Localization.Language.ENGLISH) "MANAGEMENT & SETTINGS" else "ΔΙΑΧΕΙΡΙΣΗ & ΡΥΘΜΙΣΕΙΣ",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        letterSpacing = 0.5.sp,
-                        modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                    )
 
                     // 1. Ρυθμίσεις Εφαρμογής
                     BurgerNavigationItem(
                         title = Localization.appSettings(lang),
                         icon = Icons.Default.Settings,
-                        iconTint = Color(0xFF475569),
-                        iconBg = Color(0xFF475569).copy(alpha = 0.12f),
+                        iconTint = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569),
+                        iconBg = (if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)).copy(alpha = if (isDark) 0.20f else 0.12f),
                         testTag = "burger_item_settings",
                         onClick = {
                             onDismiss()
@@ -456,8 +295,8 @@ fun BurgerMenuDrawer(
                     BurgerNavigationItem(
                         title = Localization.householdManager(lang),
                         icon = Icons.Default.MenuBook,
-                        iconTint = Color(0xFF0284C7),
-                        iconBg = Color(0xFF0284C7).copy(alpha = 0.12f),
+                        iconTint = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7),
+                        iconBg = (if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)).copy(alpha = if (isDark) 0.20f else 0.12f),
                         testTag = "burger_item_exodologio",
                         onClick = {
                             onDismiss()
@@ -471,8 +310,8 @@ fun BurgerMenuDrawer(
                     BurgerNavigationItem(
                         title = Localization.myProfile(lang),
                         icon = Icons.Default.Person,
-                        iconTint = Emerald700,
-                        iconBg = Emerald700.copy(alpha = 0.12f),
+                        iconTint = if (isDark) Color(0xFF34D399) else Emerald700,
+                        iconBg = (if (isDark) Color(0xFF34D399) else Emerald700).copy(alpha = if (isDark) 0.20f else 0.12f),
                         testTag = "burger_item_profile",
                         onClick = {
                             onDismiss()
@@ -485,8 +324,8 @@ fun BurgerMenuDrawer(
                         BurgerNavigationItem(
                             title = if (lang == Localization.Language.ENGLISH) "Instructions" else "Οδηγίες",
                             icon = Icons.Default.Info,
-                            iconTint = Color(0xFFD97706),
-                            iconBg = Color(0xFFD97706).copy(alpha = 0.12f),
+                            iconTint = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706),
+                            iconBg = (if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706)).copy(alpha = if (isDark) 0.20f else 0.12f),
                             testTag = "burger_item_guide",
                             onClick = {
                                 onDismiss()

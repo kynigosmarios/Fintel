@@ -270,7 +270,7 @@ fun ExpensesScreen(
             contentPadding = PaddingValues(bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 1. HERO FOREST GREEN CARD (Exact match to Screenshot 1)
+            // 1. HERO FOREST GREEN CARD (Glossy glass reflection matching logo)
             item(key = "hero_dashboard_card") {
                 Surface(
                     modifier = Modifier
@@ -278,23 +278,35 @@ fun ExpensesScreen(
                         .padding(horizontal = 16.dp, vertical = 6.dp)
                         .testTag("hero_balance_card"),
                     shape = RoundedCornerShape(26.dp),
-                    color = Color(0xFF044837),
-                    border = BorderStroke(1.dp, Color(0xFF065F46).copy(alpha = 0.6f)),
-                    tonalElevation = 6.dp
+                    color = Color(0xFF047857),
+                    border = BorderStroke(
+                        1.2.dp,
+                        Brush.linearGradient(
+                            listOf(
+                                Color(0xFF34D399).copy(alpha = 0.55f),
+                                Color(0xFF059669).copy(alpha = 0.35f),
+                                Color(0xFF34D399).copy(alpha = 0.25f)
+                            )
+                        )
+                    ),
+                    tonalElevation = 8.dp,
+                    shadowElevation = 4.dp
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
                                 Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFF044837),
-                                        Color(0xFF023628)
+                                    listOf(
+                                        Color(0xFF0F766E),
+                                        Color(0xFF059669),
+                                        Color(0xFF047857),
+                                        Color(0xFF064E3B)
                                     )
                                 )
                             )
-                            .padding(18.dp)
                     ) {
+                        Box(modifier = Modifier.padding(18.dp)) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -773,6 +785,7 @@ fun ExpensesScreen(
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 }

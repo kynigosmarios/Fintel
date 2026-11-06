@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FamilyRestroom
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,6 +56,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,7 +73,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,9 +88,11 @@ import com.example.data.entity.Income
 import com.example.data.entity.getPayerShares
 import com.example.ui.components.BudgetAlertsCard
 import com.example.ui.components.CategoryIconHelper
+import com.example.ui.theme.Amber700
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
 import com.example.util.GreekVoiceParser
+import com.example.util.SettleUpCalculator
 import java.util.Locale
 
 data class PieChartSlice(
@@ -973,7 +980,7 @@ fun AnalyticsScreen(
                     // Triple KPI: Incomes, Expenses, Net Balance
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Surface(
                             modifier = Modifier.weight(1f),
@@ -981,19 +988,21 @@ fun AnalyticsScreen(
                             color = Color(0xFF10B981).copy(alpha = 0.12f),
                             border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.28f))
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 9.dp)) {
                                 Text(Localization.incomes(lang), fontSize = 11.sp, color = Color(0xFF047857), fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = String.format(Locale.US, "+%.2f €", totalIncome),
-                                    fontSize = 15.sp,
+                                    fontSize = 14.5.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color(0xFF059669)
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = Localization.entriesCount(periodIncomes.size, lang),
-                                    fontSize = 10.sp,
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -1005,19 +1014,21 @@ fun AnalyticsScreen(
                             color = Color(0xFFEF4444).copy(alpha = 0.08f),
                             border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.22f))
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 9.dp)) {
                                 Text(Localization.expenses(lang), fontSize = 11.sp, color = Color(0xFFDC2626), fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = String.format(Locale.US, "%.2f €", totalSpend),
-                                    fontSize = 15.sp,
+                                    fontSize = 14.5.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color(0xFFDC2626)
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = Localization.transactionsCount(periodExpenses.size, lang),
-                                    fontSize = 10.sp,
+                                    fontSize = 9.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -1029,20 +1040,22 @@ fun AnalyticsScreen(
                             color = (if (netBalance >= 0) Color(0xFF10B981) else Color(0xFFEF4444)).copy(alpha = 0.12f),
                             border = BorderStroke(1.dp, (if (netBalance >= 0) Color(0xFF10B981) else Color(0xFFEF4444)).copy(alpha = 0.28f))
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(horizontal = 6.dp, vertical = 9.dp)) {
                                 Text(Localization.netBalanceTitle(lang), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = String.format(Locale.US, "%s%.2f €", if (netBalance >= 0) "+" else "", netBalance),
-                                    fontSize = 15.sp,
+                                    fontSize = 14.5.sp,
                                     fontWeight = FontWeight.Black,
                                     color = if (netBalance >= 0) Color(0xFF059669) else Color(0xFFDC2626)
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (totalIncome > 0) Localization.savingsRateLabel(savingsRate.toInt(), lang) else Localization.balanceLabel(lang),
-                                    fontSize = 10.sp,
+                                    fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                     color = if (netBalance >= 0) Color(0xFF059669) else Color(0xFFDC2626)
                                 )
                             }
@@ -2320,6 +2333,217 @@ fun AnalyticsScreen(
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Section: Εκκαθάριση Εξόδων (Expense Settle-Up) - ALWAYS expanded, without toggle arrow, no subtitle
+        if (members.size >= 2) {
+            item {
+                val isGreek = lang != Localization.Language.ENGLISH
+                val clipboardManager = LocalClipboardManager.current
+                val settleUpResult = remember(periodExpenses, members) {
+                    SettleUpCalculator.calculate(periodExpenses, members)
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settle_up_analytics_card"),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp)
+                    ) {
+                        // Header with icon, title and status pill (no arrow button, no subtitle "Ποιος χρωστάει σε ποιον")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.SwapHoriz,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (isGreek) "Εκκαθάριση Εξόδων" else "Expense Settle-Up",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = Emerald700.copy(alpha = 0.12f)
+                                    ) {
+                                        Text(
+                                            text = if (settleUpResult.isBalanced) (if (isGreek) "ΙΣΟΣΚΕΛΙΣΜΕΝΟ" else "BALANCED") else "${settleUpResult.transfers.size} ${if (isGreek) "μεταφορές" else "transfers"}",
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (settleUpResult.isBalanced) Emerald700 else Amber700,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Transfers list / balanced message
+                        Spacer(modifier = Modifier.height(12.dp))
+                        if (settleUpResult.transfers.isEmpty()) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Emerald700.copy(alpha = 0.08f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (isGreek) "✅ Όλα τα μερίδια είναι τακτοποιημένα!" else "✅ All member shares are balanced!",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Emerald700,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                                )
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                settleUpResult.transfers.forEach { t ->
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Amber700.copy(alpha = 0.08f),
+                                        border = BorderStroke(1.dp, Amber700.copy(alpha = 0.25f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "👉 ${t.fromMember.name} ➔ ${t.toMember.name}",
+                                                fontSize = 12.5.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = String.format(Locale.GERMANY, "%.2f €", t.amount),
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Amber700
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Detailed breakdown (permanently open)
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = if (isGreek) "Ανάλυση ανά Μέλος:" else "Per-Member Breakdown:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        settleUpResult.memberSummaries.forEach { s ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = Color(s.member.avatarColorHex),
+                                        modifier = Modifier.size(10.dp)
+                                    ) {}
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = s.member.name,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "${if (isGreek) "Πλήρωσε:" else "Paid:"} ${String.format(Locale.GERMANY, "%.0f€", s.totalPaid)} | ${if (isGreek) "Μερίδιο:" else "Share:"} ${String.format(Locale.GERMANY, "%.0f€", s.totalShare)}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    val isPositive = s.netBalance > 0.01
+                                    val isNegative = s.netBalance < -0.01
+                                    Text(
+                                        text = when {
+                                            isPositive -> "+${String.format(Locale.GERMANY, "%.2f €", s.netBalance)}"
+                                            isNegative -> "-${String.format(Locale.GERMANY, "%.2f €", kotlin.math.abs(s.netBalance))}"
+                                            else -> "0,00 €"
+                                        },
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when {
+                                            isPositive -> Emerald700
+                                            isNegative -> MaterialTheme.colorScheme.error
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                val text = SettleUpCalculator.formatSummaryText(settleUpResult, if (isGreek) "Εξοδολόγιο" else "Household", isGreek)
+                                clipboardManager.setText(AnnotatedString(text))
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(38.dp)
+                                .testTag("copy_settle_up_analytics_button"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isGreek) "Αντιγραφή Εκκαθάρισης για Κοινοποίηση" else "Copy Settlement Summary",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }

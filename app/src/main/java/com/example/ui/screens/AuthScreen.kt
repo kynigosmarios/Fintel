@@ -92,6 +92,7 @@ import com.example.R
 import com.example.ui.components.OikoNomosLogo
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
+import com.example.ui.theme.LogoGreen
 import com.example.ui.theme.ModernFontFamily
 import com.example.ui.viewmodel.OikoNomosViewModel
 import com.example.util.Localization
@@ -167,7 +168,7 @@ fun AuthScreen(
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = (-0.5).sp,
-                color = MaterialTheme.colorScheme.primary
+                color = LogoGreen
             )
 
             Spacer(modifier = Modifier.height(20.dp))

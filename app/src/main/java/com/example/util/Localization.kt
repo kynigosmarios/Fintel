@@ -400,7 +400,7 @@ object Localization {
     fun transactionsCount(count: Int, lang: Language): String = if (lang == Language.ENGLISH) "$count transactions" else "$count συναλλαγές"
     fun transactionsCount(lang: Language, count: Int): String = transactionsCount(count, lang)
 
-    fun savingsRateLabel(rate: Int, lang: Language): String = if (lang == Language.ENGLISH) "Savings Rate: $rate%" else "Αποταμίευση: $rate%"
+    fun savingsRateLabel(rate: Int, lang: Language): String = if (lang == Language.ENGLISH) "Savings: $rate%" else "Αποταμίευση $rate%"
     fun savingsRateLabel(lang: Language, rate: Int): String = savingsRateLabel(rate, lang)
 
     fun percentOfTotalIncome(percent: Int, lang: Language): String = if (lang == Language.ENGLISH) "$percent% of total income" else "$percent% του συνολικού εισοδήματος"

@@ -8,6 +8,8 @@ object BankNotificationHolder {
     private val _pendingTransactions = MutableStateFlow<List<PendingBankTransaction>>(emptyList())
     val pendingTransactions: StateFlow<List<PendingBankTransaction>> = _pendingTransactions.asStateFlow()
 
+    var onTransactionRemoved: ((String) -> Unit)? = null
+
     fun addTransaction(tx: PendingBankTransaction) {
         val current = _pendingTransactions.value.toMutableList()
         // Deduplicate recent identical transactions within 30 seconds
@@ -24,11 +26,16 @@ object BankNotificationHolder {
 
     fun removeTransaction(id: String) {
         val current = _pendingTransactions.value.toMutableList()
-        current.removeAll { it.id == id }
-        _pendingTransactions.value = current
+        val removed = current.removeAll { it.id == id }
+        if (removed) {
+            _pendingTransactions.value = current
+            onTransactionRemoved?.invoke(id)
+        }
     }
 
     fun clearAll() {
+        val list = _pendingTransactions.value
         _pendingTransactions.value = emptyList()
+        list.forEach { tx -> onTransactionRemoved?.invoke(tx.id) }
     }
 }

@@ -100,6 +100,15 @@
             </intent-filter>
         </service>
 
+        <!-- Receiver for syncing notification dismissals from notification shade -->
+        <receiver
+            android:name="com.example.service.BankNotificationDismissReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.service.ACTION_DISMISS_BANK_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
+
         <!-- FileProvider for sharing real Excel and PDF files -->
         <provider
             android:name="androidx.core.content.FileProvider"

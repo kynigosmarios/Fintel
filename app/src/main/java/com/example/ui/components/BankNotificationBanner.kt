@@ -159,7 +159,7 @@ fun BankNotificationBanner(
                         Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isGreek) "Καταχώρηση (1 πάτημα)" else "Record (1 tap)",
+                            text = if (isGreek) "Καταχώρηση" else "Record",
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold
                         )

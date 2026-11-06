@@ -137,6 +137,7 @@ import com.example.ui.theme.Emerald700
 import com.example.ui.theme.Emerald800
 import com.example.ui.theme.Emerald900
 import com.example.ui.theme.Emerald950
+import com.example.ui.theme.LogoGreen
 import com.example.ui.theme.ModernFontFamily
 import com.example.ui.viewmodel.OikoNomosViewModel
 import com.example.util.SpeechRecognitionHelper
@@ -229,6 +230,7 @@ fun MainScreen(
     val dailyReminderMinute by viewModel.dailyReminderMinute.collectAsStateWithLifecycle()
     val showPrivacyConsentDialog by viewModel.showPrivacyConsentDialog.collectAsStateWithLifecycle()
     val notificationConsentCompleted by viewModel.notificationConsentCompleted.collectAsStateWithLifecycle()
+    val bankAutoCatcherEnabled by viewModel.bankAutoCatcherEnabled.collectAsStateWithLifecycle()
 
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
 
@@ -327,7 +329,7 @@ fun MainScreen(
                             .testTag("app_brand_home_button")
                     ) {
                         OikoNomosLogo(
-                            isDarkTheme = isDarkTheme,
+                            isDarkTheme = false,
                             size = 36.dp
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -337,7 +339,7 @@ fun MainScreen(
                             fontWeight = FontWeight.Black,
                             fontSize = 25.sp,
                             letterSpacing = (-0.5).sp,
-                            color = if (isDarkTheme) Color(0xFF34D399) else Color(0xFF0F5132)
+                            color = LogoGreen
                         )
                     }
                 },
@@ -397,6 +399,14 @@ fun MainScreen(
                     }
                 )
 
+                val navItemColors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = if (isDarkTheme) Color(0xFF10B981) else Color(0xFF065F46),
+                    selectedTextColor = if (isDarkTheme) Color(0xFF34D399) else Color(0xFF065F46),
+                    indicatorColor = if (isDarkTheme) Color(0xFF064E3B).copy(alpha = 0.6f) else Color(0xFFD1FAE5),
+                    unselectedIconColor = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF475569),
+                    unselectedTextColor = if (isDarkTheme) Color(0xFF94A3B8) else Color(0xFF64748B)
+                )
+
                 // Navigation Bar
                 NavigationBar(
                     containerColor = if (isDarkTheme) Color(0xFF0F172A) else Color(0xFFF1F5F2),
@@ -416,13 +426,7 @@ fun MainScreen(
                             )
                         },
                         label = { Text(com.example.util.Localization.tabExpenses(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 0) FontWeight.Bold else FontWeight.Medium) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF064E3B),
-                            selectedTextColor = Color(0xFF064E3B),
-                            indicatorColor = Color(0xFFD1FAE5),
-                            unselectedIconColor = Color(0xFF475569),
-                            unselectedTextColor = Color(0xFF64748B)
-                        ),
+                        colors = navItemColors,
                         modifier = Modifier.testTag("tab_expenses")
                     )
 
@@ -436,13 +440,7 @@ fun MainScreen(
                             )
                         },
                         label = { Text(com.example.util.Localization.tabAnalytics(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 1) FontWeight.Bold else FontWeight.Medium) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF064E3B),
-                            selectedTextColor = Color(0xFF064E3B),
-                            indicatorColor = Color(0xFFD1FAE5),
-                            unselectedIconColor = Color(0xFF475569),
-                            unselectedTextColor = Color(0xFF64748B)
-                        ),
+                        colors = navItemColors,
                         modifier = Modifier.testTag("tab_analytics")
                     )
 
@@ -456,13 +454,7 @@ fun MainScreen(
                             )
                         },
                         label = { Text(com.example.util.Localization.tabMembers(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Medium) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF064E3B),
-                            selectedTextColor = Color(0xFF064E3B),
-                            indicatorColor = Color(0xFFD1FAE5),
-                            unselectedIconColor = Color(0xFF475569),
-                            unselectedTextColor = Color(0xFF64748B)
-                        ),
+                        colors = navItemColors,
                         modifier = Modifier.testTag("tab_members")
                     )
 
@@ -476,13 +468,7 @@ fun MainScreen(
                             )
                         },
                         label = { Text(com.example.util.Localization.tabCategories(lang), fontSize = 10.5.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Medium) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF064E3B),
-                            selectedTextColor = Color(0xFF064E3B),
-                            indicatorColor = Color(0xFFD1FAE5),
-                            unselectedIconColor = Color(0xFF475569),
-                            unselectedTextColor = Color(0xFF64748B)
-                        ),
+                        colors = navItemColors,
                         modifier = Modifier.testTag("tab_categories")
                     )
                 }
@@ -772,6 +758,7 @@ fun MainScreen(
             appLanguage = appLanguage,
             currentUserId = currentUser?.uid.orEmpty(),
             onRenameHousehold = { viewModel.renameCurrentHousehold(it) },
+            onRenameHouseholdById = { id, name -> viewModel.renameHousehold(id, name) },
             onSelectHousehold = { viewModel.switchExodologio(it) },
             onCreateNewHousehold = { viewModel.createNewExodologio(it) },
             onDeleteHousehold = { viewModel.deleteHousehold(it) },
@@ -922,10 +909,12 @@ fun MainScreen(
             reminderHour = dailyReminderHour,
             reminderMinute = dailyReminderMinute,
             notificationConsentHandled = notificationConsentCompleted,
+            bankAutoCatcherEnabled = bankAutoCatcherEnabled,
             onAcceptNotificationConsent = { viewModel.acceptNotificationConsent() },
             onToggleReminder = { viewModel.toggleDailyReminder(it) },
             onSetReminderTime = { h, m -> viewModel.setDailyReminderTime(h, m) },
             onTestReminder = { viewModel.triggerTestReminderNotification() },
+            onToggleBankAutoCatcher = { viewModel.toggleBankAutoCatcher(it) },
             onThemeChange = { viewModel.setThemeMode(it) },
             onLanguageChange = { viewModel.setAppLanguage(it) },
             onToggleLaunchWithChooser = { viewModel.setLaunchWithChooser(it) },

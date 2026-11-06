@@ -83,100 +83,147 @@ fun OnboardingCarouselDialog(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(pageCount = { 3 })
     val isEnglish = appLanguage.equals("EN", ignoreCase = true)
 
     val steps = if (isEnglish) {
         listOf(
             OnboardingStep(
                 stepNumber = 1,
-                title = "Voice Logging",
-                subtitle = "Tap the mic and say: \"Coffee 3.50\". Amount & category are recognized instantly.",
-                icon = Icons.Default.Mic,
+                title = "Expense Categories",
+                subtitle = "Organize spending with custom categories and monthly budgets.",
+                icon = Icons.Default.Category,
                 gradientColors = listOf(Color(0xFF059669), Color(0xFF10B981)),
                 highlights = listOf(
-                    "Voice recognition in English & Greek",
-                    "Instant category & amount detection",
-                    "Fast entry without typing"
+                    "Create & edit custom categories",
+                    "Set monthly budget limits"
                 ),
-                badgeLabel = "1/3: Voice",
-                statusPill = "✓ Fast Voice Logging"
+                badgeLabel = "1/5: Categories",
+                statusPill = "✓ Category Management"
             ),
             OnboardingStep(
                 stepNumber = 2,
-                title = "Household Profile",
-                subtitle = "Designed for singles, couples, flatmates, or families.",
+                title = "Household Members",
+                subtitle = "Add members to log expenses and split shared household costs.",
                 icon = Icons.Default.Group,
                 gradientColors = listOf(Color(0xFF7C3AED), Color(0xFFA78BFA)),
                 highlights = listOf(
-                    "Single role for solo tracking",
-                    "Fair split for couples & roommates",
-                    "Parent & children tracking for families"
+                    "Add members with custom roles",
+                    "Automatic expense splitting"
                 ),
-                badgeLabel = "2/3: Profile",
-                statusPill = "✓ Built for Everyone"
+                badgeLabel = "2/5: Members",
+                statusPill = "✓ Member Management"
             ),
             OnboardingStep(
                 stepNumber = 3,
-                title = "Smart Stats & Cloud",
-                subtitle = "Real-time sync across devices and a reminder at 22:00.",
+                title = "Statistics & Insights",
+                subtitle = "Track net balance, savings rates, and spending trends with charts.",
                 icon = Icons.Default.PieChart,
                 gradientColors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8)),
                 highlights = listOf(
-                    "Real-time cloud sync on all devices",
-                    "Monthly balance & daily average",
-                    "Gentle reminder at 22:00"
+                    "Monthly balance & savings rate",
+                    "Visual breakdown by category & member"
                 ),
-                badgeLabel = "3/3: Stats & Sync",
-                statusPill = "✓ Live Cloud Sync"
+                badgeLabel = "3/5: Statistics",
+                statusPill = "✓ Smart Insights"
+            ),
+            OnboardingStep(
+                stepNumber = 4,
+                title = "Voice & Bank Push Alerts",
+                subtitle = "Log expenses instantly via voice or automated bank notification catcher.",
+                icon = Icons.Default.Mic,
+                gradientColors = listOf(Color(0xFFD97706), Color(0xFFF59E0B)),
+                highlights = listOf(
+                    "1-tap fast voice logging",
+                    "Automated bank push notification scanner"
+                ),
+                badgeLabel = "4/5: Automation",
+                statusPill = "✓ Automated Logging"
+            ),
+            OnboardingStep(
+                stepNumber = 5,
+                title = "Fintel Pro Features",
+                subtitle = "Unlock unlimited households, CSV/Excel export, and advanced analytics.",
+                icon = Icons.Default.Star,
+                gradientColors = listOf(Color(0xFF0F766E), Color(0xFF14B8A6)),
+                highlights = listOf(
+                    "Unlimited households & wallets",
+                    "Data export to CSV/Excel & full reports"
+                ),
+                badgeLabel = "5/5: Pro",
+                statusPill = "✓ Fintel Pro"
             )
         )
     } else {
         listOf(
             OnboardingStep(
                 stepNumber = 1,
-                title = "Φωνητική Καταγραφή",
-                subtitle = "Πατήστε το μικρόφωνο και πείτε: «Σούπερ μάρκετ 45€». Αναγνωρίζεται αυτόματα.",
-                icon = Icons.Default.Mic,
+                title = "Κατηγορίες Εξόδων",
+                subtitle = "Οργανώστε τα έξοδα με προσαρμοσμένες κατηγορίες και όρια προϋπολογισμού.",
+                icon = Icons.Default.Category,
                 gradientColors = listOf(Color(0xFF059669), Color(0xFF10B981)),
                 highlights = listOf(
-                    "Φωνητική καταγραφή στα ελληνικά",
-                    "Αυτόματη κατηγορία & ποσό",
-                    "Άμεση καταχώρηση χωρίς πληκτρολόγηση"
+                    "Δημιουργία & επεξεργασία κατηγοριών",
+                    "Μηνιαίος προϋπολογισμός ανά κατηγορία"
                 ),
-                badgeLabel = "1/3: Φωνή",
-                statusPill = "✓ Φωνητική Καταγραφή"
+                badgeLabel = "1/5: Κατηγορίες",
+                statusPill = "✓ Οργάνωση Εξόδων"
             ),
             OnboardingStep(
                 stepNumber = 2,
-                title = "Επιλογή Προφίλ",
-                subtitle = "Ιδανικό για μονοπρόσωπο σπίτι, ζευγάρια, συγκατοίκους ή οικογένειες.",
+                title = "Μέλη Εξοδολογίου",
+                subtitle = "Προσθέστε μέλη για καταγραφή και δίκαιο επιμερισμό των εξόδων.",
                 icon = Icons.Default.Group,
                 gradientColors = listOf(Color(0xFF7C3AED), Color(0xFFA78BFA)),
                 highlights = listOf(
-                    "«Μονοπρόσωπο» για ατομική χρήση",
-                    "Διαμοιρασμός για ζευγάρια & συγκατοίκους",
-                    "Έξοδα γονέων & παιδιών για οικογένειες"
+                    "Προσθήκη μελών με ονόματα & ρόλους",
+                    "Αυτόματος διαμοιρασμός & εκκαθάριση"
                 ),
-                badgeLabel = "2/3: Προφίλ",
-                statusPill = "✓ Προσαρμογή για Όλους"
+                badgeLabel = "2/5: Μέλη",
+                statusPill = "✓ Διαχείριση Μελών"
             ),
             OnboardingStep(
                 stepNumber = 3,
-                title = "Στατιστικά & Cloud Sync",
-                subtitle = "Αυτόματος συγχρονισμός σε όλες τις συσκευές και υπενθύμιση στις 22:00.",
+                title = "Στατιστικά & Ανάλυση",
+                subtitle = "Πλήρης εικόνα ισολογισμού, αποταμίευσης και μηνιαίων τάσεων.",
                 icon = Icons.Default.PieChart,
                 gradientColors = listOf(Color(0xFF0284C7), Color(0xFF38BDF8)),
                 highlights = listOf(
-                    "Real-time συγχρονισμός στο Cloud",
-                    "Μηνιαίος ισολογισμός & μέσο έξοδο",
-                    "Βραδινή υπενθύμιση στις 22:00"
+                    "Μηνιαίο υπόλοιπο & δείκτης αποταμίευσης",
+                    "Γραφήματα ανά κατηγορία & μέλος"
                 ),
-                badgeLabel = "3/3: Στατιστικά",
-                statusPill = "✓ Ζωντανός Συγχρονισμός"
+                badgeLabel = "3/5: Στατιστικά",
+                statusPill = "✓ Έξυπνα Στατιστικά"
+            ),
+            OnboardingStep(
+                stepNumber = 4,
+                title = "Φωνή & Push Ειδοποιήσεις",
+                subtitle = "Άμεση καταγραφή με τη φωνή σας ή αυτόματη ανάγνωση τραπεζικών push.",
+                icon = Icons.Default.Mic,
+                gradientColors = listOf(Color(0xFFD97706), Color(0xFFF59E0B)),
+                highlights = listOf(
+                    "Φωνητική καταγραφή με 1 πάτημα",
+                    "Αυτόματη σάρωση τραπεζικών ειδοποιήσεων"
+                ),
+                badgeLabel = "4/5: Αυτοματισμός",
+                statusPill = "✓ Αυτόματη Καταγραφή"
+            ),
+            OnboardingStep(
+                stepNumber = 5,
+                title = "Λειτουργία Fintel Pro",
+                subtitle = "Απεριόριστα εξοδολόγια, εξαγωγή δεδομένων και προηγμένες δυνατότητες.",
+                icon = Icons.Default.Star,
+                gradientColors = listOf(Color(0xFF0F766E), Color(0xFF14B8A6)),
+                highlights = listOf(
+                    "Απεριόριστα εξοδολόγια & πορτοφόλια",
+                    "Εξαγωγή σε Excel/CSV & αναλυτικές αναφορές"
+                ),
+                badgeLabel = "5/5: Pro",
+                statusPill = "✓ Fintel Pro"
             )
         )
     }
+
+    val pagerState = rememberPagerState(pageCount = { steps.size })
 
     // Auto-advance every 10 seconds if user is not actively scrolling
     LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
@@ -385,93 +432,35 @@ fun OnboardingCarouselDialog(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // 5. Interactive Action Area: Exactly 42dp across ALL steps so height is 100% constant!
+                        // 5. Interactive Action Area: Exactly 42dp uniform status pill across ALL steps so height is 100% constant!
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(42.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (step.stepNumber == 2 && (onAddCategory != null || onSeedCategories != null)) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = step.gradientColors.first().copy(alpha = 0.08f),
+                                modifier = Modifier.height(34.dp)
+                            ) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    modifier = Modifier.padding(horizontal = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (onAddCategory != null) {
-                                        Button(
-                                            onClick = onAddCategory,
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = step.gradientColors.first()),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(38.dp)
-                                                .testTag("onboarding_add_category_btn")
-                                        ) {
-                                            Text(
-                                                text = if (isEnglish) "New Category" else "Νέα Κατηγορία",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                    if (onSeedCategories != null) {
-                                        OutlinedButton(
-                                            onClick = onSeedCategories,
-                                            shape = RoundedCornerShape(12.dp),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(38.dp)
-                                                .testTag("onboarding_seed_categories_btn")
-                                        ) {
-                                            Text(
-                                                text = if (isEnglish) "Load Defaults" else "Φόρτωση Βασικών",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    }
-                                }
-                            } else if (step.stepNumber == 2 && onAddMember != null) {
-                                Button(
-                                    onClick = onAddMember,
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = step.gradientColors.first()),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(38.dp)
-                                        .testTag("onboarding_add_member_btn")
-                                ) {
-                                    Text(
-                                        text = if (isEnglish) "Set Up Members & Roles" else "Ορισμός Μελών & Ρόλων",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = step.gradientColors.first(),
+                                        modifier = Modifier.size(13.dp)
                                     )
-                                }
-                            } else {
-                                // Subtle aesthetic status pill giving equal layout balance to Steps 1, 4, 5, 6
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = step.gradientColors.first().copy(alpha = 0.08f),
-                                    modifier = Modifier.height(34.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 14.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = step.gradientColors.first(),
-                                            modifier = Modifier.size(13.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = step.statusPill,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = step.gradientColors.first()
-                                        )
-                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = step.statusPill,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = step.gradientColors.first()
+                                    )
                                 }
                             }
                         }

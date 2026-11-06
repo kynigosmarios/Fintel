@@ -44,6 +44,15 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
+            com.example.util.BankNotificationSystemManager.init(this)
+            com.example.util.BankNotificationHolder.onTransactionRemoved = { id ->
+                com.example.util.BankNotificationSystemManager.cancelNotification(this, id)
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Bank notification init: ${e.message}")
+        }
+
+        try {
             handleIntent(intent)
         } catch (e: Exception) {
             Log.w("MainActivity", "handleIntent safe fallback: ${e.message}")
@@ -94,6 +103,14 @@ class MainActivity : ComponentActivity() {
 
             if (action == ACTION_QUICK_EXPENSE || extraAction == ACTION_QUICK_EXPENSE) {
                 viewModel.openVoiceInputDialog()
+            }
+
+            val bankTxId = intent.getStringExtra("EXTRA_BANK_TX_ID")
+            if (!bankTxId.isNullOrBlank()) {
+                val pending = com.example.util.BankNotificationHolder.pendingTransactions.value.find { it.id == bankTxId }
+                if (pending != null) {
+                    viewModel.confirmBankTransaction(pending)
+                }
             }
         } catch (e: Exception) {
             Log.w("MainActivity", "Error parsing intent: ${e.message}")

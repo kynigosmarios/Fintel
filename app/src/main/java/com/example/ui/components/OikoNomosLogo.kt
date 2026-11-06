@@ -23,7 +23,7 @@ import com.example.R
 @Composable
 fun OikoNomosLogo(
     modifier: Modifier = Modifier,
-    isDarkTheme: Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f || isSystemInDarkTheme(),
+    isDarkTheme: Boolean = false,
     size: Dp = 36.dp
 ) {
     Box(

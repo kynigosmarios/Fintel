@@ -31,6 +31,7 @@ import com.example.data.repository.FirestoreSyncRepository
 import com.example.data.safety.DataSafetyGuard
 import com.example.data.seed.FirestoreDataSeed
 import com.example.util.BankNotificationHolder
+import com.example.util.BankNotificationSystemManager
 import com.example.util.GreekVoiceParser
 import com.example.util.Localization
 import com.example.util.ParsedVoiceExpense
@@ -3144,39 +3145,50 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun confirmBankTransaction(tx: PendingBankTransaction) {
-        viewModelScope.launch {
-            val user = _currentUser.value
-            val targetHouseholdId = getOrEnsureHouseholdId(user)
-            val defaultCat = allCategories.value.firstOrNull {
-                it.name.contains("Σούπερ", ignoreCase = true) || it.name.contains("Super", ignoreCase = true)
-            } ?: allCategories.value.firstOrNull() ?: ExpenseCategory(id = 1L, name = "Γενικά", iconKey = "other", colorHex = 0xFF4CAF50)
+        val user = _currentUser.value
+        val targetHouseholdId = getOrEnsureHouseholdId(user)
+        val defaultCat = allCategories.value.firstOrNull {
+            it.name.contains("Σούπερ", ignoreCase = true) || it.name.contains("Super", ignoreCase = true)
+        } ?: allCategories.value.firstOrNull() ?: ExpenseCategory(id = 1L, name = "Γενικά", iconKey = "other", colorHex = 0xFF4CAF50)
 
-            val defaultMember = allMembers.value.firstOrNull()
+        val defaultMember = allMembers.value.firstOrNull()
 
-            saveExpense(
-                id = 0L,
-                title = tx.merchantName,
-                amount = tx.amount,
-                categoryId = defaultCat.id,
-                categoryName = defaultCat.name,
-                timestamp = tx.timestamp,
-                splitType = "ALL_FAMILY",
-                memberIds = emptyList(),
-                memberNamesDisplay = "Κοινό Οικογένειας",
-                note = "Αυτόματη καταχώρηση από ${tx.bankName}",
-                payerMemberId = defaultMember?.id ?: 0L,
-                payerMemberName = defaultMember?.name ?: "Οικογένεια",
-                payerMemberIdsCsv = if (defaultMember != null) "${defaultMember.id}" else "",
-                payerAmountsCsv = ""
-            )
+        val prefilledExpense = Expense(
+            id = 0L,
+            title = tx.merchantName,
+            amount = tx.amount,
+            categoryId = defaultCat.id,
+            categoryName = defaultCat.name,
+            timestamp = tx.timestamp,
+            splitType = "ALL_FAMILY",
+            memberIdsCsv = "",
+            memberNamesDisplay = "Κοινό Οικογένειας",
+            note = "Από ${tx.bankName}",
+            payerMemberId = defaultMember?.id ?: 0L,
+            payerMemberName = defaultMember?.name ?: "Οικογένεια",
+            payerMemberIdsCsv = if (defaultMember != null) "${defaultMember.id}" else "",
+            payerAmountsCsv = ""
+        )
 
-            BankNotificationHolder.removeTransaction(tx.id)
-            showSnackbar("Καταχωρήθηκε: ${tx.merchantName} (${String.format(Locale.GERMANY, "%.2f €", tx.amount)})")
+        // Remove from pending bank notifications & cancel system notification
+        BankNotificationHolder.removeTransaction(tx.id)
+        try {
+            BankNotificationSystemManager.cancelNotification(getApplication(), tx.id)
+        } catch (e: Exception) {
+            // safe fallback
         }
+
+        // Open manual expense screen/dialog with the transaction information pre-filled so the user reviews it before saving
+        openManualExpenseDialog(prefilledExpense)
     }
 
     fun dismissBankTransaction(tx: PendingBankTransaction) {
         BankNotificationHolder.removeTransaction(tx.id)
+        try {
+            BankNotificationSystemManager.cancelNotification(getApplication(), tx.id)
+        } catch (e: Exception) {
+            // safe fallback
+        }
     }
 
     fun openBurgerMenu() {
@@ -5556,6 +5568,22 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         showSnackbar("Η ώρα υπενθύμισης ορίστηκε στις %02d:%02d".format(hour, minute))
+    }
+
+    private val _bankAutoCatcherEnabled = MutableStateFlow(
+        BankNotificationSystemManager.isAutoCatcherEnabled(getApplication())
+    )
+    val bankAutoCatcherEnabled: StateFlow<Boolean> = _bankAutoCatcherEnabled.asStateFlow()
+
+    fun toggleBankAutoCatcher(enabled: Boolean) {
+        _bankAutoCatcherEnabled.value = enabled
+        BankNotificationSystemManager.setAutoCatcherEnabled(getApplication(), enabled)
+        if (!enabled) {
+            BankNotificationHolder.clearAll()
+            showSnackbar(if (_appLanguage.value == "EN") "Bank notification catcher disabled" else "Η ανάγνωση τραπεζικών push απενεργοποιήθηκε")
+        } else {
+            showSnackbar(if (_appLanguage.value == "EN") "Bank notification catcher enabled" else "Η ανάγνωση τραπεζικών push ενεργοποιήθηκε")
+        }
     }
 
     fun triggerTestReminderNotification() {

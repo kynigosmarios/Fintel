@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -81,6 +82,7 @@ fun CategoriesScreen(
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
     val isGreek = lang != Localization.Language.ENGLISH
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     var categoryToDelete by remember { mutableStateOf<ExpenseCategory?>(null) }
     var showDeletedCategoriesDialog by remember { mutableStateOf(false) }
     var categoryToPermanentlyDelete by remember { mutableStateOf<ExpenseCategory?>(null) }
@@ -114,14 +116,14 @@ fun CategoriesScreen(
                     Column(modifier = Modifier.weight(1f, fill = false)) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFFD1FAE5),
+                            color = if (isDark) Color(0xFF064E3B) else Color(0xFFD1FAE5),
                             modifier = Modifier.padding(bottom = 4.dp)
                         ) {
                             Text(
                                 text = if (lang == Localization.Language.ENGLISH) "BUDGET CATEGORIES" else "ΚΑΤΗΓΟΡΙΕΣ ΕΞΟΔΩΝ",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF047857),
+                                color = if (isDark) Color(0xFF34D399) else Color(0xFF047857),
                                 letterSpacing = 0.5.sp,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
@@ -144,8 +146,8 @@ fun CategoriesScreen(
                             if (categories.size < 5) {
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = Color(0xFFD1FAE5).copy(alpha = 0.7f),
-                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
+                                    color = if (isDark) Color(0xFF064E3B).copy(alpha = 0.6f) else Color(0xFFD1FAE5).copy(alpha = 0.7f),
+                                    border = BorderStroke(1.dp, if (isDark) Color(0xFF059669) else Color(0xFF10B981).copy(alpha = 0.5f)),
                                     modifier = Modifier.clickable { onSeedStandardCategories() }
                                 ) {
                                     Row(
@@ -156,14 +158,14 @@ fun CategoriesScreen(
                                         Icon(
                                             Icons.Default.Refresh,
                                             contentDescription = null,
-                                            tint = Color(0xFF047857),
+                                            tint = if (isDark) Color(0xFF34D399) else Color(0xFF047857),
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Text(
                                             text = if (lang == Localization.Language.ENGLISH) "Defaults" else "Έτοιμες",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF047857)
+                                            color = if (isDark) Color(0xFF34D399) else Color(0xFF047857)
                                         )
                                     }
                                 }
@@ -367,14 +369,15 @@ fun CategoriesScreen(
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     if (category.monthlyBudget > 0.0) {
+                                        val budgetColor = if (isDark) Color(0xFF34D399) else Emerald700
                                         Surface(
                                             shape = RoundedCornerShape(6.dp),
-                                            color = Emerald700.copy(alpha = 0.12f)
+                                            color = budgetColor.copy(alpha = if (isDark) 0.22f else 0.12f)
                                         ) {
                                             Text(
                                                 text = "🎯 ${String.format(Locale.US, "%.2f €", category.monthlyBudget)}",
                                                 fontSize = 11.sp,
-                                                color = Emerald700,
+                                                color = budgetColor,
                                                 fontWeight = FontWeight.SemiBold,
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                             )
@@ -439,11 +442,12 @@ fun CategoriesScreen(
                                         }
                                     }
 
+                                    val editBtnColor = if (isDark) Color(0xFF34D399) else Emerald700
                                     Box(
                                         modifier = Modifier
                                             .size(28.dp)
                                             .clip(CircleShape)
-                                            .background(Emerald700.copy(alpha = 0.12f))
+                                            .background(editBtnColor.copy(alpha = if (isDark) 0.22f else 0.12f))
                                             .clickable { onEditCategory(category) }
                                             .testTag("edit_cat_${category.id}"),
                                         contentAlignment = Alignment.Center
@@ -452,7 +456,7 @@ fun CategoriesScreen(
                                             imageVector = Icons.Default.Edit,
                                             contentDescription = "Edit",
                                             modifier = Modifier.size(14.dp),
-                                            tint = Emerald700
+                                            tint = editBtnColor
                                         )
                                     }
 

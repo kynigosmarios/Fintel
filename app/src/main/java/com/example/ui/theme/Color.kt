@@ -3,11 +3,12 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
+val LogoGreen = Color(0xFF059669) // Exact vibrant primary green from Fintel logo
 val Emerald950 = Color(0xFF022C22)
 val Emerald900 = Color(0xFF064E3B)
 val Emerald850 = Color(0xFF065440)
 val Emerald800 = Color(0xFF065F46)
-val Emerald700 = Color(0xFF047857)
+val Emerald700 = LogoGreen // Color(0xFF059669) - exact brand logo green
 val Emerald600 = Color(0xFF059669)
 val Emerald500 = Color(0xFF10B981)
 val Emerald400 = Color(0xFF34D399)
