@@ -574,6 +574,7 @@ fun PremiumPaywallDialog(
                     "recurring_expense_limit" -> if (lang == Localization.Language.ENGLISH) "Free edition supports up to 2 Recurring Expenses" else "Η δωρεάν έκδοση υποστηρίζει έως 2 Πάγιες Εντολές"
                     "multi_exodologio" -> if (lang == Localization.Language.ENGLISH) "Unlock unlimited households & wallets" else "Ξεκλειδώστε απεριόριστα ανεξάρτητα εξοδολόγια & πορτοφόλια"
                     "ocr_receipt" -> if (lang == Localization.Language.ENGLISH) "Camera & Gallery Receipt OCR is a Pro feature" else "Η σάρωση αποδείξεων με Κάμερα & OCR είναι δυνατότητα Pro"
+                    "export_report" -> if (lang == Localization.Language.ENGLISH) "Exporting reports to PDF & CSV is a Pro feature" else "Η εξαγωγή αναφορών σε PDF & CSV είναι δυνατότητα Pro"
                     else -> null
                 }
 

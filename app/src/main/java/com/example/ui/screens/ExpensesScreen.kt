@@ -200,9 +200,15 @@ fun ExpensesScreen(
     val totalIncomesAmount = remember(monthIncomes) { monthIncomes.sumOf { it.amount } }
     val netBalance = totalIncomesAmount - totalExpensesAmount
 
-    // Dynamic budget calculation: exact sum of monthly budgets of categories
-    val totalBudget = remember(categories) {
-        categories.sumOf { it.monthlyBudget }
+    // Dynamic budget calculation: exact sum of monthly budgets of categories.
+    // When "ALL" months are selected, scale budget by active months count so total expenses are fairly compared
+    val totalBudget = remember(categories, selectedMonthKey, availableMonths) {
+        val baseMonthlyBudget = categories.sumOf { it.monthlyBudget }
+        if (selectedMonthKey == "ALL") {
+            baseMonthlyBudget * availableMonths.size.coerceAtLeast(1)
+        } else {
+            baseMonthlyBudget
+        }
     }
     val remainingBudget = remember(totalBudget, totalExpensesAmount) {
         totalBudget - totalExpensesAmount
@@ -543,7 +549,6 @@ fun ExpensesScreen(
                                         .weight(1f)
                                         .clickable {
                                             selectedTypeFilter = "EXPENSE"
-                                            onAddManualExpense()
                                         },
                                     shape = RoundedCornerShape(16.dp),
                                     color = Color(0xFF451A1A).copy(alpha = 0.35f),

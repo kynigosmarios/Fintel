@@ -809,7 +809,7 @@ fun MainScreen(
                 val launched = if (act != null) onLaunchBilling(act, planId) else false
                 if (!launched) {
                     try {
-                        val playIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.aistudio.oikonomos.app")).apply {
+                        val playIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         context.startActivity(playIntent)
