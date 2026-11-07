@@ -278,14 +278,14 @@ fun ExpensesScreen(
                         .padding(horizontal = 16.dp, vertical = 6.dp)
                         .testTag("hero_balance_card"),
                     shape = RoundedCornerShape(26.dp),
-                    color = Color(0xFF047857),
+                    color = Color(0xFF03533C),
                     border = BorderStroke(
                         1.2.dp,
                         Brush.linearGradient(
                             listOf(
-                                Color(0xFF34D399).copy(alpha = 0.55f),
-                                Color(0xFF059669).copy(alpha = 0.35f),
-                                Color(0xFF34D399).copy(alpha = 0.25f)
+                                Color(0xFF10B981).copy(alpha = 0.5f),
+                                Color(0xFF059669).copy(alpha = 0.3f),
+                                Color(0xFF10B981).copy(alpha = 0.2f)
                             )
                         )
                     ),
@@ -298,10 +298,10 @@ fun ExpensesScreen(
                             .background(
                                 Brush.verticalGradient(
                                     listOf(
-                                        Color(0xFF0F766E),
-                                        Color(0xFF059669),
-                                        Color(0xFF047857),
-                                        Color(0xFF064E3B)
+                                        Color(0xFF0A5851),
+                                        Color(0xFF04684A),
+                                        Color(0xFF03533C),
+                                        Color(0xFF023627)
                                     )
                                 )
                             )
@@ -390,12 +390,12 @@ fun ExpensesScreen(
                                     }
                                 }
 
-                                // Dynamic 'Έξοδο' / 'Έσοδο' Pill Button (No '+' symbol)
+                                // Dynamic 'Έξοδο' / 'Έσοδο' Pill Button (Same color for both)
                                 val isIncomeSelected = selectedTypeFilter == "INCOME"
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
-                                    color = if (isIncomeSelected) Color(0xFF047857) else Color(0xFF065F46),
-                                    border = BorderStroke(1.dp, (if (isIncomeSelected) Color(0xFF10B981) else Color(0xFF34D399)).copy(alpha = 0.5f)),
+                                    color = Color(0xFF065F46),
+                                    border = BorderStroke(1.dp, Color(0xFF34D399).copy(alpha = 0.5f)),
                                     modifier = Modifier
                                         .clickable {
                                             if (isIncomeSelected) {
@@ -1296,7 +1296,7 @@ fun ExpensesScreen(
 
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = expense.title,
+                                                    text = expense.title.ifBlank { Localization.translateCategory(expense.categoryName, lang) },
                                                     fontSize = 15.5.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onSurface,

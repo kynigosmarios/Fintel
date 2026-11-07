@@ -98,7 +98,7 @@ fun OnboardingCarouselDialog(
                     "Set monthly budget limits"
                 ),
                 badgeLabel = "1/5: Categories",
-                statusPill = "✓ Category Management"
+                statusPill = "Category Management"
             ),
             OnboardingStep(
                 stepNumber = 2,
@@ -111,7 +111,7 @@ fun OnboardingCarouselDialog(
                     "Automatic expense splitting"
                 ),
                 badgeLabel = "2/5: Members",
-                statusPill = "✓ Member Management"
+                statusPill = "Member Management"
             ),
             OnboardingStep(
                 stepNumber = 3,
@@ -124,33 +124,33 @@ fun OnboardingCarouselDialog(
                     "Visual breakdown by category & member"
                 ),
                 badgeLabel = "3/5: Statistics",
-                statusPill = "✓ Smart Insights"
+                statusPill = "Smart Insights"
             ),
             OnboardingStep(
                 stepNumber = 4,
                 title = "Voice & Bank Push Alerts",
                 subtitle = "Log expenses instantly via voice or automated bank notification catcher.",
                 icon = Icons.Default.Mic,
-                gradientColors = listOf(Color(0xFFD97706), Color(0xFFF59E0B)),
+                gradientColors = listOf(Color(0xFF059669), Color(0xFF10B981)),
                 highlights = listOf(
                     "1-tap fast voice logging",
                     "Automated bank push notification scanner"
                 ),
                 badgeLabel = "4/5: Automation",
-                statusPill = "✓ Automated Logging"
+                statusPill = "Automated Logging"
             ),
             OnboardingStep(
                 stepNumber = 5,
                 title = "Fintel Pro Features",
                 subtitle = "Unlock unlimited households, CSV/Excel export, and advanced analytics.",
                 icon = Icons.Default.Star,
-                gradientColors = listOf(Color(0xFF0F766E), Color(0xFF14B8A6)),
+                gradientColors = listOf(Color(0xFFD97706), Color(0xFFF59E0B)),
                 highlights = listOf(
-                    "Unlimited households & wallets",
-                    "Data export to CSV/Excel & full reports"
+                    "Unlimited voice & camera receipt OCR",
+                    "Multiple households & PDF/CSV export"
                 ),
                 badgeLabel = "5/5: Pro",
-                statusPill = "✓ Fintel Pro"
+                statusPill = "Fintel Pro Exclusive"
             )
         )
     } else {
@@ -166,7 +166,7 @@ fun OnboardingCarouselDialog(
                     "Μηνιαίος προϋπολογισμός ανά κατηγορία"
                 ),
                 badgeLabel = "1/5: Κατηγορίες",
-                statusPill = "✓ Οργάνωση Εξόδων"
+                statusPill = "Οργάνωση Εξόδων"
             ),
             OnboardingStep(
                 stepNumber = 2,
@@ -179,7 +179,7 @@ fun OnboardingCarouselDialog(
                     "Αυτόματος διαμοιρασμός & εκκαθάριση"
                 ),
                 badgeLabel = "2/5: Μέλη",
-                statusPill = "✓ Διαχείριση Μελών"
+                statusPill = "Διαχείριση Μελών"
             ),
             OnboardingStep(
                 stepNumber = 3,
@@ -192,33 +192,33 @@ fun OnboardingCarouselDialog(
                     "Γραφήματα ανά κατηγορία & μέλος"
                 ),
                 badgeLabel = "3/5: Στατιστικά",
-                statusPill = "✓ Έξυπνα Στατιστικά"
+                statusPill = "Έξυπνα Στατιστικά"
             ),
             OnboardingStep(
                 stepNumber = 4,
                 title = "Φωνή & Push Ειδοποιήσεις",
                 subtitle = "Άμεση καταγραφή με τη φωνή σας ή αυτόματη ανάγνωση τραπεζικών push.",
                 icon = Icons.Default.Mic,
-                gradientColors = listOf(Color(0xFFD97706), Color(0xFFF59E0B)),
+                gradientColors = listOf(Color(0xFF059669), Color(0xFF10B981)),
                 highlights = listOf(
-                    "Φωνητική καταγραφή με 1 πάτημα",
+                    "Φωνητική καταγραφή με αναγνώριση ομιλίας",
                     "Αυτόματη σάρωση τραπεζικών ειδοποιήσεων"
                 ),
                 badgeLabel = "4/5: Αυτοματισμός",
-                statusPill = "✓ Αυτόματη Καταγραφή"
+                statusPill = "Αυτοματισμός Καταγραφής"
             ),
             OnboardingStep(
                 stepNumber = 5,
                 title = "Λειτουργία Fintel Pro",
-                subtitle = "Απεριόριστα εξοδολόγια, εξαγωγή δεδομένων και προηγμένες δυνατότητες.",
+                subtitle = "Αποκλειστικά προνόμια Pro: απεριόριστες καταχωρήσεις, πολλαπλά πορτοφόλια & εξαγωγές.",
                 icon = Icons.Default.Star,
-                gradientColors = listOf(Color(0xFF0F766E), Color(0xFF14B8A6)),
+                gradientColors = listOf(Color(0xFFD97706), Color(0xFFF59E0B)),
                 highlights = listOf(
-                    "Απεριόριστα εξοδολόγια & πορτοφόλια",
-                    "Εξαγωγή σε Excel/CSV & αναλυτικές αναφορές"
+                    "Απεριόριστη φωνή & σάρωση αποδείξεων με κάμερα",
+                    "Πολλαπλά εξοδολόγια & εξαγωγή σε PDF/CSV"
                 ),
                 badgeLabel = "5/5: Pro",
-                statusPill = "✓ Fintel Pro"
+                statusPill = "Αποκλειστικά Fintel Pro"
             )
         )
     }

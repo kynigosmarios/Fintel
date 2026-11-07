@@ -886,6 +886,72 @@ object GreekVoiceParser {
      * - Payer: Μάριος
      * - Beneficiaries: [Μάριος, Βασιλική]
      */
+    data class MemberSegmentMatch(
+        val members: List<FamilyMember>,
+        val isAllFamily: Boolean = false,
+        val isKids: Boolean = false,
+        val isParents: Boolean = false,
+        val matchedWords: Set<String> = emptySet()
+    )
+
+    private fun findMembersInSegment(
+        segment: String,
+        allMembers: List<FamilyMember>
+    ): MemberSegmentMatch {
+        val matchedWords = mutableSetOf<String>()
+        val segNorm = segment.lowercase(Locale.ROOT)
+
+        val allFamilyKws = listOf("οικογενεια", "ολοι", "σπιτι", "κοινο", "σπιτιου", "ολο το σπιτι", "παντες", "κοινα", "all", "everyone")
+        for (kw in allFamilyKws) {
+            if (containsWord(segNorm, kw)) {
+                matchedWords.add(kw)
+                return MemberSegmentMatch(allMembers, isAllFamily = true, matchedWords = matchedWords)
+            }
+        }
+
+        val kidsKws = listOf("παιδια", "παιδιων", "στα παιδια", "τα παιδια", "kids", "children")
+        for (kw in kidsKws) {
+            if (containsWord(segNorm, kw)) {
+                matchedWords.add(kw)
+                val kids = allMembers.filter { it.role.equals("Παιδί", ignoreCase = true) }
+                return MemberSegmentMatch(kids.ifEmpty { allMembers }, isKids = true, matchedWords = matchedWords)
+            }
+        }
+
+        val parentsKws = listOf("γονεις", "γονιων", "στους γονεις", "οι γονεις", "parents")
+        for (kw in parentsKws) {
+            if (containsWord(segNorm, kw)) {
+                matchedWords.add(kw)
+                val parents = allMembers.filter { it.role.equals("Γονέας", ignoreCase = true) }
+                return MemberSegmentMatch(parents.ifEmpty { allMembers }, isParents = true, matchedWords = matchedWords)
+            }
+        }
+
+        val matched = mutableListOf<FamilyMember>()
+        for (member in allMembers) {
+            val variations = getMemberNameVariations(member)
+            val foundVariations = variations.filter { containsWord(segNorm, it) }
+            if (foundVariations.isNotEmpty() && !matched.contains(member)) {
+                matched.add(member)
+                matchedWords.addAll(foundVariations)
+            }
+        }
+
+        if (matched.size >= 2) {
+            matchedWords.add("και")
+            matchedWords.add("κι")
+            matchedWords.add("&")
+            matchedWords.add("and")
+        }
+
+        return MemberSegmentMatch(matched, matchedWords = matchedWords)
+    }
+
+    /**
+     * Requirements 6.2 & 6.3:
+     * - 6.2: Understand who paid with prefixes: "πληρώθηκε από", "πλήρωσε ο", "πλήρωσε η", "πλήρωσαν οι", "πλήρωσε", "paid by"
+     * - 6.3: Understand whom the payment concerns with prefixes: "για", "για τον", "για την", "για τους", "αφορά τον", "αφορά την", "αφορά τους"
+     */
     private fun extractPayerAndBeneficiaries(
         cleanedNorm: String,
         allMembers: List<FamilyMember>,
@@ -913,168 +979,186 @@ object GreekVoiceParser {
             return ParsedPayerResult(primaryId, displayName, idsCsv, amountsCsv, list)
         }
 
-        // Magic words for beneficiaries: "για", "αφορα", "αφορουν" (Unicode-safe word boundaries)
-        val beneficiaryPattern = Regex("(?:^|[^\\p{L}\\p{Nd}])(για|αφορα|αφορουν)(?:\\s+(?:τον|την|το|τους|τις|τα|ολη\\s+την|ολο\\s+το))?(?=$|[^\\p{L}\\p{Nd}])", RegexOption.IGNORE_CASE)
-        val match = beneficiaryPattern.find(cleanedNorm)
+        // 6.2 Payer trigger prefixes: "πληρώθηκε από", "πλήρωσε ο", "πλήρωσε η", "πλήρωσαν οι", "πλήρωσε", "paid by"
+        val payerTriggerRegex = Regex("(?:^|[^\\p{L}\\p{Nd}])(πληρωθηκε\\s+απο|πληρωθηκε\\s+απ|πληρωσαν\\s+οι|πληρωσαν|πληρωσε\\s+ο|πληρωσε\\s+η|πληρωσε|paid\\s+by|πληρωμη\\s+απο|εβαλε\\s+ο|εβαλε\\s+η|εβαλε)(?:\\s+(?:τον|την|το|τους|τις|τα|ο|η|οι|των))?(?=$|[^\\p{L}\\p{Nd}])", RegexOption.IGNORE_CASE)
 
-        if (match != null) {
-            val kwGroup = match.groups[1]!!
-            val beforePart = cleanedNorm.substring(0, kwGroup.range.first).trim()
-            val afterPart = cleanedNorm.substring(match.range.last + 1).trim()
+        // 6.3 Beneficiary trigger prefixes: "για", "για τον", "για την", "για τους", "αφορά τον", "αφορά την", "αφορά τους"
+        val beneficiaryTriggerRegex = Regex("(?:^|[^\\p{L}\\p{Nd}])(για\\s+τον|για\\s+την|για\\s+τους|για\\s+το|για\\s+τις|για\\s+τα|για|αφορα\\s+τον|αφορα\\s+την|αφορα\\s+τους|αφορα\\s+το|αφορα\\s+τις|αφορα\\s+τα|αφορα|αφορουν\\s+τους|αφορουν\\s+τις|αφορουν\\s+τα|αφορουν|for\\s+the|for)(?:\\s+(?:τον|την|το|τους|τις|τα|ολη\\s+την|ολο\\s+το))?(?=$|[^\\p{L}\\p{Nd}])", RegexOption.IGNORE_CASE)
 
-            match.value.split(Regex("[^\\p{L}\\p{Nd}]+")).filter { it.isNotBlank() }.forEach { consumedWords.add(it) }
-            consumedWords.add("για")
-            consumedWords.add("αφορα")
-            consumedWords.add("αφορουν")
+        val payerMatch = payerTriggerRegex.find(cleanedNorm)
+        val benMatch = beneficiaryTriggerRegex.find(cleanedNorm)
 
-            // 1. Beneficiaries extracted from afterPart
-            val beneficiaryResult = extractBeneficiariesFromText(afterPart, allMembers, consumedWords)
+        if (payerMatch != null || benMatch != null) {
+            // Consume matched trigger words
+            payerMatch?.value?.split(Regex("[^\\p{L}\\p{Nd}]+"))?.filter { it.isNotBlank() }?.forEach { consumedWords.add(it) }
+            benMatch?.value?.split(Regex("[^\\p{L}\\p{Nd}]+"))?.filter { it.isNotBlank() }?.forEach { consumedWords.add(it) }
+            consumedWords.addAll(listOf("πληρωθηκε", "απο", "πληρωσε", "πληρωσαν", "paid", "by", "για", "αφορα", "αφορουν", "τον", "την", "τους", "τις", "τα", "το", "ο", "η", "οι"))
 
-            // 2. Payers extracted from beforePart (who paid)
             val matchedPayers = mutableListOf<FamilyMember>()
-            for (m in allMembers) {
-                val variations = getMemberNameVariations(m)
-                val found = variations.any { v -> containsWord(beforePart, v) }
-                if (found && !matchedPayers.contains(m)) {
-                    matchedPayers.add(m)
-                    variations.filter { containsWord(beforePart, it) }.forEach { consumedWords.add(it) }
+            var beneficiaryResult: Triple<String, List<FamilyMember>, String>? = null
+
+            if (payerMatch != null && benMatch != null) {
+                if (payerMatch.range.first < benMatch.range.first) {
+                    val payerSeg = cleanedNorm.substring(payerMatch.range.last + 1, benMatch.range.first).trim()
+                    val benSeg = cleanedNorm.substring(benMatch.range.last + 1).trim()
+
+                    val pMatch = findMembersInSegment(payerSeg, allMembers)
+                    matchedPayers.addAll(pMatch.members)
+                    consumedWords.addAll(pMatch.matchedWords)
+
+                    val bMatch = findMembersInSegment(benSeg, allMembers)
+                    consumedWords.addAll(bMatch.matchedWords)
+                    beneficiaryResult = resolveBeneficiaryDisplay(bMatch, allMembers)
+                } else {
+                    val benSeg = cleanedNorm.substring(benMatch.range.last + 1, payerMatch.range.first).trim()
+                    val payerSeg = cleanedNorm.substring(payerMatch.range.last + 1).trim()
+
+                    val bMatch = findMembersInSegment(benSeg, allMembers)
+                    consumedWords.addAll(bMatch.matchedWords)
+                    beneficiaryResult = resolveBeneficiaryDisplay(bMatch, allMembers)
+
+                    val pMatch = findMembersInSegment(payerSeg, allMembers)
+                    matchedPayers.addAll(pMatch.members)
+                    consumedWords.addAll(pMatch.matchedWords)
                 }
+            } else if (payerMatch != null) {
+                // Only payer prefix present
+                val payerSeg = cleanedNorm.substring(payerMatch.range.last + 1).trim()
+                val pMatch = findMembersInSegment(payerSeg, allMembers)
+                matchedPayers.addAll(pMatch.members)
+                consumedWords.addAll(pMatch.matchedWords)
+
+                // If payer segment had no direct names, check whole text before trigger
+                if (matchedPayers.isEmpty()) {
+                    val beforeSeg = cleanedNorm.substring(0, payerMatch.range.first).trim()
+                    val pMatchBefore = findMembersInSegment(beforeSeg, allMembers)
+                    matchedPayers.addAll(pMatchBefore.members)
+                    consumedWords.addAll(pMatchBefore.matchedWords)
+                }
+
+                beneficiaryResult = Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
+            } else if (benMatch != null) {
+                // Only beneficiary prefix present
+                val benSeg = cleanedNorm.substring(benMatch.range.last + 1).trim()
+                val bMatch = findMembersInSegment(benSeg, allMembers)
+                consumedWords.addAll(bMatch.matchedWords)
+                beneficiaryResult = resolveBeneficiaryDisplay(bMatch, allMembers)
+
+                // Payer extracted from before beneficiary trigger
+                val beforePart = cleanedNorm.substring(0, benMatch.range.first).trim()
+                val pMatch = findMembersInSegment(beforePart, allMembers)
+                matchedPayers.addAll(pMatch.members)
+                consumedWords.addAll(pMatch.matchedWords)
             }
 
-            if (matchedPayers.size >= 2) {
-                consumedWords.add("και")
-                consumedWords.add("κι")
-            }
+            val finalPayers = if (matchedPayers.isNotEmpty()) matchedPayers else listOfNotNull(defaultParent)
+            val payerResult = buildPayerResult(finalPayers)
+            val finalBeneficiaries = beneficiaryResult ?: Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
 
-            val payerResult = buildPayerResult(matchedPayers)
-            return Triple(payerResult, beneficiaryResult, consumedWords)
+            return Triple(payerResult, finalBeneficiaries, consumedWords)
         } else {
-            // No "για" / "αφορά" present:
-            // If explicit payer phrase: "πληρωσε ο/η..."
-            var explicitPayer: FamilyMember? = null
+            // Fallback when neither explicit payer nor beneficiary prefix is present
+            val matchedMembers = mutableListOf<FamilyMember>()
             for (m in allMembers) {
                 val variations = getMemberNameVariations(m)
-                for (v in variations) {
-                    if (cleanedNorm.contains("πληρωσε $v") ||
-                        cleanedNorm.contains("πληρωσε ο $v") ||
-                        cleanedNorm.contains("πληρωσε η $v") ||
-                        cleanedNorm.contains("$v πληρωσε") ||
-                        cleanedNorm.contains("πληρωμη απο $v") ||
-                        cleanedNorm.contains("εβαλε ο $v") ||
-                        cleanedNorm.contains("εβαλε η $v") ||
-                        cleanedNorm.contains("εβαλε $v")
-                    ) {
-                        explicitPayer = m
-                        consumedWords.add(v)
-                        consumedWords.add("πληρωσε")
-                        consumedWords.add("εβαλε")
-                        consumedWords.add("πληρωμη")
-                        break
-                    }
-                }
-                if (explicitPayer != null) break
-            }
-
-            val matchedPayers = mutableListOf<FamilyMember>()
-            if (explicitPayer != null) {
-                matchedPayers.add(explicitPayer)
-            } else {
-                for (m in allMembers) {
-                    val variations = getMemberNameVariations(m)
-                    if (variations.any { containsWord(cleanedNorm, it) } && !matchedPayers.contains(m)) {
-                        matchedPayers.add(m)
-                        variations.filter { containsWord(cleanedNorm, it) }.forEach { consumedWords.add(it) }
-                    }
+                if (variations.any { containsWord(cleanedNorm, it) } && !matchedMembers.contains(m)) {
+                    matchedMembers.add(m)
+                    variations.filter { containsWord(cleanedNorm, it) }.forEach { consumedWords.add(it) }
                 }
             }
 
-            if (matchedPayers.size >= 2) {
+            if (matchedMembers.size >= 2) {
                 consumedWords.add("και")
                 consumedWords.add("κι")
             }
 
-            val payerResult = buildPayerResult(matchedPayers)
-            val beneficiaryResult = if (matchedPayers.isEmpty()) {
-                Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
-            } else if (matchedPayers.size == allMembers.size) {
+            val payerResult = buildPayerResult(matchedMembers)
+            val beneficiaryResult = if (matchedMembers.isEmpty() || matchedMembers.size == allMembers.size) {
                 Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
             } else {
-                val display = if (matchedPayers.size >= 2) {
-                    val firstRolePlural = Localization.pluralRoleName(matchedPayers.first().role, Localization.Language.GREEK)
-                    val allSame = matchedPayers.all {
+                val display = if (matchedMembers.size >= 2) {
+                    val firstRolePlural = Localization.pluralRoleName(matchedMembers.first().role, Localization.Language.GREEK)
+                    val allSame = matchedMembers.all {
                         Localization.pluralRoleName(it.role, Localization.Language.GREEK).equals(firstRolePlural, ignoreCase = true)
                     }
-                    if (allSame) firstRolePlural else matchedPayers.joinToString(" & ") { it.name }
+                    if (allSame) firstRolePlural else matchedMembers.joinToString(" & ") { it.name }
                 } else {
-                    matchedPayers.first().name
+                    matchedMembers.first().name
                 }
-                Triple("SPECIFIC_MEMBERS", matchedPayers, display)
+                Triple("SPECIFIC_MEMBERS", matchedMembers, display)
             }
 
             return Triple(payerResult, beneficiaryResult, consumedWords)
         }
     }
 
-    private fun extractBeneficiariesFromText(
-        text: String,
-        allMembers: List<FamilyMember>,
-        consumedWords: MutableSet<String>
+    private fun resolveBeneficiaryDisplay(
+        match: MemberSegmentMatch,
+        allMembers: List<FamilyMember>
     ): Triple<String, List<FamilyMember>, String> {
-        val allFamilyKeywords = listOf(
-            "οικογενεια", "ολοι", "σπιτι", "κοινο", "σπιτιου", "ολο το σπιτι", "παντες", "κοινα"
-        )
-        for (kw in allFamilyKeywords) {
-            if (containsWord(text, kw)) {
-                consumedWords.add(kw)
-                return Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
-            }
+        if (match.isAllFamily) {
+            return Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
         }
-
-        val kidsKeywords = listOf("παιδια", "παιδιων", "στα παιδια", "τα παιδια")
-        for (kw in kidsKeywords) {
-            if (containsWord(text, kw)) {
-                consumedWords.add(kw)
-                val kids = allMembers.filter { it.role.equals("Παιδί", ignoreCase = true) }
-                if (kids.isNotEmpty()) {
-                    val display = if (kids.size >= 2) "Παιδιά" else kids.first().name
-                    return Triple("SPECIFIC_MEMBERS", kids, display)
-                }
-            }
+        if (match.isKids) {
+            val kids = allMembers.filter { it.role.equals("Παιδί", ignoreCase = true) }
+            val display = if (kids.size >= 2) "Παιδιά" else kids.firstOrNull()?.name ?: "Παιδιά"
+            return Triple("SPECIFIC_MEMBERS", kids.ifEmpty { allMembers }, display)
         }
-
-        val parentsKeywords = listOf("γονεις", "γονιων", "στους γονεις", "οι γονεις")
-        for (kw in parentsKeywords) {
-            if (containsWord(text, kw)) {
-                consumedWords.add(kw)
-                val parents = allMembers.filter { it.role.equals("Γονέας", ignoreCase = true) }
-                if (parents.isNotEmpty()) {
-                    val display = if (parents.size >= 2) "Γονείς" else parents.first().name
-                    return Triple("SPECIFIC_MEMBERS", parents, display)
-                }
-            }
+        if (match.isParents) {
+            val parents = allMembers.filter { it.role.equals("Γονέας", ignoreCase = true) }
+            val display = if (parents.size >= 2) "Γονείς" else parents.firstOrNull()?.name ?: "Γονείς"
+            return Triple("SPECIFIC_MEMBERS", parents.ifEmpty { allMembers }, display)
         }
-
-        // Match individual members by name variations
-        val matchedMembers = mutableListOf<FamilyMember>()
-        for (member in allMembers) {
-            val variations = getMemberNameVariations(member)
-            val found = variations.any { v -> containsWord(text, v) }
-            if (found && !matchedMembers.contains(member)) {
-                matchedMembers.add(member)
-                variations.filter { containsWord(text, it) }.forEach { consumedWords.add(it) }
-            }
-        }
-
-        if (matchedMembers.isNotEmpty()) {
-            val display = if (matchedMembers.size >= 2) {
-                matchedMembers.joinToString(" & ") { it.name }
+        if (match.members.isNotEmpty()) {
+            val display = if (match.members.size >= 2) {
+                match.members.joinToString(" & ") { it.name }
             } else {
-                matchedMembers.first().name
+                match.members.first().name
             }
-            return Triple("SPECIFIC_MEMBERS", matchedMembers, display)
+            return Triple("SPECIFIC_MEMBERS", match.members, display)
+        }
+        return Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
+    }
+
+    /**
+     * Requirement 6.1: Helper to strip any word from a candidate title that matches any word
+     * from the category name or the category's voice keywords.
+     */
+    fun stripCategoryWords(text: String, cat: ExpenseCategory): String {
+        val normCat = normalizeGreek(cat.name).replace('ς', 'σ')
+        val wordsToStrip = normCat.split(Regex("[^\\p{L}\\p{Nd}]+"))
+            .map { it.trim() }
+            .filter { it.length >= 2 }
+            .toMutableSet()
+
+        // Add singular/plural inflections for Category Name words
+        val inflections = mutableSetOf<String>()
+        for (w in wordsToStrip) {
+            if (w.endsWith("εσ")) inflections.add(w.dropLast(2) + "η") // καφεδεσ -> καφε
+            if (w.endsWith("η")) inflections.add(w + "σ")
+            if (w.endsWith("ο")) inflections.add(w + "σ")
+            if (w.endsWith("α")) inflections.add(w + "τα")
+            if (w.endsWith("ια")) inflections.add(w.dropLast(2) + "ι")
+        }
+        wordsToStrip.addAll(inflections)
+
+        val rawTokens = text.split(Regex("\\s+"))
+        val remainingTokens = rawTokens.filter { rawToken ->
+            val clean = normalizeGreek(rawToken.replace(Regex("[^\\p{L}\\p{Nd}]"), "")).replace('ς', 'σ')
+            clean.isBlank() || !wordsToStrip.contains(clean)
         }
 
-        return Triple("ALL_FAMILY", allMembers, "Κοινό Οικογένειας")
+        val result = remainingTokens.joinToString(" ").trim()
+        val normResult = normalizeGreek(result).replace('ς', 'σ')
+        return if (result.equals(cat.name, ignoreCase = true) || normResult == normCat || normResult.isBlank()) {
+            if (normalizeGreek(text).replace('ς', 'σ') != normCat && text.isNotBlank()) {
+                text.trim()
+            } else {
+                ""
+            }
+        } else {
+            result
+        }
     }
 
     private fun extractCategoryAndTitleDetailed(
@@ -1183,24 +1267,29 @@ object GreekVoiceParser {
                 voiceKeywords = ""
             )
 
-        // Requirement 4: Extract leftover words from originalPrompt as "Περιγραφή" (Description)
+        // If detectedTitle was matched from specificTitles, keep it unless it literally matches the category name
+        if (detectedTitle != null) {
+            val stripped = stripCategoryWords(detectedTitle, category)
+            detectedTitle = stripped.ifBlank { detectedTitle }
+        }
+
+        // Extract leftover words from originalPrompt as "Περιγραφή" (Description)
         val rawTokens = originalPrompt.trim().split(Regex("[\\s,;!?]+")).filter { it.isNotBlank() }
 
         val ignoredWords = mutableSetOf<String>()
         ignoredWords.addAll(consumedAmountWords.map { normalizeGreek(it) })
         ignoredWords.addAll(consumedMemberWords.map { normalizeGreek(it) })
-        if (matchedCategoryWord != null) {
-            matchedCategoryWord.split(Regex("\\s+")).forEach { ignoredWords.add(normalizeGreek(it)) }
-        }
+
+        // Only ignore words that are literally part of the Category NAME itself (e.g. "σουπερ", "μαρκετ")
         val catNameNorm = normalizeGreek(category.name)
-        catNameNorm.split(Regex("\\s+")).forEach { ignoredWords.add(it) }
+        catNameNorm.split(Regex("[^\\p{L}\\p{Nd}]+")).filter { it.isNotBlank() }.forEach { ignoredWords.add(it) }
 
         // Standard structural words to ignore in description
         val systemWords = setOf(
-            "ευρω", "ευρα", "λεπτα", "λεπτο", "cent", "cents", "και", "κι",
+            "ευρω", "ευρα", "λεπτα", "λεπτο", "cent", "cents",
             "για", "αφορα", "αφορουν", "τον", "την", "το", "τους", "τις", "τα",
             "στο", "στον", "στην", "στα", "στους", "στις", "σε", "απο", "του", "της", "των",
-            "ο", "η", "πληρωσε", "εβαλε", "πληρωμη", "χρεωση",
+            "ο", "η", "οι", "πληρωσε", "εβαλε", "πληρωμη", "χρεωση", "πληρωσαν", "πληρωθηκε", "paid", "by",
             "καταχωρησε", "βαλε", "γραψε", "σημειωσε", "περασε", "προσθεσε", "εξοδο", "εξοδα", "νεο",
             "σημερα", "χθες", "χτες", "προχθες", "προχτες"
         )
@@ -1247,7 +1336,12 @@ object GreekVoiceParser {
         val customDescription = if (leftoverTokens.isNotEmpty()) {
             val joined = leftoverTokens.joinToString(" ").trim()
             if (joined.length >= 2) {
-                joined.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                val cleanedJoined = stripCategoryWords(joined, category)
+                if (cleanedJoined.isNotBlank()) {
+                    cleanedJoined.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                } else {
+                    joined.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                }
             } else {
                 null
             }
@@ -1255,9 +1349,22 @@ object GreekVoiceParser {
             null
         }
 
-        val finalTitle = customDescription
-            ?: detectedTitle
-            ?: category.name
+        // Fallback: If no leftover tokens were found, check if a specific keyword was matched (and not the category name)
+        val matchedKeywordFallback = if (customDescription.isNullOrBlank() && !matchedCategoryWord.isNullOrBlank()) {
+            val normKw = normalizeGreek(matchedCategoryWord).replace('ς', 'σ')
+            if (normKw != catNameNorm.replace('ς', 'σ') && !catNameNorm.contains(normKw)) {
+                matchedCategoryWord.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+            } else null
+        } else null
+
+        val rawTitle = customDescription ?: detectedTitle ?: matchedKeywordFallback ?: ""
+        val finalTitle = if (rawTitle.isNotBlank()) {
+            if (rawTitle.equals(category.name, ignoreCase = true) || normalizeGreek(rawTitle).replace('ς', 'σ') == catNameNorm.replace('ς', 'σ')) {
+                ""
+            } else {
+                rawTitle
+            }
+        } else ""
 
         return Pair(category, finalTitle)
     }

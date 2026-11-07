@@ -40,8 +40,8 @@ class BankNotificationListenerService : NotificationListenerService() {
 
             if (parsed != null) {
                 Log.d("BankNotification", "Caught bank transaction: ${parsed.bankName} - ${parsed.merchantName} - ${parsed.amount}€")
-                // Add to in-app holder
-                BankNotificationHolder.addTransaction(parsed)
+                // Add to in-app holder with persistence
+                BankNotificationHolder.addTransaction(parsed, this)
                 // Also show in Android system notification
                 BankNotificationSystemManager.showNotification(this, parsed)
             }

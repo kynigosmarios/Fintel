@@ -124,12 +124,33 @@ fun VoiceInputDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = Localization.voiceLoggingTitle(lang),
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = Localization.voiceLoggingTitle(lang),
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        if (isPro) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFF59E0B).copy(alpha = 0.16f),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = "Pro",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFFD97706),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
 
                     IconButton(
                         onClick = {
@@ -145,24 +166,7 @@ fun VoiceInputDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (isPro) Color(0xFFF59E0B).copy(alpha = 0.14f) else Emerald700.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, if (isPro) Color(0xFFF59E0B).copy(alpha = 0.4f) else Emerald700.copy(alpha = 0.3f))
-                ) {
-                    Text(
-                        text = if (isPro) (if (lang == Localization.Language.ENGLISH) "⭐ Fintel Pro: Unlimited Voice Entries" else "⭐ Fintel Pro: Απεριόριστες Καταχωρήσεις")
-                        else (if (lang == Localization.Language.ENGLISH) "Free Quota: ${(15 - monthlyUsage).coerceAtLeast(0)}/15 left this month" else "Δωρεάν: ${(15 - monthlyUsage).coerceAtLeast(0)}/15 απομένουν αυτόν τον μήνα"),
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isPro) Color(0xFFB45309) else Emerald700,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Pulsing Mic Animation
                 Box(
@@ -222,16 +226,6 @@ fun VoiceInputDialog(
                     fontSize = 16.sp,
                     color = if (isListening) Emerald700 else MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    text = if (lang == Localization.Language.ENGLISH) "Once you stop speaking, the expense will appear automatically." else "Μόλις σταματήσετε να μιλάτε, το έξοδο θα εμφανιστεί αυτόματα.",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 16.sp
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))

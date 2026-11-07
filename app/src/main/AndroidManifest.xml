@@ -112,7 +112,7 @@
         <!-- FileProvider for sharing real Excel and PDF files -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="com.kynigos.oikonomos.fileprovider"
+            android:authorities="${applicationId}.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data

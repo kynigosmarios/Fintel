@@ -87,12 +87,13 @@ class ExampleUnitTest {
         )
 
         // Case: "Έξι ευρώ καφέδες Μάριος για Μάριο και Βασιλική"
+        // Rule 6.1: "καφέδες" is the category name, so it is NOT added to title/description!
         val p1 = parser.parse("Έξι ευρώ καφέδες Μάριος για Μάριο και Βασιλική", categories, members)
         assertEquals(6.0, p1.amount, 0.01)
         assertEquals(1L, p1.payerMemberId)
         assertEquals("Μάριος", p1.payerMemberName)
         assertEquals(2, p1.memberIds.size)
-        assertEquals("Καφέδες", p1.title)
+        assertEquals("", p1.title)
 
         // Case: "Δεκατέσσερα ευρώ, πληκτρολόγιο, gadgets, Μάριος Για Βασιλική"
         val p2 = parser.parse("Δεκατέσσερα ευρώ, πληκτρολόγιο, gadgets, Μάριος Για Βασιλική", categories, members)
@@ -117,6 +118,190 @@ class ExampleUnitTest {
         assertEquals("1,2", pUser.payerMemberIdsCsv)
         assertEquals(listOf(1L, 2L), pUser.memberIds)
         assertEquals("Μάριος & Βασιλική", pUser.memberNamesDisplay)
+    }
+
+    @Test
+    fun testRequirement61CategoryWordOmittedFromDescription() {
+        val parser = com.example.util.GreekVoiceParser
+        val categories = listOf(
+            com.example.data.entity.ExpenseCategory(id = 1, name = "Καφέδες", voiceKeywords = "καφέδες, καφές"),
+            com.example.data.entity.ExpenseCategory(id = 2, name = "Σούπερ μάρκετ", voiceKeywords = "σούπερ μάρκετ, σουπερ μαρκετ"),
+            com.example.data.entity.ExpenseCategory(id = 3, name = "Ρεύμα", voiceKeywords = "ρεύμα, ρευμα, δεη")
+        )
+        val members = listOf(
+            com.example.data.entity.FamilyMember(id = 1, name = "Μάριος", role = "Γονέας")
+        )
+
+        // Only category word spoken -> description field MUST be empty
+        val resCoffee = parser.parse("15 ευρώ καφέδες", categories, members)
+        assertEquals(1L, resCoffee.categoryId)
+        assertEquals("", resCoffee.title)
+
+        val resMarket = parser.parse("45 ευρώ σούπερ μάρκετ", categories, members)
+        assertEquals(2L, resMarket.categoryId)
+        assertEquals("", resMarket.title)
+
+        val resPower = parser.parse("60 ευρώ ρεύμα", categories, members)
+        assertEquals(3L, resPower.categoryId)
+        assertEquals("", resPower.title)
+
+        // Category word with custom description -> category word stripped, custom description kept
+        val resCoffeeCustom = parser.parse("12 ευρώ καφέδες starbucks", categories, members)
+        assertEquals(1L, resCoffeeCustom.categoryId)
+        assertEquals("Starbucks", resCoffeeCustom.title)
+    }
+
+    @Test
+    fun testRequirement62PayerPrefixes() {
+        val parser = com.example.util.GreekVoiceParser
+        val categories = listOf(
+            com.example.data.entity.ExpenseCategory(id = 1, name = "Σούπερ μάρκετ", voiceKeywords = "σούπερ μάρκετ")
+        )
+        val members = listOf(
+            com.example.data.entity.FamilyMember(id = 1, name = "Μάριος", role = "Γονέας"),
+            com.example.data.entity.FamilyMember(id = 2, name = "Βασιλική", role = "Γονέας")
+        )
+
+        // 1. "πληρώθηκε από"
+        val r1 = parser.parse("30 ευρώ σούπερ μάρκετ πληρώθηκε από τη Βασιλική", categories, members)
+        assertEquals(2L, r1.payerMemberId)
+        assertEquals("Βασιλική", r1.payerMemberName)
+
+        // 2. "πλήρωσε ο"
+        val r2 = parser.parse("50 ευρώ σούπερ μάρκετ πλήρωσε ο Μάριος", categories, members)
+        assertEquals(1L, r2.payerMemberId)
+        assertEquals("Μάριος", r2.payerMemberName)
+
+        // 3. "πλήρωσε η"
+        val r3 = parser.parse("25 ευρώ σούπερ μάρκετ πλήρωσε η Βασιλική", categories, members)
+        assertEquals(2L, r3.payerMemberId)
+        assertEquals("Βασιλική", r3.payerMemberName)
+
+        // 4. "πλήρωσαν οι"
+        val r4 = parser.parse("100 ευρώ σούπερ μάρκετ πλήρωσαν οι Μάριος και Βασιλική", categories, members)
+        assertEquals("Μάριος & Βασιλική", r4.payerMemberName)
+
+        // 5. "paid by"
+        val r5 = parser.parse("40 euros paid by Marios", categories, members)
+        assertEquals(1L, r5.payerMemberId)
+        assertEquals("Μάριος", r5.payerMemberName)
+    }
+
+    @Test
+    fun testRequirement63BeneficiaryPrefixes() {
+        val parser = com.example.util.GreekVoiceParser
+        val categories = listOf(
+            com.example.data.entity.ExpenseCategory(id = 1, name = "Δραστηριότητες", voiceKeywords = "δραστηριότητες")
+        )
+        val members = listOf(
+            com.example.data.entity.FamilyMember(id = 1, name = "Μάριος", role = "Γονέας"),
+            com.example.data.entity.FamilyMember(id = 2, name = "Βασιλική", role = "Γονέας"),
+            com.example.data.entity.FamilyMember(id = 3, name = "Μελίνα", role = "Παιδί")
+        )
+
+        // 1. "για"
+        val r1 = parser.parse("20 ευρώ δραστηριότητες για Μελίνα", categories, members)
+        assertEquals(listOf(3L), r1.memberIds)
+        assertEquals("Μελίνα", r1.memberNamesDisplay)
+
+        // 2. "για τον"
+        val r2 = parser.parse("35 ευρώ δραστηριότητες για τον Μάριο", categories, members)
+        assertEquals(listOf(1L), r2.memberIds)
+        assertEquals("Μάριος", r2.memberNamesDisplay)
+
+        // 3. "για την"
+        val r3 = parser.parse("40 ευρώ δραστηριότητες για την Βασιλική", categories, members)
+        assertEquals(listOf(2L), r3.memberIds)
+        assertEquals("Βασιλική", r3.memberNamesDisplay)
+
+        // 4. "για τους"
+        val r4 = parser.parse("50 ευρώ δραστηριότητες για τους Μάριο και Βασιλική", categories, members)
+        assertEquals(listOf(1L, 2L), r4.memberIds)
+        assertEquals("Μάριος & Βασιλική", r4.memberNamesDisplay)
+
+        // 5. "αφορά τον"
+        val r5 = parser.parse("25 ευρώ δραστηριότητες αφορά τον Μάριο", categories, members)
+        assertEquals(listOf(1L), r5.memberIds)
+        assertEquals("Μάριος", r5.memberNamesDisplay)
+
+        // 6. "αφορά την"
+        val r6 = parser.parse("30 ευρώ δραστηριότητες αφορά την Βασιλική", categories, members)
+        assertEquals(listOf(2L), r6.memberIds)
+        assertEquals("Βασιλική", r6.memberNamesDisplay)
+
+        // 7. "αφορά τους"
+        val r7 = parser.parse("60 ευρώ δραστηριότητες αφορά τους Μάριο και Βασιλική", categories, members)
+        assertEquals(listOf(1L, 2L), r7.memberIds)
+        assertEquals("Μάριος & Βασιλική", r7.memberNamesDisplay)
+    }
+
+    @Test
+    fun testRequirement3BalanceIgnoredInBankNotifications() {
+        val parser = com.example.util.BankNotificationParser
+
+        // Push notification with "υπόλοιπο" after transaction
+        val tx1 = parser.parse(
+            packageName = "gr.eurobank.mobile",
+            title = "Eurobank",
+            text = "Αγορά 15.00€ στο LIDL. Νέο υπόλοιπο: 250.00€"
+        )
+        org.junit.Assert.assertNotNull(tx1)
+        assertEquals(15.00, tx1!!.amount, 0.01)
+
+        // Push notification with "Υπόλοιπο" capitalized
+        val tx2 = parser.parse(
+            packageName = "gr.winbank.mobile",
+            title = "winbank",
+            text = "Εγκρίθηκε συναλλαγή 34,50€ στο IKEA. Υπόλοιπο λογαριασμού 890,20€"
+        )
+        org.junit.Assert.assertNotNull(tx2)
+        assertEquals(34.50, tx2!!.amount, 0.01)
+
+        // Push notification with "balance"
+        val tx3 = parser.parse(
+            packageName = "com.revolut.revolut",
+            title = "Revolut",
+            text = "You paid €18.20 at Shell. Balance: €450.00"
+        )
+        org.junit.Assert.assertNotNull(tx3)
+        assertEquals(18.20, tx3!!.amount, 0.01)
+
+        // Notification that ONLY contains balance inquiry -> NOT an expense!
+        val txBalanceOnly = parser.parse(
+            packageName = "gr.alphabank.mobilebanking",
+            title = "Alpha Bank",
+            text = "Το διαθέσιμο υπόλοιπο της κάρτας σας είναι 350.00 EUR"
+        )
+        org.junit.Assert.assertNull(txBalanceOnly)
+    }
+
+    @Test
+    fun testRequirement5BankNotificationCategorization() {
+        val parser = com.example.util.BankNotificationParser
+        val categories = listOf(
+            com.example.data.entity.ExpenseCategory(id = 10, name = "Σούπερ μάρκετ", voiceKeywords = "σούπερ μάρκετ"),
+            com.example.data.entity.ExpenseCategory(id = 20, name = "Έξοδα σπιτιού", voiceKeywords = "έπιπλα, σπίτι"),
+            com.example.data.entity.ExpenseCategory(id = 30, name = "Μετακινήσεις & Καύσιμα", voiceKeywords = "βενζίνη, καύσιμα")
+        )
+
+        // IKEA -> should categorize to "Έξοδα σπιτιού"
+        val catIkea = parser.categorizeMerchant("IKEA", "Αγορά 80.00€ στο IKEA", categories)
+        org.junit.Assert.assertNotNull(catIkea)
+        assertEquals(20L, catIkea!!.id)
+
+        // Lidl -> should categorize to "Σούπερ μάρκετ"
+        val catLidl = parser.categorizeMerchant("LIDL", "Αγορά 25.00€ στο κατάστημα LIDL", categories)
+        org.junit.Assert.assertNotNull(catLidl)
+        assertEquals(10L, catLidl!!.id)
+
+        // Shell -> should categorize to "Μετακινήσεις & Καύσιμα"
+        val catShell = parser.categorizeMerchant("Shell", "Πληρωμή 40.00€ Shell", categories)
+        org.junit.Assert.assertNotNull(catShell)
+        assertEquals(30L, catShell!!.id)
+
+        // Unknown merchant that cannot be categorized -> returns null!
+        val catUnknown = parser.categorizeMerchant("XYZ Unknown", "Συναλλαγή 15.00€", categories)
+        org.junit.Assert.assertNull(catUnknown)
     }
 
     @Test
@@ -301,5 +486,51 @@ class ExampleUnitTest {
         assertEquals(4.80, revolutTx!!.amount, 0.01)
         assertEquals("Coffee Island", revolutTx.merchantName)
         assertEquals("Revolut", revolutTx.bankName)
+
+        // Incoming funds should NOT be parsed as expenses
+        val incomingRevolut = parser.parse(
+            packageName = "com.revolut.revolut",
+            title = "Revolut",
+            text = "You received 50.00 € from John"
+        )
+        org.junit.Assert.assertNull(incomingRevolut)
+
+        val incomingEurobank = parser.parse(
+            packageName = "gr.eurobank.mobile",
+            title = "Eurobank",
+            text = "Λάβατε μεταφορά 120,00€ από ΓΕΩΡΓΙΟΣ"
+        )
+        org.junit.Assert.assertNull(incomingEurobank)
+    }
+
+    @Test
+    fun testVoiceInputKeywordDescriptionPreserved() {
+        val parser = com.example.util.GreekVoiceParser
+        val categories = listOf(
+            com.example.data.entity.ExpenseCategory(
+                id = 1,
+                name = "Σούπερ μάρκετ",
+                voiceKeywords = "σουπερ μαρκετ, κρεοπωλείο, κρεοπωλειο, μαναβικο, σκλαβενιτης, lidl"
+            ),
+            com.example.data.entity.ExpenseCategory(
+                id = 2,
+                name = "Φαγητό έξω",
+                voiceKeywords = "φαγητο, ταβερνα, εστιατοριο"
+            )
+        )
+        val members = listOf(
+            com.example.data.entity.FamilyMember(id = 1, name = "Μάριος", role = "Γονέας")
+        )
+
+        // "43 ευρώ κρεοπωλείο"
+        val parsed = parser.parse("43 ευρώ κρεοπωλείο", categories, members)
+        assertEquals(43.0, parsed.amount, 0.01)
+        assertEquals(1L, parsed.categoryId)
+        assertTrue("Expected title to contain 'Κρεοπωλείο', got: '${parsed.title}'", parsed.title.contains("κρεοπωλείο", ignoreCase = true))
+
+        // "25 ευρώ lidl"
+        val parsedLidl = parser.parse("25 ευρώ lidl", categories, members)
+        assertEquals(25.0, parsedLidl.amount, 0.01)
+        assertTrue("Expected title to contain 'Lidl', got: '${parsedLidl.title}'", parsedLidl.title.contains("lidl", ignoreCase = true))
     }
 }

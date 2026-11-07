@@ -79,6 +79,8 @@ class SpeechRecognitionHelper(
     private val appContext: Context = context.applicationContext
     private val mainHandler = Handler(Looper.getMainLooper())
     private var speechRecognizer: SpeechRecognizer? = null
+    private var isStarting = false
+    private var timeoutRunnable: Runnable? = null
 
     fun isRecognitionAvailable(): Boolean {
         return try {
@@ -89,9 +91,21 @@ class SpeechRecognitionHelper(
         }
     }
 
+    private fun removeWatchdog() {
+        timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        timeoutRunnable = null
+    }
+
     fun startListening() {
-        stopListening()
+        // Prevent concurrent or overlapping starts
+        if (isStarting) return
+        isStarting = true
+
+        // Always cleanly destroy any previous instance before allocating a new one
+        cancelListening()
+
         if (!isRecognitionAvailable()) {
+            isStarting = false
             mainHandler.post {
                 onListeningStateChanged(false)
                 onError("Η φωνητική αναγνώριση δεν είναι διαθέσιμη σε αυτή τη συσκευή. Μπορείτε να πληκτρολογήσετε ή να επιλέξετε ένα έτοιμο παράδειγμα!")
@@ -102,8 +116,17 @@ class SpeechRecognitionHelper(
         try {
             val recognizer = SpeechRecognizer.createSpeechRecognizer(appContext)
             speechRecognizer = recognizer
+
+            // Safety watchdog: auto-stop after 15 seconds of inactivity so it never hangs indefinitely
+            timeoutRunnable = Runnable {
+                Log.d(TAG, "SpeechRecognizer watchdog triggered after 15s")
+                stopListening()
+            }
+            mainHandler.postDelayed(timeoutRunnable!!, 15000L)
+
             recognizer.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
+                    isStarting = false
                     mainHandler.post { onListeningStateChanged(true) }
                 }
 
@@ -116,10 +139,12 @@ class SpeechRecognitionHelper(
                 override fun onBufferReceived(buffer: ByteArray?) {}
 
                 override fun onEndOfSpeech() {
+                    removeWatchdog()
                     mainHandler.post { onListeningStateChanged(false) }
                 }
 
                 override fun onError(error: Int) {
+                    removeWatchdog()
                     val message = when (error) {
                         SpeechRecognizer.ERROR_NO_MATCH -> "Δεν αναγνωρίστηκε ομιλία. Δοκιμάστε ξανά."
                         SpeechRecognizer.ERROR_NETWORK -> "Σφάλμα σύνδεσης δικτύου κατά τη φωνητική αναγνώριση."
@@ -127,6 +152,8 @@ class SpeechRecognitionHelper(
                         SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Δεν ακούστηκε ομιλία."
                         else -> "Σφάλμα φωνητικής αναγνώρισης ($error)"
                     }
+                    // Cleanly destroy recognizer on error to avoid leaked audio buffers
+                    cancelListening()
                     mainHandler.post {
                         onListeningStateChanged(false)
                         onError(message)
@@ -134,8 +161,11 @@ class SpeechRecognitionHelper(
                 }
 
                 override fun onResults(results: Bundle?) {
+                    removeWatchdog()
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull()?.trim().orEmpty()
+                    // Cleanly release recognizer once results are obtained
+                    cancelListening()
                     mainHandler.post {
                         onListeningStateChanged(false)
                         if (text.isNotBlank()) {
@@ -162,7 +192,10 @@ class SpeechRecognitionHelper(
             }
             recognizer.startListening(intent)
         } catch (t: Throwable) {
+            isStarting = false
+            removeWatchdog()
             Log.e(TAG, "Failed to start speech recognition", t)
+            cancelListening()
             mainHandler.post {
                 onListeningStateChanged(false)
                 onError("Η φωνητική αναγνώριση δεν μπόρεσε να ξεκινήσει (${t.localizedMessage ?: "μη διαθέσιμη"}).")
@@ -171,6 +204,8 @@ class SpeechRecognitionHelper(
     }
 
     fun stopListening() {
+        removeWatchdog()
+        isStarting = false
         try {
             speechRecognizer?.stopListening()
             mainHandler.post { onListeningStateChanged(false) }
@@ -181,6 +216,8 @@ class SpeechRecognitionHelper(
     }
 
     fun cancelListening() {
+        removeWatchdog()
+        isStarting = false
         try {
             speechRecognizer?.cancel()
             speechRecognizer?.destroy()

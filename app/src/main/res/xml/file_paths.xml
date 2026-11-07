@@ -2,5 +2,8 @@
 <paths>
     <cache-path
         name="export_cache"
-        path="exports/"/>
+        path="."/>
+    <files-path
+        name="export_files"
+        path="."/>
 </paths>

@@ -24,23 +24,20 @@ service cloud.firestore {
       }
     }
 
-    // 2. Shared Household Database (Multi-user sync)
+    // 2. Shared Household Database (Single-User & Member Isolated)
     match /households/{householdId} {
-      // Any authenticated user can create a household
       allow create: if isAuthenticated();
-
-      // Authenticated users can read households (for discovery, invites and multi-exodologio listing)
-      allow read: if isAuthenticated();
-
-      // Update allowed for authenticated users (owner, members, and invited users joining via memberUids)
-      allow update: if isAuthenticated();
-
-      // Delete allowed for authenticated users
-      allow delete: if isAuthenticated();
-
-      // Household subcollections (shared expenses, incomes, members, categories, savings_goals, recurring_expenses, sync)
+      allow read, update, delete: if isAuthenticated() && (
+        resource == null ||
+        resource.data.ownerId == request.auth.uid ||
+        request.auth.uid in resource.data.get('memberUids', [])
+      );
       match /{document=**} {
-        allow read, write: if isAuthenticated();
+        allow read, write: if isAuthenticated() && (
+          !exists(/databases/$(database)/documents/households/$(householdId)) ||
+          get(/databases/$(database)/documents/households/$(householdId)).data.ownerId == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/households/$(householdId)).data.get('memberUids', [])
+        );
       }
     }
 

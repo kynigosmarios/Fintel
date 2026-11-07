@@ -322,7 +322,7 @@ fun BurgerMenuDrawer(
                     if (onOpenGuide != null) {
                         Spacer(modifier = Modifier.height(6.dp))
                         BurgerNavigationItem(
-                            title = if (lang == Localization.Language.ENGLISH) "Instructions" else "Οδηγίες",
+                            title = if (lang == Localization.Language.ENGLISH) "Getting Started" else "Πρώτα βήματα",
                             icon = Icons.Default.Info,
                             iconTint = if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706),
                             iconBg = (if (isDark) Color(0xFFFBBF24) else Color(0xFFD97706)).copy(alpha = if (isDark) 0.20f else 0.12f),

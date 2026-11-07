@@ -37,6 +37,11 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FamilyRestroom
+import android.app.DatePickerDialog
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -62,7 +67,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import com.example.util.ExpenseReportExporter
+import java.util.Calendar
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import java.text.SimpleDateFormat
@@ -239,11 +247,15 @@ fun AnalyticsScreen(
     categories: List<ExpenseCategory>,
     members: List<FamilyMember>,
     appLanguage: String = "EN",
+    isPro: Boolean = false,
+    onShowPremiumPaywall: (String) -> Unit = {},
     onExportReport: () -> Unit = {},
     onManageCategories: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
+    val isGreek = lang != Localization.Language.ENGLISH
+    val context = LocalContext.current
     var splitMode by remember { mutableIntStateOf(0) } // 0 = Ατομικά, 1 = Γονείς + Κοινά, 2 = Ισόποσα σε όλους
     var chartTypeFamily by remember { mutableIntStateOf(0) } // 0 = Μπάρες, 1 = Πίτα (Requirement 6)
     var chartTypeMembers by remember { mutableIntStateOf(0) } // 0 = Μπάρες, 1 = Πίτα (Requirement 6)
@@ -2544,6 +2556,462 @@ fun AnalyticsScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Data Export Card (Requirement 5)
+        item {
+            var exportPeriodIndex by remember { mutableIntStateOf(0) } // 0 = Τρέχων Μήνας, 1 = Προηγούμενος, 2 = Διάστημα, 3 = Όλα
+            var exportRangeStart by remember {
+                val cal = Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_MONTH, -30)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                mutableLongStateOf(cal.timeInMillis)
+            }
+            var exportRangeEnd by remember {
+                val cal = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+                mutableLongStateOf(cal.timeInMillis)
+            }
+            var selectedExportCategoryId by remember { mutableStateOf<Long?>(null) }
+            var selectedExportMemberId by remember { mutableStateOf<Long?>(null) }
+            var showCategoryDropdown by remember { mutableStateOf(false) }
+            var showMemberDropdown by remember { mutableStateOf(false) }
+
+            val dateSdf = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+
+            // Filter expenses based on user selection
+            val filteredExportExpenses = remember(
+                expenses,
+                exportPeriodIndex,
+                exportRangeStart,
+                exportRangeEnd,
+                selectedExportCategoryId,
+                selectedExportMemberId
+            ) {
+                expenses.filter { exp ->
+                    val matchesPeriod = when (exportPeriodIndex) {
+                        0 -> {
+                            val cal = Calendar.getInstance()
+                            val curYear = cal.get(Calendar.YEAR)
+                            val curMonth = cal.get(Calendar.MONTH)
+                            val expCal = Calendar.getInstance().apply { timeInMillis = exp.timestamp }
+                            expCal.get(Calendar.YEAR) == curYear && expCal.get(Calendar.MONTH) == curMonth
+                        }
+                        1 -> {
+                            val cal = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
+                            val prevYear = cal.get(Calendar.YEAR)
+                            val prevMonth = cal.get(Calendar.MONTH)
+                            val expCal = Calendar.getInstance().apply { timeInMillis = exp.timestamp }
+                            expCal.get(Calendar.YEAR) == prevYear && expCal.get(Calendar.MONTH) == prevMonth
+                        }
+                        2 -> exp.timestamp in exportRangeStart..exportRangeEnd
+                        else -> true
+                    }
+                    val matchesCategory = selectedExportCategoryId == null || exp.categoryId == selectedExportCategoryId
+                    val matchesMember = selectedExportMemberId == null ||
+                            exp.payerMemberId == selectedExportMemberId ||
+                            exp.memberIdsCsv.split(",").mapNotNull { it.trim().toLongOrNull() }.contains(selectedExportMemberId)
+
+                    matchesPeriod && matchesCategory && matchesMember
+                }
+            }
+
+            val exportPeriodTitle = when (exportPeriodIndex) {
+                0 -> if (isGreek) "Τρέχων Μήνας" else "Current Month"
+                1 -> if (isGreek) "Προηγούμενος Μήνας" else "Previous Month"
+                2 -> "${dateSdf.format(exportRangeStart)} - ${dateSdf.format(exportRangeEnd)}"
+                else -> if (isGreek) "Όλα τα Έξοδα" else "All Expenses"
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("analytics_export_data_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    // Header Row: Title + Pro Badge
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Emerald700.copy(alpha = 0.12f),
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.TableChart,
+                                        contentDescription = null,
+                                        tint = Emerald700,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = if (isGreek) "Εξαγωγή δεδομένων" else "Data Export",
+                                fontSize = 15.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            // Discreet Pro Badge
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFF59E0B).copy(alpha = 0.16f),
+                                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = "Pro",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFFD97706),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = if (isGreek) "${filteredExportExpenses.size} έξοδα" else "${filteredExportExpenses.size} items",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Minimal Period Chips Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            if (isGreek) "Τρέχων" else "Current",
+                            if (isGreek) "Προηγ." else "Prev",
+                            if (isGreek) "Διάστημα" else "Range",
+                            if (isGreek) "Όλα" else "All"
+                        ).forEachIndexed { idx, label ->
+                            val isSel = exportPeriodIndex == idx
+                            Surface(
+                                shape = RoundedCornerShape(9.dp),
+                                color = if (isSel) Emerald700 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                border = BorderStroke(1.dp, if (isSel) Emerald700 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { exportPeriodIndex = idx }
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.5.sp,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSel) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 7.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // Optional Custom Range Pickers
+                    if (exportPeriodIndex == 2) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        val cal = Calendar.getInstance().apply { timeInMillis = exportRangeStart }
+                                        DatePickerDialog(
+                                            context,
+                                            { _, y, m, d ->
+                                                val newCal = Calendar.getInstance().apply {
+                                                    set(y, m, d, 0, 0, 0)
+                                                    set(Calendar.MILLISECOND, 0)
+                                                }
+                                                exportRangeStart = newCal.timeInMillis
+                                            },
+                                            cal.get(Calendar.YEAR),
+                                            cal.get(Calendar.MONTH),
+                                            cal.get(Calendar.DAY_OF_MONTH)
+                                        ).show()
+                                    }
+                            ) {
+                                Text(
+                                    text = (if (isGreek) "Από: " else "From: ") + dateSdf.format(exportRangeStart),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Emerald700,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        val cal = Calendar.getInstance().apply { timeInMillis = exportRangeEnd }
+                                        DatePickerDialog(
+                                            context,
+                                            { _, y, m, d ->
+                                                val newCal = Calendar.getInstance().apply {
+                                                    set(y, m, d, 23, 59, 59)
+                                                    set(Calendar.MILLISECOND, 999)
+                                                }
+                                                exportRangeEnd = newCal.timeInMillis
+                                            },
+                                            cal.get(Calendar.YEAR),
+                                            cal.get(Calendar.MONTH),
+                                            cal.get(Calendar.DAY_OF_MONTH)
+                                        ).show()
+                                    }
+                            ) {
+                                Text(
+                                    text = (if (isGreek) "Έως: " else "To: ") + dateSdf.format(exportRangeEnd),
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Emerald700,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Minimal Filter Selectors (Category + Member)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Category Filter Dropdown
+                        Box(modifier = Modifier.weight(1f)) {
+                            val catName = categories.find { it.id == selectedExportCategoryId }?.let {
+                                Localization.translateCategory(it.name, lang)
+                            } ?: if (isGreek) "Όλες οι κατηγορίες" else "All categories"
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showCategoryDropdown = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = catName,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showCategoryDropdown,
+                                onDismissRequest = { showCategoryDropdown = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (isGreek) "Όλες οι κατηγορίες" else "All categories", fontSize = 12.sp) },
+                                    onClick = {
+                                        selectedExportCategoryId = null
+                                        showCategoryDropdown = false
+                                    }
+                                )
+                                categories.forEach { cat ->
+                                    DropdownMenuItem(
+                                        text = { Text(Localization.translateCategory(cat.name, lang), fontSize = 12.sp) },
+                                        onClick = {
+                                            selectedExportCategoryId = cat.id
+                                            showCategoryDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Member Filter Dropdown
+                        Box(modifier = Modifier.weight(1f)) {
+                            val memName = members.find { it.id == selectedExportMemberId }?.name
+                                ?: if (isGreek) "Όλα τα μέλη" else "All members"
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showMemberDropdown = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = memName,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showMemberDropdown,
+                                onDismissRequest = { showMemberDropdown = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (isGreek) "Όλα τα μέλη" else "All members", fontSize = 12.sp) },
+                                    onClick = {
+                                        selectedExportMemberId = null
+                                        showMemberDropdown = false
+                                    }
+                                )
+                                members.forEach { mem ->
+                                    DropdownMenuItem(
+                                        text = { Text(mem.name, fontSize = 12.sp) },
+                                        onClick = {
+                                            selectedExportMemberId = mem.id
+                                            showMemberDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Export Action Buttons (.pdf & .csv)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // PDF Button
+                        Button(
+                            onClick = {
+                                if (!isPro) {
+                                    onShowPremiumPaywall("export_report")
+                                } else {
+                                    val targetList = if (filteredExportExpenses.isNotEmpty()) filteredExportExpenses else expenses
+                                    val targetTitle = if (filteredExportExpenses.isNotEmpty()) exportPeriodTitle else (if (isGreek) "Όλα τα Έξοδα" else "All Expenses")
+                                    if (targetList.isEmpty()) {
+                                        Toast.makeText(context, if (isGreek) "Δεν υπάρχουν καταχωρημένα έξοδα προς εξαγωγή" else "No expenses to export", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, if (isGreek) "Δημιουργία και κοινοποίηση PDF..." else "Generating and sharing PDF...", Toast.LENGTH_SHORT).show()
+                                        ExpenseReportExporter.exportPdf(context, targetList, targetTitle)
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626), contentColor = Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .testTag("export_pdf_button")
+                        ) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = ".pdf",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White.copy(alpha = 0.85f))
+                        }
+
+                        // CSV Button
+                        Button(
+                            onClick = {
+                                if (!isPro) {
+                                    onShowPremiumPaywall("export_report")
+                                } else {
+                                    val targetList = if (filteredExportExpenses.isNotEmpty()) filteredExportExpenses else expenses
+                                    val targetTitle = if (filteredExportExpenses.isNotEmpty()) exportPeriodTitle else (if (isGreek) "Όλα τα Έξοδα" else "All Expenses")
+                                    if (targetList.isEmpty()) {
+                                        Toast.makeText(context, if (isGreek) "Δεν υπάρχουν καταχωρημένα έξοδα προς εξαγωγή" else "No expenses to export", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, if (isGreek) "Δημιουργία και κοινοποίηση CSV..." else "Generating and sharing CSV...", Toast.LENGTH_SHORT).show()
+                                        ExpenseReportExporter.exportCsv(context, targetList, targetTitle)
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald700, contentColor = Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .testTag("export_csv_button")
+                        ) {
+                            Icon(Icons.Default.TableChart, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = ".csv",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White.copy(alpha = 0.85f))
                         }
                     }
                 }

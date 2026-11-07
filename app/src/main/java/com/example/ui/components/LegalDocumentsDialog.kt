@@ -64,17 +64,17 @@ import com.example.util.Localization
 
 @Composable
 fun LegalDocumentsDialog(
-    initialTab: String = "PRIVACY", // "PRIVACY" or "TERMS"
+    initialTab: String = "TERMS", // "TERMS" or "PRIVACY"
     appLanguage: String = "EL",
     onDismiss: () -> Unit
 ) {
     val lang = Localization.Language.fromCode(appLanguage)
     val context = LocalContext.current
-    var selectedTab by remember { mutableStateOf(if (initialTab == "TERMS") 1 else 0) }
+    var selectedTab by remember { mutableStateOf(if (initialTab == "PRIVACY") 1 else 0) }
 
     val privacyCloudUrl = "https://oikonomos-af58b.web.app/privacy-policy.html"
     val termsCloudUrl = "https://oikonomos-af58b.web.app/terms-of-service.html"
-    val currentCloudUrl = if (selectedTab == 0) privacyCloudUrl else termsCloudUrl
+    val currentCloudUrl = if (selectedTab == 0) termsCloudUrl else privacyCloudUrl
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -113,7 +113,7 @@ fun LegalDocumentsDialog(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = if (selectedTab == 0) Icons.Default.Security else Icons.Default.Description,
+                                    imageVector = if (selectedTab == 0) Icons.Default.Description else Icons.Default.Security,
                                     contentDescription = null,
                                     tint = Emerald700,
                                     modifier = Modifier.size(20.dp)
@@ -124,9 +124,9 @@ fun LegalDocumentsDialog(
                         Column {
                             Text(
                                 text = if (selectedTab == 0) {
-                                    if (lang == Localization.Language.ENGLISH) "Privacy Policy" else "Πολιτική Απορρήτου"
-                                } else {
                                     if (lang == Localization.Language.ENGLISH) "Terms & Conditions" else "Όροι & Προϋποθέσεις"
+                                } else {
+                                    if (lang == Localization.Language.ENGLISH) "Privacy Policy" else "Πολιτική Απορρήτου"
                                 },
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
@@ -164,7 +164,7 @@ fun LegalDocumentsDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Tabs: Privacy Policy / Terms of Service
+                // Tabs: Terms of Service / Privacy Policy
                 TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
@@ -184,7 +184,7 @@ fun LegalDocumentsDialog(
                         onClick = { selectedTab = 0 },
                         text = {
                             Text(
-                                text = if (lang == Localization.Language.ENGLISH) "Privacy Policy" else "Πολιτική Απορρήτου",
+                                text = if (lang == Localization.Language.ENGLISH) "Terms of Service" else "Όροι Χρήσης",
                                 fontSize = 12.5.sp,
                                 fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
                                 color = if (selectedTab == 0) Emerald700 else MaterialTheme.colorScheme.onSurfaceVariant
@@ -196,7 +196,7 @@ fun LegalDocumentsDialog(
                         onClick = { selectedTab = 1 },
                         text = {
                             Text(
-                                text = if (lang == Localization.Language.ENGLISH) "Terms of Service" else "Όροι Χρήσης",
+                                text = if (lang == Localization.Language.ENGLISH) "Privacy Policy" else "Πολιτική Απορρήτου",
                                 fontSize = 12.5.sp,
                                 fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
                                 color = if (selectedTab == 1) Emerald700 else MaterialTheme.colorScheme.onSurfaceVariant
@@ -204,10 +204,6 @@ fun LegalDocumentsDialog(
                         }
                     )
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Spacer(modifier = Modifier.height(10.dp))
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -221,11 +217,11 @@ fun LegalDocumentsDialog(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     if (selectedTab == 0) {
-                        // Privacy Policy
-                        PrivacyPolicyText(lang = lang)
-                    } else {
                         // Terms of Service
                         TermsOfServiceText(lang = lang)
+                    } else {
+                        // Privacy Policy
+                        PrivacyPolicyText(lang = lang)
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))

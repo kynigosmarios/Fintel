@@ -94,6 +94,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -154,7 +157,7 @@ enum class AppTab(val title: String) {
 @Composable
 fun MainScreen(
     viewModel: OikoNomosViewModel,
-    onLaunchBilling: (android.app.Activity) -> Boolean = { false }
+    onLaunchBilling: (android.app.Activity, String) -> Boolean = { _, _ -> false }
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -231,6 +234,7 @@ fun MainScreen(
     val showPrivacyConsentDialog by viewModel.showPrivacyConsentDialog.collectAsStateWithLifecycle()
     val notificationConsentCompleted by viewModel.notificationConsentCompleted.collectAsStateWithLifecycle()
     val bankAutoCatcherEnabled by viewModel.bankAutoCatcherEnabled.collectAsStateWithLifecycle()
+    val isUserPro = userProfile?.isPremium == true || currentHousehold?.isPremium == true || viewModel.isCurrentUserPro()
 
     val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
 
@@ -262,8 +266,17 @@ fun MainScreen(
         )
     }
 
-    DisposableEffect(Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+                speechHelper.cancelListening()
+                viewModel.dismissVoiceInputDialog()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
             speechHelper.cancelListening()
         }
     }
@@ -553,6 +566,8 @@ fun MainScreen(
                         categories = categories,
                         members = members,
                         appLanguage = appLanguage,
+                        isPro = isUserPro,
+                        onShowPremiumPaywall = { viewModel.showPremiumPaywall(it) },
                         onExportReport = { viewModel.openExportReportDialog() },
                         onManageCategories = { currentTab = 3 }
                     )
@@ -745,8 +760,6 @@ fun MainScreen(
         )
     }
 
-    val isUserPro = viewModel.isCurrentUserPro()
-
     // Exodologio Details Dialog (Rename, Members, Switch, Clear)
     if (showExodologioDetailsDialog) {
         ExodologioDetailsDialog(
@@ -791,9 +804,9 @@ fun MainScreen(
         PremiumPaywallDialog(
             reason = premiumPaywallReason!!,
             appLanguage = appLanguage,
-            onUnlockPro = {
+            onUnlockPro = { planId ->
                 val act = context as? android.app.Activity
-                val launched = if (act != null) onLaunchBilling(act) else false
+                val launched = if (act != null) onLaunchBilling(act, planId) else false
                 if (!launched) {
                     try {
                         val playIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.aistudio.oikonomos.app")).apply {
@@ -803,7 +816,12 @@ fun MainScreen(
                     } catch (e: Exception) {
                         Log.w("MainScreen", "Could not open Google Play Store: ${e.message}")
                     }
-                    viewModel.unlockPro()
+                    viewModel.showSnackbar(
+                        if (appLanguage == "EN")
+                            "Connecting to Google Play... Please try again in a moment."
+                        else
+                            "Σύνδεση με το Google Play... Παρακαλώ δοκιμάστε ξανά σε λίγο."
+                    )
                 }
             },
             onDismiss = { viewModel.dismissPremiumPaywall() }

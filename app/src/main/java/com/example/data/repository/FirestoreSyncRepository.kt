@@ -141,31 +141,6 @@ class FirestoreSyncRepository(
             }
         }
 
-        // 5. Fallback scan on households collection (limit 150)
-        try {
-            val allHouseholdsSnap = db.collection("households").limit(150).get().await()
-            for (doc in allHouseholdsSnap.documents) {
-                if (foundMap.containsKey(doc.id)) continue
-                if (excludedHouseholdIds.contains(doc.id)) continue
-                val deletedFor = (doc.get("deletedForUsers") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
-                if (uid.isNotBlank() && deletedFor.contains(uid)) continue
-
-                val owner = doc.getString("ownerId") ?: ""
-                val members = (doc.get("memberUids") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
-
-                val isOwner = uid.isNotBlank() && owner == uid
-                val isMember = uid.isNotBlank() && members.contains(uid)
-
-                if (isOwner || isMember) {
-                    parseAndAccept(doc)?.let { h ->
-                        foundMap[h.id] = h
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "getAllUserHouseholds scan fallback warning: ${e.message}")
-        }
-
         // Special Marios handling
         if (isMariosAccount) {
             val defaultHid = FirestoreDataSeed.DEFAULT_HOUSEHOLD_ID

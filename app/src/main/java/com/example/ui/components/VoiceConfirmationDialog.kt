@@ -966,10 +966,6 @@ fun VoiceConfirmationDialog(
                     Button(
                         onClick = {
                             val parsedAmount = amountText.toDoubleOrNull()
-                            if (titleText.isBlank()) {
-                                errorText = Localization.fillDescriptionError(lang)
-                                return@Button
-                            }
                             if (parsedAmount == null || parsedAmount <= 0) {
                                 errorText = Localization.fillAmountError(lang)
                                 return@Button

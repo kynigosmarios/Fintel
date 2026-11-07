@@ -92,127 +92,57 @@ fun CategoriesScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Categories Header Card (Spacious, balanced, beautiful)
+        // Categories Header Card
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            shape = RoundedCornerShape(22.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            shape = RoundedCornerShape(18.dp),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-            tonalElevation = 2.dp
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+            tonalElevation = 1.dp
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Top Row: Header Info & Action Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f, fill = false)) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isDark) Color(0xFF064E3B) else Color(0xFFD1FAE5),
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        ) {
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH) "BUDGET CATEGORIES" else "ΚΑΤΗΓΟΡΙΕΣ ΕΞΟΔΩΝ",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isDark) Color(0xFF34D399) else Color(0xFF047857),
-                                letterSpacing = 0.5.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                        Text(
-                            text = Localization.categoriesCount(categories.size, lang),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.onSurface
+                Text(
+                    text = if (isGreek) "Κατηγορίες εξόδων" else "Expense Categories",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (canManage) {
+                    Button(
+                        onClick = onAddCategory,
+                        modifier = Modifier
+                            .height(38.dp)
+                            .testTag("add_category_button"),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Emerald700,
+                            contentColor = Color.White
                         )
-                    }
-
-                    if (canManage) {
-                        // Action buttons: Defaults pill + Add Category pill
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Seed standard categories button (Soft Pill)
-                            if (categories.size < 5) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (isDark) Color(0xFF064E3B).copy(alpha = 0.6f) else Color(0xFFD1FAE5).copy(alpha = 0.7f),
-                                    border = BorderStroke(1.dp, if (isDark) Color(0xFF059669) else Color(0xFF10B981).copy(alpha = 0.5f)),
-                                    modifier = Modifier.clickable { onSeedStandardCategories() }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Refresh,
-                                            contentDescription = null,
-                                            tint = if (isDark) Color(0xFF34D399) else Color(0xFF047857),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = if (lang == Localization.Language.ENGLISH) "Defaults" else "Έτοιμες",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isDark) Color(0xFF34D399) else Color(0xFF047857)
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Primary Add Category Button (Modern Pill)
-                            Button(
-                                onClick = onAddCategory,
-                                modifier = Modifier
-                                    .height(38.dp)
-                                    .testTag("add_category_button"),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Emerald700,
-                                    contentColor = Color.White
-                                ),
-                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 1.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (lang == Localization.Language.ENGLISH) "Add" else "Προσθήκη",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                        ) {
-                            Text(
-                                text = if (lang == Localization.Language.ENGLISH) "View Only" else "Προβολή Μόνο",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
-                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isGreek) "Προσθήκη" else "Add",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
                 }
             }

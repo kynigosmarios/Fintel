@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val viewModel: OikoNomosViewModel by viewModels()
+    private lateinit var billingManager: com.example.billing.BillingManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +45,18 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
+            billingManager = com.example.billing.BillingManager(this) { isActivated ->
+                if (isActivated) {
+                    viewModel.unlockPro()
+                }
+            }
+            billingManager.startConnection()
+        } catch (e: Exception) {
+            Log.w("MainActivity", "BillingManager init error: ${e.message}")
+        }
+
+        try {
+            com.example.util.BankNotificationHolder.init(this)
             com.example.util.BankNotificationSystemManager.init(this)
             com.example.util.BankNotificationHolder.onTransactionRemoved = { id ->
                 com.example.util.BankNotificationSystemManager.cancelNotification(this, id)
@@ -70,9 +83,29 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppRootNavigator(viewModel = viewModel)
+                    AppRootNavigator(
+                        viewModel = viewModel,
+                        onLaunchBilling = { act, planId ->
+                            if (::billingManager.isInitialized) {
+                                billingManager.launchPurchaseFlow(act, planId)
+                            } else {
+                                false
+                            }
+                        }
+                    )
                 }
             }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            if (::billingManager.isInitialized) {
+                billingManager.endConnection()
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "BillingManager endConnection: ${e.message}")
         }
     }
 
@@ -107,10 +140,9 @@ class MainActivity : ComponentActivity() {
 
             val bankTxId = intent.getStringExtra("EXTRA_BANK_TX_ID")
             if (!bankTxId.isNullOrBlank()) {
-                val pending = com.example.util.BankNotificationHolder.pendingTransactions.value.find { it.id == bankTxId }
-                if (pending != null) {
-                    viewModel.confirmBankTransaction(pending)
-                }
+                // User opened app by tapping notification. Do not auto-confirm;
+                // Keep the pending transaction in BankNotificationHolder so the banner card stack displays it.
+                Log.d("MainActivity", "User opened app from bank transaction notification: $bankTxId")
             }
         } catch (e: Exception) {
             Log.w("MainActivity", "Error parsing intent: ${e.message}")
@@ -126,7 +158,10 @@ private enum class RootScreen {
 }
 
 @Composable
-fun AppRootNavigator(viewModel: OikoNomosViewModel) {
+fun AppRootNavigator(
+    viewModel: OikoNomosViewModel,
+    onLaunchBilling: (android.app.Activity, String) -> Boolean = { _, _ -> false }
+) {
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isUserVerified by viewModel.isUserVerifiedState.collectAsStateWithLifecycle()
     val isAuthInitialized by viewModel.isAuthInitialized.collectAsStateWithLifecycle()
@@ -162,7 +197,10 @@ fun AppRootNavigator(viewModel: OikoNomosViewModel) {
                 } ?: AuthScreen(viewModel = viewModel)
             }
             RootScreen.MAIN -> {
-                MainScreen(viewModel = viewModel)
+                MainScreen(
+                    viewModel = viewModel,
+                    onLaunchBilling = onLaunchBilling
+                )
             }
         }
     }

@@ -1,7 +1,11 @@
 package com.example.util
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -34,6 +38,22 @@ object ExpenseReportExporter {
         val totalStr = String.format(Locale.US, "%.2f", totalAmount)
         sb.append("ΣΥΝΟΛΟ,,,,$totalStr\n")
         return sb.toString()
+    }
+
+    fun exportCsv(context: Context, expenses: List<Expense>, periodTitle: String = "Όλα τα Έξοδα") {
+        try {
+            val exportDir = File(context.cacheDir, "exports").apply { mkdirs() }
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val file = File(exportDir, "Fintel_Exoda_${timeStamp}.csv")
+            val csvContent = generateCsv(expenses, periodTitle)
+            file.writeBytes(csvContent.toByteArray(Charsets.UTF_8))
+            shareFile(context, file, "text/csv", "Αναφορά Εξόδων Fintel (CSV) - $periodTitle")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error exporting CSV: ${e.message}", e)
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "Σφάλμα εξαγωγής CSV: ${e.localizedMessage ?: "άγνωστο"}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     fun exportExcel(context: Context, expenses: List<Expense>, periodTitle: String = "Όλα τα Έξοδα") {
@@ -169,27 +189,40 @@ object ExpenseReportExporter {
             fos.close()
             pdfDocument.close()
 
-            shareFile(context, file, "application/pdf", "Αναφορά Εξόδων Fintel (PDF) - $periodTitle")
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                shareFile(context, file, "application/pdf", "Αναφορά Εξόδων Fintel (PDF) - $periodTitle")
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error exporting PDF: \${e.message}", e)
+            Log.e(TAG, "Error exporting PDF: ${e.message}", e)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(context, "Σφάλμα κατά τη δημιουργία PDF: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 
     private fun shareFile(context: Context, file: File, mimeType: String, title: String) {
-        val uri: Uri = FileProvider.getUriForFile(
-            context,
-            "\${context.packageName}.fileprovider",
-            file
-        )
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = mimeType
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, title)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        try {
+            val uri: Uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, title)
+                clipData = android.content.ClipData.newRawUri(title, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(intent, title).apply {
+                clipData = android.content.ClipData.newRawUri(title, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sharing file: ${e.message}", e)
+            android.widget.Toast.makeText(context, "Σφάλμα κοινοποίησης αρχείου: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
         }
-        val chooser = Intent.createChooser(intent, title).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(chooser)
     }
 }

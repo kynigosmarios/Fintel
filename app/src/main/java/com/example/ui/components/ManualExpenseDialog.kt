@@ -1,5 +1,18 @@
 package com.example.ui.components
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -69,6 +82,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.example.data.entity.Expense
 import com.example.data.entity.ExpenseCategory
 import com.example.data.entity.FamilyMember
@@ -77,6 +97,15 @@ import com.example.ui.theme.Amber700
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald700
 import com.example.util.Localization
+import com.example.util.ReceiptParser
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -197,6 +226,109 @@ fun ManualExpenseDialog(
     }
     var showDatePicker by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var showCameraChooserDialog by remember { mutableStateOf(false) }
+    var isScanningReceipt by remember { mutableStateOf(false) }
+
+    fun processReceiptBitmap(bitmap: Bitmap) {
+        isScanningReceipt = true
+        coroutineScope.launch {
+            try {
+                val inputImage = InputImage.fromBitmap(bitmap, 0)
+                // 1. Try QR first for AADE
+                val barcodeScanner = BarcodeScanning.getClient()
+                val barcodes = withContext(Dispatchers.IO) {
+                    try {
+                        barcodeScanner.process(inputImage).await()
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
+                }
+                val aadeQr = barcodes.firstOrNull { it.rawValue?.isNotBlank() == true }?.rawValue
+                if (!aadeQr.isNullOrBlank()) {
+                    val result = ReceiptParser.parseAadeQr(aadeQr, categories)
+                    if (result.amount > 0.0) {
+                        if (result.title.isNotBlank()) title = result.title
+                        amountText = String.format(Locale.US, "%.2f", result.amount)
+                        if (result.timestamp > 0) selectedTimestamp = result.timestamp
+                        val matched = categories.find { it.name.equals(result.suggestedCategoryName, ignoreCase = true) }
+                        if (matched != null) selectedCategoryId = matched.id
+                        Toast.makeText(context, if (lang == Localization.Language.ENGLISH) "Receipt scanned: ${result.title}" else "Αναγνωρίστηκε: ${result.title} (${String.format(Locale.US, "%.2f€", result.amount)})", Toast.LENGTH_SHORT).show()
+                        isScanningReceipt = false
+                        return@launch
+                    }
+                }
+
+                // 2. OCR Text Recognition
+                val textRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                val visionText = withContext(Dispatchers.IO) {
+                    textRecognizer.process(inputImage).await()
+                }
+                val result = ReceiptParser.parseOcrText(visionText.text, categories)
+                if (result.title.isNotBlank()) title = result.title
+                if (result.amount > 0.0) amountText = String.format(Locale.US, "%.2f", result.amount)
+                if (result.timestamp > 0) selectedTimestamp = result.timestamp
+                val matched = categories.find { it.name.equals(result.suggestedCategoryName, ignoreCase = true) }
+                if (matched != null) selectedCategoryId = matched.id
+
+                val msg = if (result.title.isNotBlank() || result.amount > 0.0) {
+                    if (lang == Localization.Language.ENGLISH)
+                        "Receipt scanned: ${if (result.title.isNotBlank()) result.title else "Receipt"} (${if (result.amount > 0.0) String.format(Locale.US, "%.2f€", result.amount) else ""})"
+                    else
+                        "Αναγνωρίστηκε: ${if (result.title.isNotBlank()) result.title else "Απόδειξη"} (${if (result.amount > 0.0) String.format(Locale.US, "%.2f€", result.amount) else ""})"
+                } else {
+                    if (lang == Localization.Language.ENGLISH) "Could not detect receipt details" else "Δεν εντοπίστηκαν στοιχεία στην απόδειξη"
+                }
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Log.e("ManualExpenseDialog", "Error parsing receipt: ${e.message}", e)
+                Toast.makeText(context, if (lang == Localization.Language.ENGLISH) "Receipt scan failed" else "Σφάλμα ανάγνωσης απόδειξης", Toast.LENGTH_SHORT).show()
+            } finally {
+                isScanningReceipt = false
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bmp: Bitmap? ->
+        if (bmp != null) {
+            processReceiptBitmap(bmp)
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            cameraLauncher.launch(null)
+        } else {
+            Toast.makeText(context, if (lang == Localization.Language.ENGLISH) "Camera permission is required" else "Απαιτείται άδεια κάμερας", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val bmp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val src = ImageDecoder.createSource(context.contentResolver, uri)
+                    ImageDecoder.decodeBitmap(src) { decoder, _, _ ->
+                        decoder.isMutableRequired = true
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+                processReceiptBitmap(bmp)
+            } catch (e: Exception) {
+                Log.e("ManualExpenseDialog", "Failed to load picked image: ${e.message}", e)
+            }
+        }
+    }
+
     var isAllFamily by remember(expenseToEdit) {
         val hasSpecific = expenseToEdit != null && (
             expenseToEdit.splitType == "SPECIFIC_MEMBERS" ||
@@ -298,6 +430,102 @@ fun ManualExpenseDialog(
         }
     }
 
+    if (showCameraChooserDialog) {
+        AlertDialog(
+            onDismissRequest = { showCameraChooserDialog = false },
+            title = {
+                Text(
+                    text = if (lang == Localization.Language.ENGLISH) "Scan Receipt" else "Σάρωση Απόδειξης",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = if (lang == Localization.Language.ENGLISH) "Choose how to scan your receipt:" else "Επιλέξτε τρόπο καταχώρησης απόδειξης:",
+                        fontSize = 13.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Option 1: Κάμερα
+                    Button(
+                        onClick = {
+                            showCameraChooserDialog = false
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                cameraLauncher.launch(null)
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald700),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                            .testTag("choose_camera_button")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "Camera" else "Κάμερα",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+
+                    // Option 2: Συλλογή
+                    Button(
+                        onClick = {
+                            showCameraChooserDialog = false
+                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                            .testTag("choose_gallery_button")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp), tint = Emerald700)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (lang == Localization.Language.ENGLISH) "Gallery" else "Συλλογή",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showCameraChooserDialog = false }) {
+                    Text(Localization.cancel(lang), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -317,7 +545,7 @@ fun ManualExpenseDialog(
                     .fillMaxSize()
                     .padding(20.dp)
             ) {
-                // 1. Fixed Header (Title + Close Button)
+                // 1. Fixed Header (Title + Camera Button + Close Button)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -329,19 +557,49 @@ fun ManualExpenseDialog(
                         fontWeight = FontWeight.Bold,
                         color = Emerald700
                     )
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clickable { onDismiss() }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = Localization.close(lang),
-                                modifier = Modifier.size(18.dp)
-                            )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Emerald100,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clickable { showCameraChooserDialog = true }
+                                .testTag("receipt_scan_header_button")
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (isScanningReceipt) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Emerald700
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Σάρωση Απόδειξης",
+                                        tint = Emerald700,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clickable { onDismiss() }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = Localization.close(lang),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }

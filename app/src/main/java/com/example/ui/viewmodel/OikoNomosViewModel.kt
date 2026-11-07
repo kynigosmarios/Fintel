@@ -454,6 +454,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun loadUserProfileAndHousehold(user: FirebaseUser) {
         val email = user.email.orEmpty().trim()
         val isMarios = isMariosUser(user, email, user.uid)
+        refreshMonthlyVoiceUsage()
 
         // Ensure base data and households exist in Firebase Firestore
         if (isMarios) {
@@ -2482,9 +2483,7 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     val isAuthLoading = _isAuthLoading.asStateFlow()
 
     fun isUserVerified(user: FirebaseUser?): Boolean {
-        if (user == null) return false
-        val isGoogleUser = user.providerData.any { it.providerId == "google.com" }
-        return isGoogleUser || user.isEmailVerified
+        return user != null
     }
 
     fun checkEmailVerification(onResult: (Boolean) -> Unit) {
@@ -3112,8 +3111,15 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     private val _showReceiptScanDialog = MutableStateFlow(false)
     val showReceiptScanDialog = _showReceiptScanDialog.asStateFlow()
 
-    private fun getMonthlyVoiceUsageKey(): String =
-        "voice_usage_" + SimpleDateFormat("yyyy_MM", Locale.ROOT).format(Date())
+    private fun getMonthlyVoiceUsageKey(): String {
+        val uid = _currentUser.value?.uid ?: auth.currentUser?.uid ?: "guest"
+        val monthKey = SimpleDateFormat("yyyy_MM", Locale.ROOT).format(Date())
+        return "voice_usage_${uid}_${monthKey}"
+    }
+
+    fun refreshMonthlyVoiceUsage() {
+        _monthlyVoiceUsage.value = prefs.getInt(getMonthlyVoiceUsageKey(), 0)
+    }
 
     private val _monthlyVoiceUsage = MutableStateFlow(prefs.getInt(getMonthlyVoiceUsageKey(), 0))
     val monthlyVoiceUsage = _monthlyVoiceUsage.asStateFlow()
@@ -3147,28 +3153,52 @@ class OikoNomosViewModel(application: Application) : AndroidViewModel(applicatio
     fun confirmBankTransaction(tx: PendingBankTransaction) {
         val user = _currentUser.value
         val targetHouseholdId = getOrEnsureHouseholdId(user)
-        val defaultCat = allCategories.value.firstOrNull {
-            it.name.contains("Σούπερ", ignoreCase = true) || it.name.contains("Super", ignoreCase = true)
-        } ?: allCategories.value.firstOrNull() ?: ExpenseCategory(id = 1L, name = "Γενικά", iconKey = "other", colorHex = 0xFF4CAF50)
+        
+        // Requirement 5: Recognize merchant/brand and categorize accordingly. If cannot categorize, leave description blank.
+        val matchedCat = com.example.util.BankNotificationParser.categorizeMerchant(
+            merchant = tx.merchantName,
+            rawText = tx.rawText,
+            categories = allCategories.value
+        )
 
         val defaultMember = allMembers.value.firstOrNull()
 
-        val prefilledExpense = Expense(
-            id = 0L,
-            title = tx.merchantName,
-            amount = tx.amount,
-            categoryId = defaultCat.id,
-            categoryName = defaultCat.name,
-            timestamp = tx.timestamp,
-            splitType = "ALL_FAMILY",
-            memberIdsCsv = "",
-            memberNamesDisplay = "Κοινό Οικογένειας",
-            note = "Από ${tx.bankName}",
-            payerMemberId = defaultMember?.id ?: 0L,
-            payerMemberName = defaultMember?.name ?: "Οικογένεια",
-            payerMemberIdsCsv = if (defaultMember != null) "${defaultMember.id}" else "",
-            payerAmountsCsv = ""
-        )
+        val prefilledExpense = if (matchedCat != null) {
+            Expense(
+                id = 0L,
+                title = tx.merchantName,
+                amount = tx.amount,
+                categoryId = matchedCat.id,
+                categoryName = matchedCat.name,
+                timestamp = tx.timestamp,
+                splitType = "ALL_FAMILY",
+                memberIdsCsv = "",
+                memberNamesDisplay = "Κοινό Οικογένειας",
+                note = "Από ${tx.bankName}",
+                payerMemberId = defaultMember?.id ?: 0L,
+                payerMemberName = defaultMember?.name ?: "Οικογένεια",
+                payerMemberIdsCsv = if (defaultMember != null) "${defaultMember.id}" else "",
+                payerAmountsCsv = ""
+            )
+        } else {
+            // Unrecognized/uncategorized -> description field is left blank ("") as requested
+            Expense(
+                id = 0L,
+                title = "",
+                amount = tx.amount,
+                categoryId = 0L,
+                categoryName = "",
+                timestamp = tx.timestamp,
+                splitType = "ALL_FAMILY",
+                memberIdsCsv = "",
+                memberNamesDisplay = "Κοινό Οικογένειας",
+                note = "Από ${tx.bankName}",
+                payerMemberId = defaultMember?.id ?: 0L,
+                payerMemberName = defaultMember?.name ?: "Οικογένεια",
+                payerMemberIdsCsv = if (defaultMember != null) "${defaultMember.id}" else "",
+                payerAmountsCsv = ""
+            )
+        }
 
         // Remove from pending bank notifications & cancel system notification
         BankNotificationHolder.removeTransaction(tx.id)
